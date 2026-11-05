@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Florian HQ</title>
+<meta name="description" content="Florian HQ – Neues, Dienstpläne, Veranstaltungen, Reservierungen und Übungsdoku für die Wehr.">
+<meta name="theme-color" content="#17131A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Florian HQ">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=IBM+Plex+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<!-- Anmeldung -->
+<div class="gate" id="gate-auth" hidden>
+  <div class="gate-card">
+    <div class="hero">
+<img class="crest" src="icons/wappen-nonnenhorn.svg" alt="Wappen der Gemeinde Nonnenhorn" width="72" height="73">
+      <div>
+        <div class="callsign">Florian Nonnenhorn · bitte kommen</div>
+        <h1>Florian <span>HQ</span></h1>
+      </div>
+      <p class="tag">Dienste, Feste, Fahrzeuge und Doku. Alles für die Wache an einem Ort.</p>
+    </div>
+    <form class="gate-form" id="auth-form" novalidate>
+      <div class="seg" id="auth-seg">
+        <button type="button" data-mode="login" aria-pressed="true">Anmelden</button>
+        <button type="button" data-mode="signup" aria-pressed="false">Registrieren</button>
+      </div>
+      <label for="auth-name" id="auth-name-wrap" hidden>Dein Name<input id="auth-name" autocomplete="name" maxlength="60" placeholder="Vor- und Nachname"></label>
+      <label for="auth-email" id="auth-email-wrap">E-Mail<input id="auth-email" type="email" autocomplete="email" required></label>
+      <label for="auth-pass" id="auth-pass-wrap">Passwort<input id="auth-pass" type="password" autocomplete="current-password" minlength="6" required></label>
+      <button class="btn primary" id="auth-submit" type="submit">Anmelden</button>
+      <button class="linkbtn" type="button" id="auth-forgot">Passwort vergessen?</button>
+      <p class="err" id="auth-err" hidden></p>
+      <p class="ok-msg" id="auth-ok" hidden></p>
+    </form>
+  </div>
+</div>
+
+<!-- Warten auf Freigabe -->
+<div class="gate" id="gate-pending" hidden>
+  <div class="gate-card">
+    <div class="hero">
+<img class="crest" src="icons/wappen-nonnenhorn.svg" alt="Wappen der Gemeinde Nonnenhorn" width="72" height="73">
+      <div>
+        <div class="callsign">Funkverbindung steht</div>
+        <h1>Fast <span>da</span></h1>
+      </div>
+      <p class="tag" id="pending-text">Dein Konto wartet auf Freigabe durch einen Bearbeiter der Wehr. Sobald du freigeschaltet bist, geht es hier automatisch weiter.</p>
+    </div>
+    <div class="form-actions"><button class="btn" data-act="logout">Abmelden</button></div>
+  </div>
+</div>
+
+<!-- App -->
+<div id="app" hidden>
+<header class="top">
+  <div class="wrap">
+    <div class="hero">
+<img class="crest" src="icons/wappen-nonnenhorn.svg" alt="Wappen der Gemeinde Nonnenhorn" width="72" height="73">
+      <div>
+        <div class="callsign">Florian Nonnenhorn · bitte kommen</div>
+        <h1>Florian <span>HQ</span></h1>
+      </div>
+      <div class="hero-side">
+        <p class="tag">Dienste, Feste, Fahrzeuge und Doku. Alles für die Wache an einem Ort.</p>
+        <span class="me-chip"><span><span id="me-name"></span> · <span class="role" id="me-role"></span></span><button data-act="logout">Abmelden</button></span>
+      </div>
+    </div>
+  </div>
+</header>
+<nav class="tabs" aria-label="Bereiche">
+  <div class="wrap" role="tablist" id="tabs">
+    <button class="tab" role="tab" data-view="home">Übersicht</button>
+    <button class="tab" role="tab" data-view="news">Neues</button>
+    <button class="tab" role="tab" data-view="duty-aktive">Dienst Aktive</button>
+    <button class="tab" role="tab" data-view="duty-jugend">Dienst Jugend</button>
+    <button class="tab" role="tab" data-view="events">Veranstaltungen</button>
+    <button class="tab" role="tab" data-view="org">Organigramm</button>
+    <button class="tab" role="tab" data-view="members" id="tab-members" hidden>Mitglieder <span class="badge" id="pending-badge" hidden></span></button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <main>
+    <div id="notice" class="notice" hidden></div>
+
+    <section class="view" id="view-home">
+      <h4 class="group-label" style="margin-top:8px">Wehr aktuell</h4>
+      <div class="tiles" id="tiles-info"></div>
+      <h4 class="group-label">Reservieren &amp; anmelden</h4>
+      <div class="tiles" id="tiles-res"></div>
+      <div id="res-body"></div>
+    </section>
+
+    <section class="view" id="view-page" hidden></section>
+
+    <section class="view" id="view-doc" hidden>
+      <div class="toolbar"><h2>Übungsdoku</h2><button class="btn ghost" data-goto="home">← Zur Übersicht</button></div>
+      <form class="doc-form" id="doc-form">
+        <h3>Anwesenheitsliste hochladen</h3>
+        <label for="doc-title">Übung
+          <input id="doc-title" required maxlength="80" placeholder="z. B. Atemschutz-Übung">
+        </label>
+        <label for="doc-date">Datum
+          <input id="doc-date" type="date" required>
+        </label>
+        <label for="doc-file">Foto der Liste
+          <input id="doc-file" type="file" accept="image/*" required>
+        </label>
+        <label for="doc-note">Notiz
+          <input id="doc-note" maxlength="140" placeholder="optional">
+        </label>
+        <div class="form-actions"><button class="btn primary" id="doc-submit" type="submit">Hochladen</button></div>
+        <p class="err" id="doc-err" hidden></p>
+      </form>
+      <div class="toolbar">
+        <div class="filters" id="doc-filters">
+          <button class="filter" data-f="offen" aria-pressed="true">Muss noch eingepflegt werden</button>
+          <button class="filter" data-f="eingepflegt" aria-pressed="false">Eingepflegt</button>
+          <button class="filter" data-f="alle" aria-pressed="false">Alle</button>
+        </div>
+        <span class="count" id="doc-count"></span>
+      </div>
+      <div id="doc-list"></div>
+    </section>
+  </main>
+</div>
+</div>
+
+<div class="lightbox" id="lightbox" hidden><img id="lightbox-img" alt="Anwesenheitsliste"></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

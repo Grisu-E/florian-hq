@@ -1,0 +1,811 @@
+/* Florian HQ – App-Logik (Supabase) */
+'use strict';
+
+/* ---------- Symbole & Bereiche ---------- */
+const ICONS = {
+  fahrzeuge:'<svg viewBox="0 0 24 24"><path d="M2 17V7h11v10"/><path d="M13 10h4.5l3.5 3.5V17h-2"/><path d="M8 17h7"/><circle cx="6" cy="17.5" r="2"/><circle cx="17" cy="17.5" r="2"/><path d="M5 4h5"/></svg>',
+  material:'<svg viewBox="0 0 24 24"><path d="M9.5 3h5L19 19H5L9.5 3z"/><path d="M7.8 9.5h8.4M6.4 14.5h11.2"/><path d="M3 21h18"/></svg>',
+  eis:'<svg viewBox="0 0 24 24"><path d="M12 2v20M3.3 7l17.4 10M20.7 7 3.3 17"/><path d="m9 3.5 3 2 3-2M9 20.5l3-2 3 2"/></svg>',
+  raum:'<svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M6 21V3h10v18"/><path d="M16 6h2.5v15"/><circle cx="13" cy="12.5" r=".9"/></svg>',
+  fest:'<svg viewBox="0 0 24 24"><path d="M12 3 2 20h20L12 3z"/><path d="M12 3v17"/><path d="M9 20l3-6 3 6"/><path d="M12 3l1.5-1.5"/></svg>',
+  doc:'<svg viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="1.5"/><path d="M9 4V2.5h6V4"/><path d="m8.5 10 1.5 1.5 3-3M8.5 16l1.5 1.5 3-3"/><path d="M15 10.5h1.5M15 16.5h1.5"/></svg>',
+  news:'<svg viewBox="0 0 24 24"><path d="M3 10v4h3l6 4V6L6 10H3z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
+  'duty-aktive':'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M12 13v5M9.5 15.5h5"/></svg>',
+  'duty-jugend':'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></svg>',
+  events:'<svg viewBox="0 0 24 24"><path d="M4 21V4"/><path d="M4 4h13l-2.5 4L17 12H4"/><path d="M9 21h6M12 15v6"/></svg>'
+};
+const CATS = [
+  {k:'fahrzeuge', n:'Fahrzeuge', ph:'z. B. MTW'},
+  {k:'material', n:'Übungsmaterial', ph:'z. B. Übungspuppe'},
+  {k:'raum', n:'Raum', ph:'z. B. Schulungsraum'},
+  {k:'fest', n:'Festzubehör', ph:'z. B. Biertischgarnitur'}
+];
+const DUTY = {'duty-aktive':{g:'aktive',n:'Dienstplan Aktive'}, 'duty-jugend':{g:'jugend',n:'Dienstplan Jugend'}};
+const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'Bearbeiter'};
+const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','doc','members'];
+const catName = k => k==='eis'?'Crushed-Eis':((CATS.find(c=>c.k===k)||{}).n || k);
+
+const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org'];
+const S = {
+  view:'home', openCat:null, data:{}, loaded:{},
+  me:null, profile:null,
+  formFor:null, openForm:null, editOrg:null, orgQ:'', skipRestore:false,
+  errs:{}, confirm:null, docFilter:'offen', busy:false, showPast:{}, urls:{}, urlPending:new Set()
+};
+TABLES.forEach(t=>{ S.data[t]=[]; S.loaded[t]=false; });
+
+/* ---------- Supabase ---------- */
+const CFG = window.FLORIAN_CONFIG || {};
+const configured = CFG.supabaseUrl && !CFG.supabaseUrl.includes('DEIN-PROJEKT') && CFG.supabaseAnonKey && !CFG.supabaseAnonKey.includes('DEIN-');
+const sb = configured ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabaseAnonKey) : null;
+
+/* ---------- Helfer ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const pad = n => String(n).padStart(2,'0');
+const localISO = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+const nowISO = () => localISO(new Date());
+const today = () => nowISO().slice(0,10);
+const D = t => S.data[t];
+function fmtDT(s){ const d=new Date(s); return d.toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'})+' '+pad(d.getHours())+':'+pad(d.getMinutes()); }
+function fmtRange(a,b){ const da=new Date(a), dbb=new Date(b);
+  if (da.toDateString()===dbb.toDateString()) return fmtDT(a)+'–'+pad(dbb.getHours())+':'+pad(dbb.getMinutes());
+  return fmtDT(a)+' → '+fmtDT(b); }
+function fmtDay(s){ if(!s) return ''; return new Date(s+'T00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'}); }
+function fmtDayLong(s){ return new Date(s+'T00:00').toLocaleDateString('de-DE',{weekday:'long',day:'numeric',month:'long'}); }
+function fmtDate(s){ if(!s) return ''; const [y,m,d]=s.split('-'); return `${d}.${m}.${y}`; }
+function dateBox(s){ const d=new Date(s+'T00:00'); return `<div class="datebox"><span class="wd">${esc(d.toLocaleDateString('de-DE',{weekday:'short'}).replace('.',''))}</span><span class="d">${pad(d.getDate())}</span><span class="m">${esc(d.toLocaleDateString('de-DE',{month:'short'}).replace('.',''))}</span></div>`; }
+function nameOf(id){ const p=D('profiles').find(x=>x.id===id); return (p&&p.name)||'Kamerad/in'; }
+const who = id => `<span class="who">${esc(nameOf(id))}</span>`;
+const isMember = () => !!S.profile && (S.profile.role==='member'||S.profile.role==='admin');
+const isAdmin = () => !!S.profile && S.profile.role==='admin';
+const mgr = isAdmin;
+const ro = () => !isMember();
+const mine = by => isAdmin() || (S.me && by===S.me);
+const lockNote = () => mgr()?'':'<p class="sub" style="margin-top:4px">Anlegen und Ändern ist den Bearbeitern vorbehalten.</p>';
+function delBtn(col,id,label='Löschen'){
+  const key=col+'-'+id;
+  return S.confirm===key
+    ? `<button class="btn danger small" data-act="del" data-col="${col}" data-id="${esc(id)}">Wirklich ${label.toLowerCase()}</button><button class="btn ghost small" data-act="cancel-confirm">Nein</button>`
+    : `<button class="btn ghost small" data-act="ask" data-key="${esc(key)}">${label}</button>`;
+}
+function toast(msg){ const t=$('#toast'); t.textContent=msg; t.hidden=false; clearTimeout(toast._t); toast._t=setTimeout(()=>t.hidden=true,2800); }
+function notice(msg){ const n=$('#notice'); n.textContent=msg||''; n.hidden=!msg; }
+function snapshotForm(root){
+  const vals={}; root.querySelectorAll('input:not([type=file]),select,textarea').forEach(el=>{ if(el.id) vals[el.id]=el.value; });
+  const a=document.activeElement; return {vals, focus: a&&root.contains(a)?a.id:null};
+}
+function restoreForm(root,snap){
+  Object.entries(snap.vals).forEach(([id,v])=>{ const el=root.querySelector('#'+CSS.escape(id)); if(el) el.value=v; });
+  if(snap.focus){ const el=root.querySelector('#'+CSS.escape(snap.focus)); if(el) el.focus({preventScroll:true}); }
+}
+const val = id => { const el=document.getElementById(id); return el?el.value.trim():''; };
+const errP = k => S.errs[k]?`<p class="err">${esc(S.errs[k])}</p>`:'';
+const loadingOr = (cols, html) => cols.every(c=>S.loaded[c]) ? html : `<div class="panel"><div class="empty">Lade …</div></div>`;
+
+/* Datenbank-Zeilen in die Form bringen, mit der die Ansichten arbeiten */
+function norm(r){
+  return {...r, by:r.created_by, createdAt:r.created_at, itemId:r.item_id, itemName:r.item_name,
+    from:r.starts?String(r.starts).slice(0,16):undefined, to:r.ends?String(r.ends).slice(0,16):undefined,
+    doneBy:r.done_by, doneAt:r.done_at, group:r.grp, eventId:r.event_id, shiftId:r.shift_id,
+    parentId:r.parent_id, order:r.sort, time:r.time!=null?String(r.time).slice(0,5):r.time};
+}
+
+/* ---------- Laden & Live-Aktualisierung ---------- */
+async function load(t){
+  const {data,error}=await sb.from(t).select('*');
+  if(error){ console.warn(t,error); S.loaded[t]=true; return; }
+  S.data[t]=(data||[]).map(norm); S.loaded[t]=true;
+  if(t==='profiles' && S.me){ const p=S.data.profiles.find(x=>x.id===S.me); if(p) S.profile=p; }
+}
+const reloadTimers={};
+function scheduleReload(t){
+  if(!TABLES.includes(t)) return;
+  clearTimeout(reloadTimers[t]);
+  reloadTimers[t]=setTimeout(async()=>{ await load(t); if(t==='profiles') return route(); schedule(); },150);
+}
+let pending=false;
+function schedule(){ if(pending) return; pending=true; requestAnimationFrame(()=>{ pending=false; render(); }); }
+let channel=null;
+function subscribe(){
+  if(channel) return;
+  channel=sb.channel('florian-hq').on('postgres_changes',{event:'*',schema:'public'},p=>scheduleReload(p.table)).subscribe();
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible' && isMember()) TABLES.forEach(scheduleReload); });
+
+/* ---------- Schreiben ---------- */
+function errText(error){
+  const m=(error&&error.message)||'';
+  if(/row-level security|permission denied/i.test(m)) return 'Dafür fehlt dir die Berechtigung.';
+  if(/duplicate key/i.test(m)) return 'Du bist hier schon eingetragen.';
+  if(/fetch|network/i.test(m)) return 'Keine Verbindung. Bitte Netz prüfen und nochmal versuchen.';
+  return 'Speichern hat nicht geklappt: '+m;
+}
+async function run(table, q, okMsg){
+  const {error}=await q;
+  if(error){ toast(errText(error)); return false; }
+  if(okMsg) toast(okMsg);
+  await load(table); schedule();
+  return true;
+}
+const ins = (t,row,msg) => run(t, sb.from(t).insert(row), msg);
+const upd = (t,id,row,msg) => run(t, sb.from(t).update(row).eq('id',id), msg);
+const del = (t,id,msg) => run(t, sb.from(t).delete().eq('id',id), msg);
+
+/* ---------- Übersicht: Kacheln ---------- */
+function tile(key,name,meta,{pressed=false,alert=false,attr=''}={}){
+  return `<button class="tile ${alert?'alert':''}" ${attr} aria-pressed="${pressed}"><span class="ico">${ICONS[key]}</span><span class="name">${esc(name)}</span><span class="meta">${meta}</span></button>`;
+}
+function renderTiles(){
+  const t=today(), n=nowISO();
+  const news=[...D('news')].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  const weekAgo=new Date(Date.now()-7*864e5).toISOString();
+  const fresh=news.filter(x=>(x.createdAt||'')>weekAgo).length;
+  const nextDuty=g=>D('duties').filter(d=>d.group===g&&d.date>=t).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time))[0];
+  const dutyMeta=g=>{ const d=nextDuty(g); return d?`Nächster: ${esc(fmtDay(d.date))}<br>${esc(d.topic)}`:'Noch keine Termine'; };
+  const evs=D('events').filter(e=>e.date>=t).sort((a,b)=>a.date.localeCompare(b.date));
+  const evIds=new Set(evs.map(e=>e.id));
+  const gaps=D('shifts').filter(s=>evIds.has(s.eventId)).reduce((sum,s)=>sum+Math.max(0,(+s.need||0)-D('signups').filter(x=>x.shiftId===s.id).length),0);
+  const openDocs=D('docs').filter(d=>d.status!=='eingepflegt').length;
+  $('#tiles-info').innerHTML =
+    tile('news','Neues in der Wehr', news.length?`${fresh?fresh+' neu · ':''}${esc(news[0].title)}`:'Noch keine Beiträge',{attr:'data-goto="news"',alert:fresh>0}) +
+    tile('duty-aktive','Dienstplan Aktive', dutyMeta('aktive'),{attr:'data-goto="duty-aktive"'}) +
+    tile('duty-jugend','Dienstplan Jugend', dutyMeta('jugend'),{attr:'data-goto="duty-jugend"'}) +
+    tile('events','Veranstaltungen', evs.length?`${esc(fmtDay(evs[0].date))} · ${esc(evs[0].title)}${gaps?`<br>${gaps} Helfer gesucht`:''}`:'Nichts geplant',{attr:'data-goto="events"',alert:gaps>0}) +
+    tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:openDocs>0});
+  const iceUp=D('ice').filter(x=>x.date>=t);
+  const iceToday=D('ice').filter(x=>x.date===t).reduce((s,x)=>s+(+x.bags||0),0);
+  $('#tiles-res').innerHTML = CATS.slice(0,2).map(c=>catTile(c,n)).join('') +
+    tile('eis','Crushed-Eis', `${iceToday} Säcke heute · ${iceUp.length} Anmeldungen`,{attr:'data-cat="eis"',pressed:S.openCat==='eis'}) +
+    CATS.slice(2).map(c=>catTile(c,n)).join('');
+}
+function catTile(c,n){
+  const items=D('items').filter(i=>i.cat===c.k).length;
+  const busy=D('reservations').filter(r=>r.cat===c.k && r.to>n).length;
+  return tile(c.k,c.n,`${items} ${items===1?'Eintrag':'Einträge'} · ${busy} reserviert`,{attr:`data-cat="${c.k}"`,pressed:S.openCat===c.k});
+}
+
+/* ---------- Reservierungen ---------- */
+function itemRes(id){ const n=nowISO(); return D('reservations').filter(r=>r.itemId===id && r.to>n).sort((a,b)=>a.from.localeCompare(b.from)); }
+function statusChip(id){
+  const n=nowISO(); const act=D('reservations').find(r=>r.itemId===id && r.from<=n && r.to>n);
+  return act ? `<span class="chip busy">belegt bis ${esc(fmtDT(act.to))}</span>` : `<span class="chip free">jetzt frei</span>`;
+}
+function reserveForm(item){
+  const d=new Date(); d.setMinutes(0,0,0); d.setHours(d.getHours()+1);
+  const e=new Date(d); e.setHours(e.getHours()+3);
+  const i=esc(item.id);
+  return `<form class="inline" data-form="reserve" data-id="${i}">
+    <label for="rf-from-${i}">Von<input type="datetime-local" id="rf-from-${i}" required value="${localISO(d)}"></label>
+    <label for="rf-to-${i}">Bis<input type="datetime-local" id="rf-to-${i}" required value="${localISO(e)}"></label>
+    <label for="rf-why-${i}">Wofür<input id="rf-why-${i}" maxlength="80" placeholder="z. B. Jugendübung" required></label>
+    <div class="form-actions"><button class="btn primary" type="submit">Verbindlich reservieren</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>
+    ${errP('r-'+item.id)}
+  </form>`;
+}
+function renderCat(){
+  const c=CATS.find(x=>x.k===S.openCat);
+  const items=D('items').filter(i=>i.cat===c.k).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+  let html=`<div class="panel"><div class="panel-head">
+    <div><h2>${esc(c.n)}</h2><p class="sub">„Reservieren“ antippen, Zeitraum und Zweck eintragen. Überschneidungen werden geblockt.</p></div>
+    <div class="actions">${ro()?'':`<button class="btn" data-act="open-form" data-form="add-item">+ Eintrag anlegen</button>`}<button class="btn ghost" data-act="close-cat">Schließen</button></div></div>`;
+  if(S.openForm==='add-item' && !ro()){
+    html+=`<form class="inline" data-form="add-item">
+      <label for="add-name">Bezeichnung<input id="add-name" required maxlength="60" placeholder="${esc(c.ph)}"></label>
+      <label for="add-note">Hinweis<input id="add-note" maxlength="120" placeholder="z. B. Schlüssel beim Gerätewart"></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Anlegen</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>
+      ${errP('add-item')}</form>`;
+  }
+  if(!S.loaded.items) html+=`<div class="empty">Lade Einträge …</div>`;
+  else if(!items.length) html+=`<div class="empty"><strong>Hier ist noch nichts angelegt.</strong>Leg über „+ Eintrag anlegen“ das erste Stück an, dann können alle es reservieren.</div>`;
+  else html+=items.map(it=>{
+    const up=itemRes(it.id).slice(0,4);
+    return `<div class="row">
+      <div class="info">
+        <div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center"><h3>${esc(it.name)}</h3>${statusChip(it.id)}</div>
+        ${it.note?`<p class="note">${esc(it.note)}</p>`:''}
+        ${up.length?`<ul class="slots">${up.map(r=>`<li><span class="when">${esc(fmtRange(r.from,r.to))}</span>${who(r.by)}<span class="why">${esc(r.purpose)}</span></li>`).join('')}</ul>`:''}
+      </div>
+      <div class="actions">
+        <button class="btn primary" data-act="reserve" data-id="${esc(it.id)}">Reservieren</button>
+        ${mine(it.by)?delBtn('items',it.id):''}
+      </div>
+      ${S.formFor===it.id?reserveForm(it):''}
+    </div>`;
+  }).join('');
+  return html+'</div>';
+}
+
+/* ---------- Crushed-Eis ---------- */
+function renderIce(){
+  const t=today();
+  const showPast=S.showPast.ice;
+  const list=D('ice').filter(x=>showPast?true:x.date>=t).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+  let html=`<div class="panel"><div class="panel-head">
+    <div><h2>Crushed-Eis</h2><p class="sub">Meld an, wann du wie viel Eis brauchst. Pro Tag wird zusammengezählt, damit die Maschinen rechtzeitig laufen.</p></div>
+    <div class="actions"><button class="btn ghost" data-act="toggle-past" data-key="ice">${showPast?'Nur kommende':'Auch vergangene'}</button><button class="btn ghost" data-act="close-cat">Schließen</button></div></div>
+    <form class="inline" data-form="ice">
+      <label for="ice-date">Datum<input type="date" id="ice-date" required value="${t}"></label>
+      <label for="ice-time">Abholung um<input type="time" id="ice-time" required value="17:00"></label>
+      <label for="ice-bags">Menge (Säcke)<input type="number" id="ice-bags" required min="1" max="200" value="2"></label>
+      <label for="ice-why">Wofür<input id="ice-why" maxlength="80" placeholder="z. B. Sommerfest Getränkestand" required></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Eis anmelden</button></div>
+      ${errP('ice')}</form>`;
+  if(!S.loaded.ice) return html+`<div class="empty">Lade Anmeldungen …</div></div>`;
+  if(!list.length) return html+`<div class="empty"><strong>Noch kein Eis angemeldet.</strong>Trag oben ein, wann du Eis brauchst.</div></div>`;
+  const days=[...new Set(list.map(x=>x.date))];
+  html+=days.map(day=>{
+    const rows=list.filter(x=>x.date===day);
+    const sum=rows.reduce((s,x)=>s+(+x.bags||0),0);
+    return `<div class="day-head"><span class="when">${esc(fmtDayLong(day))}</span><span class="chip ice">${sum} ${sum===1?'Sack':'Säcke'} gesamt</span></div>` +
+      rows.map(x=>`<div class="row ${day<t?'past':''}">
+        <div class="info">
+          <div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center"><h3>${+x.bags||0} ${(+x.bags)===1?'Sack':'Säcke'}</h3><span class="chip ${x.done?'done':'open'}">${x.done?'bereitgestellt':'offen'}</span></div>
+          <ul class="slots"><li><span class="when">ab ${esc(x.time||'')} Uhr</span>${who(x.by)}<span class="why">${esc(x.purpose)}</span></li></ul>
+        </div>
+        <div class="actions"><button class="btn small ${x.done?'':'primary'}" data-act="ice-done" data-id="${esc(x.id)}">${x.done?'Zurück auf offen':'Bereitgestellt'}</button>${mine(x.by)?delBtn('ice',x.id,'Stornieren'):''}</div>
+      </div>`).join('');
+  }).join('');
+  return html+'</div>';
+}
+
+function renderUpcoming(){
+  const n=nowISO();
+  const list=D('reservations').filter(r=>r.to>n).sort((a,b)=>a.from.localeCompare(b.from)).slice(0,15);
+  let html=`<div class="panel upcoming"><div class="panel-head"><div><h2>Als Nächstes belegt</h2><p class="sub">Alle laufenden und kommenden Reservierungen der Wehr.</p></div></div>`;
+  if(!S.loaded.reservations) return html+`<div class="empty">Lade Reservierungen …</div></div>`;
+  if(!list.length) return html+`<div class="empty"><strong>Noch nichts reserviert.</strong>Wähle oben eine Kachel und reserviere Fahrzeug, Material oder Raum.</div></div>`;
+  html+=list.map(r=>{
+    const active=r.from<=n;
+    return `<div class="row">
+      <span class="chip ${active?'busy':'free'}">${active?'läuft':'geplant'}</span>
+      <div class="info">
+        <div class="cat-dot">${esc(catName(r.cat))}</div>
+        <h3>${esc(r.itemName)}</h3>
+        <ul class="slots"><li><span class="when">${esc(fmtRange(r.from,r.to))}</span>${who(r.by)}<span class="why">${esc(r.purpose)}</span></li></ul>
+      </div>
+      <div class="actions">${mine(r.by)?delBtn('reservations',r.id,'Stornieren'):''}</div>
+    </div>`;
+  }).join('');
+  return html+'</div>';
+}
+
+/* ---------- Neues in der Wehr ---------- */
+function renderNews(){
+  const list=[...D('news')].sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  const weekAgo=new Date(Date.now()-7*864e5).toISOString();
+  let html=`<div class="panel"><div class="panel-head">
+    <div><h2>Neues in der Wehr</h2><p class="sub">Infos, Termine, Durchsagen. Was alle wissen sollten.</p>${lockNote()}</div>
+    ${mgr()?`<div class="actions"><button class="btn primary" data-act="open-form" data-form="news">+ Neuigkeit</button></div>`:''}</div>`;
+  if(S.openForm==='news' && mgr()){
+    html+=`<form class="inline" data-form="news" style="grid-template-columns:1fr">
+      <label for="news-title">Überschrift<input id="news-title" required maxlength="90" placeholder="z. B. Neue Atemschutzgeräte sind da"></label>
+      <label for="news-text">Text<textarea id="news-text" required maxlength="2000"></textarea></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Veröffentlichen</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>
+      ${errP('news')}</form>`;
+  }
+  if(!list.length) html+=`<div class="empty"><strong>Noch keine Neuigkeiten.</strong>${mgr()?'Über „+ Neuigkeit“ schreibst du den ersten Beitrag.':'Sobald die Bearbeiter etwas posten, steht es hier.'}</div>`;
+  else html+=list.map(x=>`<div class="row">
+    <div class="info">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">${(x.createdAt||'')>weekAgo?'<span class="news-new">neu</span>':''}<h3>${esc(x.title)}</h3></div>
+      <div class="facts">${who(x.by)} · ${esc(x.createdAt?new Date(x.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</div>
+      <p class="text">${esc(x.text)}</p>
+    </div>
+    <div class="actions">${mgr()?delBtn('news',x.id):''}</div>
+  </div>`).join('');
+  return loadingOr(['news'], html+'</div>');
+}
+
+/* ---------- Dienstplan ---------- */
+function renderDuty(viewKey){
+  const {g,n}=DUTY[viewKey]; const t=today(); const fk='duty-'+g;
+  const all=D('duties').filter(d=>d.group===g).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
+  const upcoming=all.filter(d=>d.date>=t), past=all.filter(d=>d.date<t).reverse();
+  let html=`<div class="panel"><div class="panel-head">
+    <div><h2>${esc(n)}</h2><p class="sub">${g==='jugend'?'Übungsabende und Termine der Jugendfeuerwehr.':'Übungsdienste und Termine der aktiven Mannschaft.'}</p>${lockNote()}</div>
+    ${mgr()?`<div class="actions"><button class="btn primary" data-act="open-form" data-form="${fk}">+ Dienst eintragen</button></div>`:''}</div>`;
+  if(S.openForm===fk && mgr()){
+    html+=`<form class="inline" data-form="duty" data-group="${g}">
+      <label for="${fk}-date">Datum<input type="date" id="${fk}-date" required></label>
+      <label for="${fk}-time">Beginn<input type="time" id="${fk}-time" required value="19:00"></label>
+      <label for="${fk}-topic" class="span-all">Thema<input id="${fk}-topic" required maxlength="90" placeholder="z. B. Technische Hilfeleistung – Stabilisieren"></label>
+      <label for="${fk}-place">Ort<input id="${fk}-place" maxlength="60" placeholder="z. B. Gerätehaus"></label>
+      <label for="${fk}-lead">Leitung<input id="${fk}-lead" maxlength="60" placeholder="Name"></label>
+      <label for="${fk}-note">Hinweis<input id="${fk}-note" maxlength="120" placeholder="z. B. Schutzausrüstung komplett"></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Eintragen</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>
+      ${errP('duty')}</form>`;
+  }
+  const row=d=>`<div class="row dated ${d.date<t?'past':''}">
+    ${dateBox(d.date)}
+    <div class="info">
+      <h3>${esc(d.topic)}</h3>
+      <div class="facts"><span><b>${esc(d.time||'')} Uhr</b></span>${d.place?`<span>${esc(d.place)}</span>`:''}${d.lead?`<span>Leitung: <b>${esc(d.lead)}</b></span>`:''}</div>
+      ${d.note?`<p class="note">${esc(d.note)}</p>`:''}
+    </div>
+    <div class="actions">${mgr()?delBtn('duties',d.id):''}</div>
+  </div>`;
+  if(!upcoming.length) html+=`<div class="empty"><strong>Keine kommenden Dienste.</strong>${mgr()?'Über „+ Dienst eintragen“ legst du den ersten Termin an.':'Der Plan erscheint hier, sobald Termine eingetragen sind.'}</div>`;
+  else{
+    let month='';
+    html+=upcoming.map(d=>{
+      const m=new Date(d.date+'T00:00').toLocaleDateString('de-DE',{month:'long',year:'numeric'});
+      const head=m!==month?`<div class="day-head"><span class="when">${esc(m)}</span></div>`:''; month=m; return head+row(d);
+    }).join('');
+  }
+  if(past.length){
+    html+=`<div class="day-head"><span class="when">Vergangene Dienste (${past.length})</span><button class="btn ghost small" data-act="toggle-past" data-key="${fk}">${S.showPast[fk]?'Ausblenden':'Anzeigen'}</button></div>`;
+    if(S.showPast[fk]) html+=past.map(row).join('');
+  }
+  return loadingOr(['duties'], html+'</div>');
+}
+
+/* ---------- Veranstaltungen & Arbeitsdienste ---------- */
+function renderShift(sh){
+  const sig=D('signups').filter(s=>s.shiftId===sh.id).sort((a,b)=>(a.createdAt||'').localeCompare(b.createdAt||''));
+  const need=+sh.need||0; const full=need>0&&sig.length>=need;
+  const amIn=sig.some(s=>s.by===S.me && !s.name);
+  const i=esc(sh.id);
+  const people=sig.map(s=>{
+    const self=s.by===S.me && !s.name;
+    return `<span class="person ${self?'self':''}">${s.name?esc(s.name):who(s.by)}${mine(s.by)?`<button data-act="unsign" data-id="${esc(s.id)}" aria-label="Austragen">×</button>`:''}</span>`;
+  }).join('') + Array.from({length:Math.max(0,need-sig.length)},()=>'<span class="gap-slot">frei</span>').join('');
+  return `<div class="shift ${full?'full':''}">
+    <div style="min-width:0">
+      <div style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center"><strong>${esc(sh.task)}</strong><span class="when">${esc(sh.start||'')}–${esc(sh.end||'')} Uhr</span>
+        <span class="chip ${full?'done':'open'}">${sig.length}/${need}${full?' voll':''}</span></div>
+      <div class="people">${people||'<span class="gap-slot">noch niemand</span>'}</div>
+      ${full?'':`<form class="mini" data-form="addname" data-id="${i}"><input id="an-${i}" maxlength="40" placeholder="Jemand anderen eintragen (Name)"><button class="btn small" type="submit">Eintragen</button></form>`}
+    </div>
+    <div class="actions">${amIn?`<button class="btn small" data-act="sign-off" data-id="${i}">Mich austragen</button>`:`<button class="btn small primary" data-act="sign-on" data-id="${i}" ${full?'disabled':''}>${full?'Voll':'Ich bin dabei'}</button>`}${mgr()?delBtn('shifts',sh.id):''}</div>
+  </div>`;
+}
+function renderEvent(ev,t){
+  const shifts=D('shifts').filter(s=>s.eventId===ev.id).sort((a,b)=>(a.start||'').localeCompare(b.start||'')||(a.task||'').localeCompare(b.task||''));
+  const fk='shift-'+ev.id, i=esc(ev.id);
+  return `<article class="panel ${ev.date<t?'past':''}">
+    <div class="row dated">
+      ${dateBox(ev.date)}
+      <div class="info">
+        <h3>${esc(ev.title)}</h3>
+        <div class="facts">${ev.time?`<span><b>ab ${esc(ev.time)} Uhr</b></span>`:''}${ev.place?`<span>${esc(ev.place)}</span>`:''}</div>
+        ${ev.note?`<p class="text">${esc(ev.note)}</p>`:''}
+      </div>
+      <div class="actions">${mgr()?delBtn('events',ev.id):''}</div>
+    </div>
+    <div class="shifts">
+      <div class="shifts-head"><h4>Arbeitsdienste</h4>${mgr()?`<button class="btn small" data-act="open-form" data-form="${fk}">+ Arbeitsdienst</button>`:''}</div>
+      ${S.openForm===fk&&mgr()?`<form class="formbox" data-form="shift" data-id="${i}">
+        <label for="${fk}-task">Aufgabe<input id="${fk}-task" required maxlength="60" placeholder="z. B. Ausschank, Grill, Aufbau"></label>
+        <label for="${fk}-start">Von<input type="time" id="${fk}-start" required value="10:00"></label>
+        <label for="${fk}-end">Bis<input type="time" id="${fk}-end" required value="14:00"></label>
+        <label for="${fk}-need">Benötigt (Personen)<input type="number" id="${fk}-need" required min="1" max="50" value="3"></label>
+        <div class="form-actions"><button class="btn primary" type="submit">Anlegen</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>
+        ${errP('shift')}</form>`:''}
+      ${shifts.length?shifts.map(renderShift).join(''):`<p class="sub">Noch keine Arbeitsdienste angelegt.</p>`}
+    </div>
+  </article>`;
+}
+function renderEvents(){
+  const t=today();
+  const all=[...D('events')].sort((a,b)=>a.date.localeCompare(b.date));
+  const up=all.filter(e=>e.date>=t), past=all.filter(e=>e.date<t).reverse();
+  let html=`<div class="panel"><div class="panel-head">
+    <div><h2>Bevorstehende Veranstaltungen</h2><p class="sub">Feste, Tage der offenen Tür, Einsätze für den Verein. Bei jeder Veranstaltung trägt sich ein, wer arbeitet.</p>${lockNote()}</div>
+    ${mgr()?`<div class="actions"><button class="btn primary" data-act="open-form" data-form="event">+ Veranstaltung</button></div>`:''}</div>`;
+  if(S.openForm==='event' && mgr()){
+    html+=`<form class="inline" data-form="event">
+      <label for="ev-title" class="span-all">Name<input id="ev-title" required maxlength="80" placeholder="z. B. Sommerfest"></label>
+      <label for="ev-date">Datum<input type="date" id="ev-date" required></label>
+      <label for="ev-time">Beginn<input type="time" id="ev-time"></label>
+      <label for="ev-place">Ort<input id="ev-place" maxlength="60" placeholder="z. B. Festplatz"></label>
+      <label for="ev-note" class="span-all">Beschreibung<textarea id="ev-note" maxlength="800" style="min-height:70px"></textarea></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Anlegen</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>
+      ${errP('event')}</form>`;
+  }
+  if(!up.length) html+=`<div class="empty"><strong>Keine Veranstaltungen geplant.</strong>${mgr()?'Über „+ Veranstaltung“ legst du die nächste an.':''}</div>`;
+  html+='</div>';
+  html+=up.map(e=>renderEvent(e,t)).join('');
+  if(past.length){
+    html+=`<div class="toolbar"><h4>Vergangene Veranstaltungen (${past.length})</h4><button class="btn ghost small" data-act="toggle-past" data-key="events">${S.showPast.events?'Ausblenden':'Anzeigen'}</button></div>`;
+    if(S.showPast.events) html+=past.map(e=>renderEvent(e,t)).join('');
+  }
+  return loadingOr(['events','shifts','signups'], html);
+}
+
+/* ---------- Organigramm ---------- */
+function orgChildren(pid){ const ids=new Set(D('org').map(n=>n.id)); return D('org').filter(n=> pid ? n.parentId===pid : (!n.parentId || !ids.has(n.parentId))).sort((a,b)=>(+a.order||0)-(+b.order||0)||(a.createdAt||'').localeCompare(b.createdAt||'')); }
+function orgDesc(id){ const out=new Set([id]); let grow=true; while(grow){ grow=false; D('org').forEach(n=>{ if(n.parentId&&out.has(n.parentId)&&!out.has(n.id)){ out.add(n.id); grow=true; } }); } return out; }
+function orgPath(n){ const byId=Object.fromEntries(D('org').map(x=>[x.id,x])); const parts=[]; let p=byId[n.parentId], guard=0; while(p&&guard++<20){ parts.unshift(p.role); p=byId[p.parentId]; } return parts.join(' › '); }
+function contact(label,v,href){ return v?`<span class="contact"><span aria-hidden="true">${label}</span><a class="v" href="${esc(href)}">${esc(v)}</a><button data-act="copy" data-v="${esc(v)}">Kopieren</button></span>`:''; }
+function orgCard(n,withPath){
+  return `<div class="org-card">
+    <div style="min-width:0"><div class="org-role">${esc(n.role)}</div><div class="org-name">${esc(n.name||'– unbesetzt –')}</div></div>
+    <div class="actions">${mgr()?`<button class="btn ghost small" data-act="edit-org" data-id="${esc(n.id)}">Bearbeiten</button>${delBtn('org',n.id)}`:''}</div>
+    ${withPath&&n.parentId?`<div class="crumb">${esc(orgPath(n))}</div>`:''}
+    ${n.area?`<p class="note"><b style="color:var(--ink)">Verantwortlich für:</b> ${esc(n.area)}</p>`:''}
+    ${(n.phone||n.email)?`<div class="contacts">${contact('Tel.',n.phone,'tel:'+String(n.phone||'').replace(/[^\d+]/g,''))}${contact('Mail',n.email,'mailto:'+(n.email||''))}</div>`:''}
+  </div>`;
+}
+function orgBranch(n,depth){ const kids=depth<12?orgChildren(n.id):[]; return `<li>${orgCard(n,false)}${kids.length?`<ul>${kids.map(k=>orgBranch(k,depth+1)).join('')}</ul>`:''}</li>`; }
+function orgForm(){
+  const ed=S.editOrg&&S.editOrg!=='new'?D('org').find(n=>n.id===S.editOrg):null;
+  const blocked=ed?orgDesc(ed.id):new Set();
+  const opts=[...D('org')].filter(n=>!blocked.has(n.id)).sort((a,b)=>a.role.localeCompare(b.role,'de'));
+  const v=k=>esc(ed?ed[k]||'':'');
+  return `<form class="inline" data-form="org" style="margin:14px 20px">
+    <label for="org-role">Funktion<input id="org-role" required maxlength="60" value="${v('role')}" placeholder="z. B. Gerätewart"></label>
+    <label for="org-name">Name<input id="org-name" maxlength="60" value="${v('name')}" placeholder="Vor- und Nachname"></label>
+    <label for="org-parent">Untergeordnet unter<select id="org-parent"><option value="">— oberste Ebene —</option>${opts.map(n=>`<option value="${esc(n.id)}" ${ed&&ed.parentId===n.id?'selected':''}>${esc(n.role)}${n.name?' · '+esc(n.name):''}</option>`).join('')}</select></label>
+    <label for="org-order">Reihenfolge<input id="org-order" type="number" min="0" max="99" value="${ed?esc(ed.order??0):0}"></label>
+    <label for="org-area" class="span-all">Verantwortlich für<input id="org-area" maxlength="200" value="${v('area')}" placeholder="z. B. Atemschutzgeräte, Prüffristen, Schlüsselverwaltung"></label>
+    <label for="org-phone">Telefon<input id="org-phone" type="tel" maxlength="40" value="${v('phone')}"></label>
+    <label for="org-mail">E-Mail<input id="org-mail" type="email" maxlength="80" value="${v('email')}"></label>
+    <div class="form-actions"><button class="btn primary" type="submit">${ed?'Speichern':'Hinzufügen'}</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>
+    ${errP('org')}</form>`;
+}
+function renderOrg(){
+  const all=D('org'); const q=S.orgQ.trim().toLowerCase();
+  let html=`<div class="panel"><div class="panel-head">
+    <div><h2>Organigramm</h2><p class="sub">Wer ist wofür zuständig und wen rufe ich an?</p>${lockNote()}</div>
+    ${mgr()?`<div class="actions"><button class="btn primary" data-act="edit-org" data-id="new">+ Funktion</button></div>`:''}</div>`;
+  if(S.editOrg && mgr()) html+=orgForm();
+  if(all.length) html+=`<div class="org-tools"><input id="org-q" type="search" placeholder="Suchen: Funktion, Name oder Zuständigkeit" value="${esc(S.orgQ)}" aria-label="Organigramm durchsuchen"><span class="count">${all.length} Funktionen</span></div>`;
+  if(!all.length) html+=`<div class="empty"><strong>Noch kein Organigramm hinterlegt.</strong>${mgr()?'Fang oben mit „+ Funktion“ an, z. B. mit dem Kommandanten, und hänge darunter Stellvertreter, Gruppenführer und Gerätewarte ein.':'Sobald die Bearbeiter es anlegen, steht es hier.'}</div>`;
+  else if(q){
+    const hits=all.filter(n=>[n.role,n.name,n.area].some(x=>(x||'').toLowerCase().includes(q)));
+    html+= hits.length?`<div class="org"><ul>${hits.map(n=>`<li>${orgCard(n,true)}</li>`).join('')}</ul></div>`:`<div class="empty"><strong>Nichts gefunden.</strong>Versuch es mit einem anderen Stichwort.</div>`;
+  } else html+=`<div class="org"><ul>${orgChildren(null).map(n=>orgBranch(n,0)).join('')}</ul></div>`;
+  return loadingOr(['org'], html+'</div>');
+}
+
+/* ---------- Mitglieder (nur Bearbeiter) ---------- */
+function renderMembers(){
+  if(!mgr()) return `<div class="panel"><div class="empty"><strong>Nur für Bearbeiter.</strong></div></div>`;
+  const all=[...D('profiles')].sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+  const waiting=all.filter(p=>p.role==='pending'), rest=all.filter(p=>p.role!=='pending');
+  const row=p=>`<div class="row">
+    <div class="info"><h3>${esc(p.name||'Ohne Namen')}${p.id===S.me?' <span class="chip free">du</span>':''}</h3><p class="note">${esc(p.email||'')} · seit ${esc(new Date(p.created_at).toLocaleDateString('de-DE'))}</p></div>
+    <div class="actions">
+      ${p.role==='pending'
+        ? `<button class="btn primary small" data-act="set-role" data-id="${esc(p.id)}" data-role="member">Freigeben</button><button class="btn small" data-act="set-role" data-id="${esc(p.id)}" data-role="admin">Als Bearbeiter freigeben</button>`
+        : `<select class="role-select" data-act-change="role" data-id="${esc(p.id)}" aria-label="Rolle von ${esc(p.name)}">${['member','admin','pending'].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${ROLE_NAME[r]==='wartet'?'Sperren (wartet)':ROLE_NAME[r]}</option>`).join('')}</select>`}
+      ${p.id!==S.me?delBtn('member',p.id,'Entfernen'):''}
+    </div>
+  </div>`;
+  return `<div class="panel"><div class="panel-head"><div><h2>Warten auf Freigabe</h2><p class="sub">Neue Registrierungen. Prüfe, ob die Person zur Wehr gehört, bevor du sie freigibst.</p></div></div>
+    ${waiting.length?waiting.map(row).join(''):'<div class="empty"><strong>Niemand wartet.</strong>Neue Kameraden registrieren sich über den Link der App und erscheinen dann hier.</div>'}</div>
+    <div class="panel"><div class="panel-head"><div><h2>Mitglieder</h2><p class="sub"><b>Mitglied</b>: reservieren, Eis anmelden, Arbeitsdienste, Übungsdoku. <b>Bearbeiter</b>: zusätzlich Neues, Dienstpläne, Veranstaltungen, Organigramm und Mitglieder.</p></div><span class="count">${rest.length} Personen</span></div>
+    ${rest.map(row).join('')}</div>`;
+}
+
+/* ---------- Übungsdoku ---------- */
+function ensureUrls(paths){
+  const need=paths.filter(p=>p && !S.urls[p] && !S.urlPending.has(p));
+  if(!need.length) return;
+  need.forEach(p=>S.urlPending.add(p));
+  sb.storage.from('listen').createSignedUrls(need, 3600).then(({data})=>{
+    (data||[]).forEach(x=>{ if(x.signedUrl) S.urls[x.path]=x.signedUrl; });
+    need.forEach(p=>{ if(!S.urls[p]) S.urls[p]='missing'; S.urlPending.delete(p); });
+    renderDocs();
+  });
+}
+function renderDocs(){
+  const docs=D('docs');
+  const open=docs.filter(d=>d.status!=='eingepflegt').length;
+  $('#doc-count').textContent=`${open} offen · ${docs.length-open} eingepflegt`;
+  document.querySelectorAll('#doc-filters .filter').forEach(f=>f.setAttribute('aria-pressed',String(f.dataset.f===S.docFilter)));
+  const list=docs.filter(d=>S.docFilter==='alle'||(S.docFilter==='eingepflegt'?d.status==='eingepflegt':d.status!=='eingepflegt'))
+    .sort((a,b)=>(b.date||'').localeCompare(a.date||'')||(b.createdAt||'').localeCompare(a.createdAt||''));
+  const el=$('#doc-list');
+  if(!S.loaded.docs){ el.innerHTML=`<div class="panel"><div class="empty">Lade Übungen …</div></div>`; return; }
+  if(!list.length){
+    el.innerHTML=`<div class="panel"><div class="empty"><strong>${S.docFilter==='offen'?'Alles eingepflegt. Sauber!':'Keine Listen in dieser Ansicht.'}</strong>${docs.length?'':'Lade oben das Foto einer Anwesenheitsliste hoch. Sie landet hier, bis sie im FW-Portal eingepflegt ist.'}</div></div>`;
+    return;
+  }
+  if(S.view==='doc') ensureUrls(list.map(d=>d.photo_path));
+  el.innerHTML=`<div class="cards">${list.map(d=>{
+    const isDone=d.status==='eingepflegt'; const url=S.urls[d.photo_path];
+    return `<article class="card ${isDone?'':'is-open'}">
+      <button class="thumb" data-act="zoom" data-path="${esc(d.photo_path||'')}" aria-label="Liste vergrößern">
+        ${url&&url!=='missing'?`<img src="${esc(url)}" alt="Anwesenheitsliste ${esc(d.title)}" loading="lazy">`:`<span class="ph">${url==='missing'||!d.photo_path?'Bild nicht verfügbar':'Lade Bild …'}</span>`}
+      </button>
+      <div class="card-body">
+        <div style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;justify-content:space-between">
+          <span class="when">${esc(fmtDate(d.date))}</span>
+          <span class="chip ${isDone?'done':'open'}">${isDone?'eingepflegt':'muss eingepflegt werden'}</span>
+        </div>
+        <h3>${esc(d.title)}</h3>
+        ${d.note?`<p class="note">${esc(d.note)}</p>`:''}
+        <div class="meta">Hochgeladen von ${who(d.by)}${isDone&&d.doneBy?`<br>Eingepflegt von ${who(d.doneBy)}${d.doneAt?' am '+esc(new Date(d.doneAt).toLocaleDateString('de-DE')):''}`:''}</div>
+        <div class="card-actions">
+          <button class="btn ${isDone?'':'primary'}" data-act="toggle-doc" data-id="${esc(d.id)}">${isDone?'Zurück auf offen':'Als eingepflegt markieren'}</button>
+          ${mine(d.by)?delBtn('docs',d.id):''}
+        </div>
+      </div>
+    </article>`;
+  }).join('')}</div>`;
+}
+
+/* ---------- Gesamt-Render ---------- */
+function render(){
+  if(!isMember()) return;
+  const v=S.view;
+  $('#view-home').hidden = v!=='home';
+  $('#view-doc').hidden = v!=='doc';
+  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','members'].includes(v);
+  document.querySelectorAll('#tabs .tab').forEach(t=>t.setAttribute('aria-selected',String(t.dataset.view===v)));
+  $('#tab-members').hidden=!mgr();
+  const waiting=D('profiles').filter(p=>p.role==='pending').length;
+  const badge=$('#pending-badge'); badge.textContent=waiting+' neu'; badge.hidden=!waiting;
+  $('#me-name').textContent=S.profile.name||'';
+  $('#me-role').textContent=ROLE_NAME[S.profile.role]||'';
+  renderTiles();
+  if(v==='home'){
+    const body=$('#res-body'); const snap=snapshotForm(body);
+    body.innerHTML = S.openCat==='eis' ? renderIce() : S.openCat ? renderCat() : renderUpcoming();
+    restoreForm(body,snap);
+  } else if(v!=='doc'){
+    const page=$('#view-page'); const snap=snapshotForm(page);
+    if(S.skipRestore){ snap.vals={}; snap.focus=null; }
+    page.innerHTML = v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg() : v==='members'?renderMembers() : renderDuty(v);
+    restoreForm(page,snap); S.skipRestore=false;
+  }
+  renderDocs();
+  $('#doc-submit').disabled = S.busy;
+}
+function go(view){
+  if(view==='members' && !mgr()) view='home';
+  S.view=view; S.openForm=null; S.editOrg=null; S.confirm=null; S.errs={};
+  try{ localStorage.setItem('fhq-view',view); }catch(_){}
+  if(location.hash!=='#'+view) history.replaceState(null,'','#'+view);
+  render(); window.scrollTo({top:0});
+}
+
+/* ---------- Klicks ---------- */
+const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',docs:'Liste gelöscht',news:'Beitrag gelöscht',duties:'Dienst gelöscht',events:'Veranstaltung gelöscht',shifts:'Arbeitsdienst gelöscht',ice:'Eis-Anmeldung storniert',org:'Funktion entfernt'};
+
+document.addEventListener('click', async e=>{
+  const tab=e.target.closest('#tabs .tab'); if(tab){ go(tab.dataset.view); return; }
+  const gt=e.target.closest('[data-goto]'); if(gt){ go(gt.dataset.goto); return; }
+  const tile=e.target.closest('.tile[data-cat]'); if(tile){
+    S.openCat = S.openCat===tile.dataset.cat?null:tile.dataset.cat; S.formFor=null; S.openForm=null; S.confirm=null; S.errs={}; render();
+    if(S.openCat) $('#res-body').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
+    return; }
+  const f=e.target.closest('#doc-filters .filter'); if(f){ S.docFilter=f.dataset.f; renderDocs(); return; }
+  const seg=e.target.closest('#auth-seg button'); if(seg){ setAuthMode(seg.dataset.mode); return; }
+  const b=e.target.closest('[data-act]'); if(!b) return;
+  const id=b.dataset.id, act=b.dataset.act;
+  if(act==='logout'){ await sb.auth.signOut(); location.hash=''; return; }
+  if(act==='close-cat'){ S.openCat=null; render(); }
+  else if(act==='open-form'){ S.openForm=b.dataset.form; S.errs={}; S.skipRestore=true; render(); }
+  else if(act==='close-form'){ S.openForm=null; S.formFor=null; S.editOrg=null; S.errs={}; render(); }
+  else if(act==='reserve'){ S.formFor=id; S.errs={}; render(); document.getElementById('rf-why-'+id)?.focus(); }
+  else if(act==='toggle-past'){ S.showPast[b.dataset.key]=!S.showPast[b.dataset.key]; render(); }
+  else if(act==='ask'){ S.confirm=b.dataset.key; render(); }
+  else if(act==='cancel-confirm'){ S.confirm=null; render(); }
+  else if(act==='del'){
+    S.confirm=null; const col=b.dataset.col;
+    if(col==='member'){
+      const {error}=await sb.rpc('remove_member',{target:id});
+      if(error) toast(errText(error)); else { toast('Mitglied entfernt'); await load('profiles'); render(); }
+      return;
+    }
+    if(col==='docs'){ const d=D('docs').find(x=>x.id===id); if(d&&d.photo_path) await sb.storage.from('listen').remove([d.photo_path]); }
+    await del(col,id,DEL_MSG[col]);
+  }
+  else if(act==='toggle-doc'){
+    const d=D('docs').find(x=>x.id===id); if(!d) return; const done=d.status!=='eingepflegt';
+    await upd('docs',id,done?{status:'eingepflegt',done_by:S.me,done_at:new Date().toISOString()}:{status:'offen',done_by:null,done_at:null}, done?'Als eingepflegt markiert':'Wieder auf offen gesetzt');
+  }
+  else if(act==='ice-done'){
+    const x=D('ice').find(y=>y.id===id); if(!x) return;
+    await upd('ice',id,{done:!x.done,done_by:x.done?null:S.me}, x.done?'Wieder offen':'Als bereitgestellt markiert');
+  }
+  else if(act==='sign-on'){
+    const sh=D('shifts').find(s=>s.id===id); if(!sh) return;
+    await ins('signups',{shift_id:id},'Eingetragen für '+sh.task);
+  }
+  else if(act==='sign-off'){
+    const s=D('signups').find(x=>x.shiftId===id && x.by===S.me && !x.name); if(!s) return;
+    await del('signups',s.id,'Ausgetragen');
+  }
+  else if(act==='unsign'){ await del('signups',id,'Ausgetragen'); }
+  else if(act==='set-role'){ await setRole(id,b.dataset.role); }
+  else if(act==='edit-org'){ S.editOrg=id; S.errs={}; S.skipRestore=true; render(); document.getElementById('org-role')?.focus(); }
+  else if(act==='copy'){
+    const v=b.dataset.v;
+    try{ await navigator.clipboard.writeText(v); toast('Kopiert: '+v); }
+    catch(_){ toast('Kopieren nicht möglich – bitte Text markieren'); }
+  }
+  else if(act==='zoom'){ const u=S.urls[b.dataset.path]; if(u&&u!=='missing'){ $('#lightbox-img').src=u; $('#lightbox').hidden=false; } }
+});
+document.addEventListener('change', async e=>{
+  const sel=e.target.closest('[data-act-change="role"]'); if(sel) await setRole(sel.dataset.id, sel.value);
+});
+async function setRole(id,role){
+  const {error}=await sb.rpc('set_role',{target:id,new_role:role});
+  if(error) toast(error.message.includes('Bearbeiter')?error.message:errText(error));
+  else toast('Rolle geändert: '+ROLE_NAME[role]);
+  await load('profiles'); route();
+}
+$('#lightbox').addEventListener('click',()=>{$('#lightbox').hidden=true});
+document.addEventListener('keydown',e=>{ if(e.key==='Escape') $('#lightbox').hidden=true; });
+document.addEventListener('input',e=>{ if(e.target.id==='org-q'){ S.orgQ=e.target.value; render(); } });
+window.addEventListener('hashchange',()=>{ const v=location.hash.slice(1); if(VIEWS.includes(v) && v!==S.view && isMember()) go(v); });
+
+/* ---------- Formulare ---------- */
+function fail(k,msg){ S.errs[k]=msg; render(); }
+async function addRow(t,row,msg,errKey){
+  const ok=await ins(t,row,msg);
+  if(ok){ S.openForm=null; if(errKey) S.errs[errKey]=null; render(); }
+  return ok;
+}
+document.addEventListener('submit', async e=>{
+  const form=e.target; const kind=form.dataset.form; const fid=form.dataset.id;
+  if(form.id==='auth-form') return submitAuth(e);
+  if(form.id==='doc-form') return submitDoc(e,form);
+  if(!kind) return;
+  e.preventDefault();
+  if(kind==='add-item'){
+    const name=val('add-name'), note=val('add-note');
+    if(!name) return fail('add-item','Bitte eine Bezeichnung eintragen.');
+    addRow('items',{cat:S.openCat,name,note},'„'+name+'“ angelegt','add-item');
+  }
+  else if(kind==='reserve'){
+    const it=D('items').find(i=>i.id===fid); if(!it) return;
+    const from=val('rf-from-'+fid), to=val('rf-to-'+fid), purpose=val('rf-why-'+fid), key='r-'+fid;
+    if(!from||!to||!purpose) return fail(key,'Bitte Von, Bis und Zweck ausfüllen.');
+    if(to<=from) return fail(key,'„Bis“ muss nach „Von“ liegen.');
+    await load('reservations');
+    const clash=D('reservations').find(r=>r.itemId===fid && r.from<to && from<r.to);
+    if(clash) return fail(key,`Schon belegt: ${fmtRange(clash.from,clash.to)} von ${nameOf(clash.by)} (${clash.purpose}). Bitte anderen Zeitraum wählen.`);
+    const ok=await ins('reservations',{item_id:fid,item_name:it.name,cat:it.cat,starts:from,ends:to,purpose},'Reserviert: '+it.name);
+    if(ok){ S.formFor=null; S.errs[key]=null; render(); }
+  }
+  else if(kind==='ice'){
+    const date=val('ice-date'), time=val('ice-time'), bags=parseInt(val('ice-bags'),10), purpose=val('ice-why');
+    if(!date||!time||!purpose||!(bags>0)) return fail('ice','Bitte Datum, Uhrzeit, Menge und Zweck angeben.');
+    const ok=await ins('ice',{date,time,bags,purpose},`${bags} ${bags===1?'Sack':'Säcke'} Eis angemeldet`);
+    if(ok){ S.errs.ice=null; const w=document.getElementById('ice-why'); if(w) w.value=''; render(); }
+  }
+  else if(kind==='news'){
+    const title=val('news-title'), text=val('news-text');
+    if(!title||!text) return fail('news','Bitte Überschrift und Text ausfüllen.');
+    addRow('news',{title,text},'Neuigkeit veröffentlicht','news');
+  }
+  else if(kind==='duty'){
+    const g=form.dataset.group, fk='duty-'+g;
+    const date=val(fk+'-date'), time=val(fk+'-time'), topic=val(fk+'-topic');
+    if(!date||!time||!topic) return fail('duty','Bitte Datum, Beginn und Thema ausfüllen.');
+    addRow('duties',{grp:g,date,time,topic,place:val(fk+'-place'),lead:val(fk+'-lead'),note:val(fk+'-note')},'Dienst eingetragen','duty');
+  }
+  else if(kind==='event'){
+    const title=val('ev-title'), date=val('ev-date');
+    if(!title||!date) return fail('event','Bitte Name und Datum ausfüllen.');
+    addRow('events',{title,date,time:val('ev-time'),place:val('ev-place'),note:val('ev-note')},'Veranstaltung angelegt','event');
+  }
+  else if(kind==='shift'){
+    const fk='shift-'+fid; const task=val(fk+'-task'), start=val(fk+'-start'), end=val(fk+'-end'), need=parseInt(val(fk+'-need'),10);
+    if(!task||!start||!end||!(need>0)) return fail('shift','Bitte Aufgabe, Zeiten und Anzahl angeben.');
+    if(end<=start) return fail('shift','„Bis“ muss nach „Von“ liegen.');
+    addRow('shifts',{event_id:fid,task,start,end,need},'Arbeitsdienst angelegt','shift');
+  }
+  else if(kind==='addname'){
+    const name=val('an-'+fid); const sh=D('shifts').find(s=>s.id===fid); if(!name||!sh) return;
+    const ok=await ins('signups',{shift_id:fid,name},name+' eingetragen');
+    if(ok){ const el=document.getElementById('an-'+fid); if(el) el.value=''; }
+  }
+  else if(kind==='org'){
+    const role=val('org-role'); if(!role) return fail('org','Bitte eine Funktion eintragen.');
+    const row={role,name:val('org-name'),area:val('org-area'),phone:val('org-phone'),email:val('org-mail'),parent_id:val('org-parent')||null,sort:parseInt(val('org-order'),10)||0};
+    const ed=S.editOrg&&S.editOrg!=='new'?S.editOrg:null;
+    const ok = ed ? await upd('org',ed,row,'Gespeichert') : await ins('org',row,'„'+role+'“ hinzugefügt');
+    if(ok){ S.editOrg=null; S.errs.org=null; render(); }
+  }
+});
+
+async function submitDoc(e,form){
+  e.preventDefault();
+  const title=$('#doc-title').value.trim(), date=$('#doc-date').value, file=$('#doc-file').files[0], note=$('#doc-note').value.trim();
+  const err=$('#doc-err'); err.hidden=true;
+  if(!title||!date||!file){ err.textContent='Bitte Übung, Datum und Foto angeben.'; err.hidden=false; return; }
+  if(file.size>20*1024*1024){ err.textContent='Das Foto ist zu groß (max. 20 MB).'; err.hidden=false; return; }
+  S.busy=true; $('#doc-submit').disabled=true; $('#doc-submit').textContent='Lädt hoch …';
+  try{
+    const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5)||'jpg';
+    const path=`${S.me}/${Date.now()}.${ext}`;
+    const {error:upErr}=await sb.storage.from('listen').upload(path,file,{contentType:file.type||'image/jpeg'});
+    if(upErr) throw upErr;
+    const ok=await ins('docs',{title,date,note,photo_path:path},'Liste hochgeladen – steht auf „muss eingepflegt werden“');
+    if(ok){ form.reset(); $('#doc-date').value=today(); S.docFilter='offen'; }
+  }catch(ex){
+    err.textContent='Das Foto ließ sich nicht hochladen. Bitte nochmal versuchen.'; err.hidden=false; console.warn(ex);
+  }finally{ S.busy=false; $('#doc-submit').textContent='Hochladen'; render(); }
+}
+
+/* ---------- Anmeldung ---------- */
+let authMode='login';
+function setAuthMode(m){
+  authMode=m;
+  document.querySelectorAll('#auth-seg button').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.mode===m)));
+  $('#auth-seg').hidden = m==='reset' || m==='newpass';
+  $('#auth-name-wrap').hidden = m!=='signup';
+  $('#auth-email-wrap').hidden = m==='newpass';
+  $('#auth-pass-wrap').hidden = m==='reset';
+  $('#auth-forgot').textContent = m==='reset' ? 'Zurück zur Anmeldung' : 'Passwort vergessen?';
+  $('#auth-forgot').hidden = m==='newpass' || m==='signup';
+  $('#auth-pass').autocomplete = m==='login'?'current-password':'new-password';
+  $('#auth-submit').textContent = {login:'Anmelden',signup:'Konto anlegen',reset:'Link zum Zurücksetzen senden',newpass:'Neues Passwort speichern'}[m];
+  $('#auth-err').hidden=true; $('#auth-ok').hidden=true;
+}
+$('#auth-forgot').addEventListener('click',()=>setAuthMode(authMode==='reset'?'login':'reset'));
+async function submitAuth(e){
+  e.preventDefault();
+  const email=val('auth-email'), pass=$('#auth-pass').value, name=val('auth-name');
+  const err=$('#auth-err'), ok=$('#auth-ok'); err.hidden=true; ok.hidden=true;
+  const show=(el,msg)=>{ el.textContent=msg; el.hidden=false; };
+  const btn=$('#auth-submit'); btn.disabled=true;
+  try{
+    if(authMode==='login'){
+      const {error}=await sb.auth.signInWithPassword({email,password:pass});
+      if(error) show(err, /confirm/i.test(error.message)?'Bitte bestätige zuerst deine E-Mail-Adresse (Link im Postfach).':'E-Mail oder Passwort stimmt nicht.');
+    } else if(authMode==='signup'){
+      if(!name) return show(err,'Bitte gib deinen Namen an, damit dich die Kameraden erkennen.');
+      if(pass.length<6) return show(err,'Das Passwort braucht mindestens 6 Zeichen.');
+      const {data,error}=await sb.auth.signUp({email,password:pass,options:{data:{name},emailRedirectTo:location.origin+location.pathname}});
+      if(error) show(err, /registered/i.test(error.message)?'Diese E-Mail ist schon registriert. Bitte anmelden.':'Registrierung fehlgeschlagen: '+error.message);
+      else if(!data.session) show(ok,'Fast geschafft: Wir haben dir eine E-Mail geschickt. Bestätige den Link darin und melde dich dann an.');
+    } else if(authMode==='reset'){
+      const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+      if(error) show(err,'Das hat nicht geklappt: '+error.message); else show(ok,'Wenn die Adresse registriert ist, kommt gleich eine E-Mail mit einem Link.');
+    } else if(authMode==='newpass'){
+      if(pass.length<6) return show(err,'Das Passwort braucht mindestens 6 Zeichen.');
+      const {error}=await sb.auth.updateUser({password:pass});
+      if(error) show(err,'Speichern fehlgeschlagen: '+error.message); else { toast('Neues Passwort gespeichert'); setAuthMode('login'); await route(); }
+    }
+  } finally { btn.disabled=false; }
+}
+
+/* ---------- Ablauf: wer sieht was ---------- */
+let started=false;
+async function route(){
+  const {data:{session}}=await sb.auth.getSession();
+  const show=id=>{ ['gate-auth','gate-pending','app'].forEach(x=>{ document.getElementById(x).hidden = x!==id; }); };
+  if(!session || authMode==='newpass'){ S.me=null; S.profile=null; started=false; show('gate-auth'); return; }
+  S.me=session.user.id;
+  if(!S.profile || S.profile.id!==S.me){
+    let {data}=await sb.from('profiles').select('*').eq('id',S.me).maybeSingle();
+    if(!data){ await new Promise(r=>setTimeout(r,800)); ({data}=await sb.from('profiles').select('*').eq('id',S.me).maybeSingle()); }
+    S.profile=data?norm(data):{id:S.me,role:'pending',name:''};
+  }
+  subscribe();
+  if(!isMember()){
+    show('gate-pending');
+    $('#pending-text').textContent=`Hallo ${S.profile.name||''}! Dein Konto wartet auf Freigabe durch einen Bearbeiter der Wehr. Sobald du freigeschaltet bist, geht es hier automatisch weiter.`;
+    return;
+  }
+  show('app');
+  if(!started){
+    started=true;
+    await Promise.all(TABLES.map(load));
+    const h=location.hash.slice(1);
+    let v=VIEWS.includes(h)?h:null;
+    if(!v){ try{ v=localStorage.getItem('fhq-view'); }catch(_){} }
+    S.view=VIEWS.includes(v)?v:'home';
+    if(S.view==='members'&&!mgr()) S.view='home';
+  }
+  render();
+}
+
+/* ---------- Start ---------- */
+$('#doc-date').value=today();
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+if(!sb){
+  document.body.innerHTML='<div class="gate"><div class="gate-card"><div class="gate-form"><h2>Noch nicht verbunden</h2><p class="sub">Trag in <b>config.js</b> die Project URL und den anon-Schlüssel deines Supabase-Projekts ein. Die Anleitung steht in der README.</p></div></div></div>';
+} else {
+  sb.auth.onAuthStateChange((event)=>{
+    if(event==='PASSWORD_RECOVERY'){ setAuthMode('newpass'); document.getElementById('gate-auth').hidden=false; document.getElementById('app').hidden=true; document.getElementById('gate-pending').hidden=true; return; }
+    if(event==='SIGNED_IN'||event==='SIGNED_OUT'){ if(event==='SIGNED_OUT'){ S.profile=null; sb.removeAllChannels(); channel=null; TABLES.forEach(t=>{ S.data[t]=[]; S.loaded[t]=false; }); } setTimeout(route,0); }
+  });
+  route();
+}
