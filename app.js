@@ -682,16 +682,56 @@ function leadAttend(){
   }).join('');
   return html+'</div>';
 }
+S.catOpen=null; S.catPerson=null;
+function fristDetail(t){
+  const entries=D('member_quals').filter(q=>q.typeId===t.id).map(q=>({q,p:D('profiles').find(p=>p.id===q.userId),st:fristState(q)}))
+    .sort((a,b)=>(a.st.k-b.st.k)||(a.q.expires||'9').localeCompare(b.q.expires||'9'));
+  const withEntry=new Set(entries.map(e=>e.q.userId));
+  const missing=people().filter(p=>!withEntry.has(p.id));
+  const sel=S.catPerson||(missing[0]&&missing[0].id)||'';
+  return `<div class="cat-detail">
+    <form class="formbox" data-form="frist" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+      <input type="hidden" id="fr-type" value="${esc(t.id)}">
+      <label for="fr-user">Person<select id="fr-user">${personOpts(sel)}</select></label>
+      <label for="fr-date">Erledigt am<input type="date" id="fr-date" value="${today()}" required></label>
+      <label for="fr-exp">Gültig bis<input type="date" id="fr-exp"></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Eintragen</button></div>
+      <p class="sub span-all" style="margin:0">„Gültig bis“ leer = automatisch ${t.valid_months} Monate ab „Erledigt am“.</p>
+      ${errP('frist')}
+    </form>
+    ${missing.length?`<div class="missing"><h4>Noch ohne Eintrag (${missing.length})</h4><div class="people">${missing.map(p=>`<button class="person-pick ${p.id===sel?'on':''}" data-act="cat-person" data-id="${esc(p.id)}">${esc(p.name||p.email)}</button>`).join('')}</div></div>`:''}
+    <div class="cat-list">${entries.length?entries.map(({q,p,st})=>`<div class="cat-entry">
+      <div style="min-width:0"><b>${esc(p?p.name:'?')}</b> <span class="chip ${st.c}">${st.n}</span>
+        <div class="facts"><span>erledigt ${esc(fmtDate(q.achieved))}</span>${q.expires?`<span>gültig bis <b>${esc(fmtDate(q.expires))}</b></span>`:''}</div></div>
+      <div class="actions"><button class="btn small" data-act="frist-renew" data-id="${esc(q.id)}">Heute erneuert</button>${delBtn('member_quals',q.id)}</div>
+    </div>`).join(''):'<p class="sub" style="margin:0">Noch niemand eingetragen.</p>'}</div>
+  </div>`;
+}
 function leadCatalog(){
-  const block=(k,title)=>`<div class="panel"><div class="panel-head"><div><h3>${title}</h3></div></div>
-    ${qTypes(k).map(t=>`<div class="row"><div class="info"><h3 style="font-size:16px">${esc(t.name)}</h3>${t.valid_months?`<p class="note">gültig ${t.valid_months} Monate</p>`:''}</div><div class="actions">${delBtn('qual_types',t.id)}</div></div>`).join('')||'<div class="empty">Noch keine Einträge.</div>'}</div>`;
-  return `<div class="panel"><div class="panel-head"><div><h3>Neue Frist</h3><p class="sub">Löschen entfernt auch alle zugehörigen Einträge bei den Personen.</p></div></div>
+  const types=qTypes('frist');
+  const list=types.map(t=>{
+    const es=D('member_quals').filter(q=>q.typeId===t.id); const red=es.filter(q=>fristState(q).k===0).length, yel=es.filter(q=>fristState(q).k===1).length;
+    const open=S.catOpen===t.id;
+    return `<div class="cat-item ${open?'open':''}">
+      <div class="row">
+        <button class="cat-head" data-act="cat-open" data-id="${esc(t.id)}" aria-expanded="${open}">
+          <span class="cat-arrow" aria-hidden="true">${open?'▾':'▸'}</span>
+          <span style="min-width:0"><span class="cat-name">${esc(t.name)}</span><span class="note">gültig ${t.valid_months} Monate · ${es.length} ${es.length===1?'Person':'Personen'}</span></span>
+          <span class="cat-chips">${red?`<span class="chip busy">${red}</span>`:''}${yel?`<span class="chip open">${yel}</span>`:''}</span>
+        </button>
+        <div class="actions">${delBtn('qual_types',t.id)}</div>
+      </div>
+      ${open?fristDetail(t):''}
+    </div>`;}).join('');
+  return `<div class="panel"><div class="panel-head"><div><h3>Fristen</h3><p class="sub">Auf eine Frist tippen, um die Personen zu sehen und neue einzutragen.</p></div></div>
+    ${list||'<div class="empty">Noch keine Fristen angelegt.</div>'}</div>
+    <div class="panel"><div class="panel-head"><div><h3>Neue Frist anlegen</h3><p class="sub">Löschen einer Frist entfernt auch alle zugehörigen Einträge bei den Personen.</p></div></div>
     <form class="inline" data-form="qtype" style="margin:14px 20px">
       <label for="qt-name">Bezeichnung<input id="qt-name" required maxlength="60" placeholder="z. B. Absturzsicherung-Unterweisung"></label>
       <label for="qt-months">Gültigkeit in Monaten<input type="number" id="qt-months" min="1" max="120" required placeholder="z. B. 12"></label>
       <div class="form-actions"><button class="btn primary" type="submit">Hinzufügen</button></div>
       ${errP('qtype')}
-    </form></div>${block('frist','Fristen')}`;
+    </form></div>`;
 }
 
 /* ---------- Mitglieder (nur Bearbeiter) ---------- */
@@ -857,6 +897,8 @@ document.addEventListener('click', async e=>{
   }
   else if(act==='lead-tab'){ S.leadTab=b.dataset.key; S.confirm=null; S.errs={}; S.skipRestore=true; render(); }
   else if(act==='lead-group'){ S.leadGroup=b.dataset.key; S.attDuty=null; render(); }
+  else if(act==='cat-open'){ S.catOpen = S.catOpen===id?null:id; S.catPerson=null; S.errs={}; S.skipRestore=true; render(); }
+  else if(act==='cat-person'){ S.catPerson=id; S.skipRestore=true; render(); document.getElementById('fr-date')?.focus(); }
   else if(act==='att-open'){ S.attDuty = S.attDuty===id?null:id; S.skipRestore=true; render(); }
   else if(act==='frist-renew'){
     const q=D('member_quals').find(x=>x.id===id); const t=q&&D('qual_types').find(x=>x.id===q.typeId); if(!q||!t) return;
@@ -964,7 +1006,7 @@ document.addEventListener('submit', async e=>{
     if(!user_id||!type_id||!achieved) return fail('frist','Bitte Person, Frist und Datum angeben.');
     const expires=val('fr-exp')||(t&&t.valid_months?addMonths(achieved,t.valid_months):null);
     const ok=await run('member_quals', sb.from('member_quals').upsert({user_id,type_id,achieved,expires,note:val('fr-note')},{onConflict:'user_id,type_id'}), 'Frist gespeichert'+(expires?' – gültig bis '+fmtDate(expires):''));
-    if(ok){ S.errs.frist=null; ['fr-exp','fr-note'].forEach(i=>{const e=document.getElementById(i); if(e) e.value='';}); render(); }
+    if(ok){ S.errs.frist=null; S.catPerson=null; S.skipRestore=true; render(); }
   }
   else if(kind==='qual'){
     const user_id=val('ql-user'), type_id=val('ql-type'), achieved=val('ql-date');

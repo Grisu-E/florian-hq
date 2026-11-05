@@ -275,3 +275,21 @@ img{max-width:100%}
 .bar span{display:block;height:100%;background:var(--red);border-radius:99px}
 label.check{flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:15px;font-weight:500;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
 label.check input{width:18px;height:18px;flex:none}
+
+/* Fristen-Katalog */
+.cat-item{border-bottom:1px solid var(--line)}
+.cat-item:last-child{border-bottom:0}
+.cat-item .row{border-bottom:0;align-items:center}
+.cat-item.open{background:color-mix(in srgb,var(--red-soft) 35%,var(--surface))}
+.cat-head{appearance:none;border:0;background:none;color:inherit;font:inherit;text-align:left;display:flex;align-items:center;gap:12px;cursor:pointer;padding:0;min-width:0;width:100%}
+.cat-head .note{display:block;margin:2px 0 0}
+.cat-name{font-family:var(--display);font-weight:700;font-size:17px}
+.cat-arrow{width:26px;height:26px;border-radius:8px;background:var(--sunk);display:grid;place-items:center;flex:none;font-size:13px}
+.cat-chips{display:flex;gap:4px;margin-left:auto}
+.cat-detail{padding:0 20px 18px;display:flex;flex-direction:column;gap:12px}
+.missing h4{margin:0 0 6px}
+.person-pick{appearance:none;border:1px dashed var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:5px 11px;font:500 13px/1.2 var(--body);cursor:pointer}
+.person-pick:hover,.person-pick.on{border-style:solid;border-color:var(--red);color:var(--red)}
+.cat-list{display:flex;flex-direction:column;gap:6px}
+.cat-entry{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
+@media (max-width:560px){.cat-entry{grid-template-columns:1fr}}
