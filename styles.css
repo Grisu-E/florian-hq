@@ -293,3 +293,5 @@ label.check input{width:18px;height:18px;flex:none}
 .cat-list{display:flex;flex-direction:column;gap:6px}
 .cat-entry{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;align-items:center}
 @media (max-width:560px){.cat-entry{grid-template-columns:1fr}}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle}
+.dot.busy{background:var(--red)}.dot.open{background:var(--warn)}.dot.done{background:var(--ok)}.dot.free{background:var(--muted)}

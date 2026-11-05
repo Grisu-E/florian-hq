@@ -580,7 +580,7 @@ function renderPush(){
 }
 
 /* ---------- Wehrführung (nur Bearbeiter) ---------- */
-S.leadTab='fristen'; S.leadYear=new Date().getFullYear(); S.leadGroup='aktive'; S.attDuty=null; S.qualPrefill=null; S.fristFilter='';
+S.leadTab='catalog'; S.leadYear=new Date().getFullYear(); S.leadGroup='aktive'; S.attDuty=null; S.qualPrefill=null; S.fristFilter='';
 const people=()=>D('profiles').filter(p=>p.role==='member'||p.role==='admin').sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
 const qTypes=k=>D('qual_types').filter(t=>t.kind===k).sort((a,b)=>(a.sort-b.sort)||a.name.localeCompare(b.name,'de'));
 function addMonths(d,m){ const x=new Date(d+'T00:00'); const day=x.getDate(); x.setMonth(x.getMonth()+m); if(x.getDate()<day) x.setDate(0); return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`; }
@@ -591,16 +591,17 @@ function typeOpts(k,sel){ return qTypes(k).map(t=>`<option value="${esc(t.id)}" 
 
 function renderLead(){
   if(!mgr()) return `<div class="panel"><div class="empty"><strong>Nur für Bearbeiter.</strong></div></div>`;
-  const tabs=[['fristen','Fristen'],['attend','Übungsbeteiligung'],['catalog','Fristen-Katalog']];
-  if(!tabs.some(([k])=>k===S.leadTab)) S.leadTab='fristen';
+  const tabs=[['catalog','Fristen'],['attend','Übungsbeteiligung']];
+  if(!tabs.some(([k])=>k===S.leadTab)) S.leadTab='catalog';
   const fr=D('member_quals').filter(q=>D('qual_types').find(t=>t.id===q.typeId&&t.kind==='frist'));
   const red=fr.filter(q=>fristState(q).k===0).length, yel=fr.filter(q=>fristState(q).k===1).length;
   let html=`<div class="panel"><div class="panel-head"><div><h2>Wehrführung</h2><p class="sub">Nur für Bearbeiter sichtbar. Fristen und Übungsbeteiligung der Mannschaft.</p></div>
     <div class="actions">${red?`<span class="chip busy">${red} abgelaufen</span>`:''}${yel?`<span class="chip open">${yel} bald fällig</span>`:''}</div></div>
     <div class="org-tools"><div class="filters">${tabs.map(([k,n])=>`<button class="filter" data-act="lead-tab" data-key="${k}" aria-pressed="${S.leadTab===k}">${n}</button>`).join('')}</div></div></div>`;
-  html += S.leadTab==='attend'?leadAttend() : S.leadTab==='catalog'?leadCatalog() : leadFristen();
+  html += S.leadTab==='attend'?leadAttend() : leadCatalog();
   return loadingOr(['qual_types','member_quals','duty_attendance','profiles'], html);
 }
+// Frühere Fristen-Gesamtliste (ersetzt durch den aufklappbaren Katalog)
 function leadFristen(){
   const types=qTypes('frist');
   const rows=D('member_quals').filter(q=>types.some(t=>t.id===q.typeId)&&(!S.fristFilter||q.typeId===S.fristFilter))
@@ -701,7 +702,7 @@ function fristDetail(t){
     </form>
     ${missing.length?`<div class="missing"><h4>Noch ohne Eintrag (${missing.length})</h4><div class="people">${missing.map(p=>`<button class="person-pick ${p.id===sel?'on':''}" data-act="cat-person" data-id="${esc(p.id)}">${esc(p.name||p.email)}</button>`).join('')}</div></div>`:''}
     <div class="cat-list">${entries.length?entries.map(({q,p,st})=>`<div class="cat-entry">
-      <div style="min-width:0"><b>${esc(p?p.name:'?')}</b> <span class="chip ${st.c}">${st.n}</span>
+      <div style="min-width:0"><span class="dot ${st.c}" aria-hidden="true"></span><b>${esc(p?p.name:'?')}</b> <span class="chip ${st.c}">${st.n}</span>
         <div class="facts"><span>erledigt ${esc(fmtDate(q.achieved))}</span>${q.expires?`<span>gültig bis <b>${esc(fmtDate(q.expires))}</b></span>`:''}</div></div>
       <div class="actions"><button class="btn small" data-act="frist-renew" data-id="${esc(q.id)}">Heute erneuert</button>${delBtn('member_quals',q.id)}</div>
     </div>`).join(''):'<p class="sub" style="margin:0">Noch niemand eingetragen.</p>'}</div>
@@ -723,7 +724,7 @@ function leadCatalog(){
       </div>
       ${open?fristDetail(t):''}
     </div>`;}).join('');
-  return `<div class="panel"><div class="panel-head"><div><h3>Fristen</h3><p class="sub">Auf eine Frist tippen, um die Personen zu sehen und neue einzutragen.</p></div></div>
+  return `<div class="panel"><div class="panel-head"><div><h3>Fristen</h3><p class="sub">Auf eine Frist tippen: Personen mit Ampel sehen, neue eintragen, erneuern.</p></div></div>
     ${list||'<div class="empty">Noch keine Fristen angelegt.</div>'}</div>
     <div class="panel"><div class="panel-head"><div><h3>Neue Frist anlegen</h3><p class="sub">Löschen einer Frist entfernt auch alle zugehörigen Einträge bei den Personen.</p></div></div>
     <form class="inline" data-form="qtype" style="margin:14px 20px">
