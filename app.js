@@ -13,6 +13,7 @@ const ICONS = {
   'duty-aktive':'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M12 13v5M9.5 15.5h5"/></svg>',
   'duty-jugend':'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></svg>',
   events:'<svg viewBox="0 0 24 24"><path d="M4 21V4"/><path d="M4 4h13l-2.5 4L17 12H4"/><path d="M9 21h6M12 15v6"/></svg>',
+  expenses:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M15 15h3"/><path d="M7 3h10"/></svg>',
   org:'<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></svg>',
   lead:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M4 4l2 2M20 4l-2 2"/></svg>',
   members:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 14.2c3 .2 5.5 2.6 5.5 5.8"/></svg>',
@@ -26,10 +27,10 @@ const CATS = [
 ];
 const DUTY = {'duty-aktive':{g:'aktive',n:'Dienstplan Aktive'}, 'duty-jugend':{g:'jugend',n:'Dienstplan Jugend'}};
 const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'Bearbeiter'};
-const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','doc','members','defects','push','lead'];
+const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','doc','members','defects','push','lead','expenses'];
 const catName = k => k==='eis'?'Crushed-Eis':((CATS.find(c=>c.k===k)||{}).n || k);
 
-const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance'];
+const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance','expenses'];
 const S = {
   view:'home', openCat:null, data:{}, loaded:{},
   me:null, profile:null,
@@ -64,6 +65,8 @@ const who = id => `<span class="who">${esc(nameOf(id))}</span>`;
 const isMember = () => !!S.profile && (S.profile.role==='member'||S.profile.role==='admin');
 const isAdmin = () => !!S.profile && S.profile.role==='admin';
 const mgr = isAdmin;
+const isTreasurer = () => !!S.profile && !!S.profile.treasurer && isMember();
+const eur = n => (Math.round((+n||0)*100)/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
 const ro = () => !isMember();
 const mine = by => isAdmin() || (S.me && by===S.me);
 const lockNote = () => mgr()?'':'<p class="sub" style="margin-top:4px">Anlegen und Ändern ist den Bearbeitern vorbehalten.</p>';
@@ -156,14 +159,16 @@ function renderTiles(){
     tile('news','Neues in der Wehr', news.length?`${fresh?fresh+' neu · ':''}${esc(news[0].title)}`:'Noch keine Beiträge',{attr:'data-goto="news"',alert:fresh>0}) +
     tile('events','Veranstaltungen', evs.length?`${esc(fmtDay(evs[0].date))} · ${esc(evs[0].title)}${gaps?`<br>${gaps} Helfer gesucht`:''}`:'Nichts geplant',{attr:'data-goto="events"',alert:gaps>0}) +
     tile('duty-aktive','Dienstplan Aktive', dutyMeta('aktive'),{attr:'data-goto="duty-aktive"'}) +
-    tile('duty-jugend','Dienstplan Jugend', dutyMeta('jugend'),{attr:'data-goto="duty-jugend"'});
+    tile('duty-jugend','Dienstplan Jugend', dutyMeta('jugend'),{attr:'data-goto="duty-jugend"'}) +
+    tile('defects','Mängel', od.length?`${od.length} offen${out?` · ${out} außer Dienst`:''}`:'Alles in Ordnung',{attr:'data-goto="defects"',alert:od.length>0});
   const iceUp=D('ice').filter(x=>x.date>=t);
   const iceToday=D('ice').filter(x=>x.date===t).reduce((s,x)=>s+(+x.bags||0),0);
   $('#tiles-res').innerHTML = CATS.map(c=>catTile(c,n)).join('') +
-    tile('eis','Crushed-Eis', `${iceToday} Säcke heute · ${iceUp.length} Anmeldungen`,{attr:'data-cat="eis"',pressed:S.openCat==='eis'}) +
-    tile('defects','Mängel', od.length?`${od.length} offen${out?` · ${out} außer Dienst`:''}`:'Alles in Ordnung',{attr:'data-goto="defects"',alert:od.length>0});
+    tile('eis','Crushed-Eis', `${iceToday} Säcke heute · ${iceUp.length} Anmeldungen`,{attr:'data-cat="eis"',pressed:S.openCat==='eis'});
   let org = tile('org','Organigramm', D('org').length?`${D('org').length} Funktionen`:'Noch nicht hinterlegt',{attr:'data-goto="org"'}) +
-    tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:mgr()&&openDocs>0});
+    tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:mgr()&&openDocs>0}) +
+    (()=>{ const ex=D('expenses').filter(x=>x.status==='offen'); const sum=ex.reduce((a,x)=>a+(+x.amount||0),0);
+      return tile('expenses','Private Ausgaben', ex.length?`${ex.length} offen · ${eur(sum)}`:(isTreasurer()?'Nichts zu erstatten':'Auslage einreichen'),{attr:'data-goto="expenses"',alert:isTreasurer()&&ex.length>0}); })();
   if(mgr()){
     const fr=D('member_quals').filter(q=>D('qual_types').some(x=>x.id===q.typeId&&x.kind==='frist'));
     const red=fr.filter(q=>fristState(q).k===0).length, yel=fr.filter(q=>fristState(q).k===1).length;
@@ -534,7 +539,7 @@ function renderDefects(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)'],['meine_fristen','Meine eigenen Fristen']];
+const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)'],['meine_fristen','Meine eigenen Fristen'],['expenses','Private Ausgaben']];
 const pushSupported=()=>('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -754,6 +759,55 @@ function leadCatalog(){
     </form></div>`;
 }
 
+/* ---------- Private Ausgaben ---------- */
+const EST={offen:{n:'offen',c:'open'},erstattet:{n:'erstattet',c:'done'},abgelehnt:{n:'abgelehnt',c:'busy'}};
+S.receiptUrls={}; S.receiptPending=new Set();
+function ensureReceipts(paths){
+  const need=paths.filter(p=>p&&!S.receiptUrls[p]&&!S.receiptPending.has(p)); if(!need.length) return;
+  need.forEach(p=>S.receiptPending.add(p));
+  sb.storage.from('belege').createSignedUrls(need,3600).then(({data})=>{ (data||[]).forEach(x=>{ if(x.signedUrl) S.receiptUrls[x.path]=x.signedUrl; }); need.forEach(p=>{ if(!S.receiptUrls[p]) S.receiptUrls[p]='missing'; S.receiptPending.delete(p); }); if(S.view==='expenses') render(); });
+}
+function renderExpenses(){
+  const tr=isTreasurer();
+  const all=[...D('expenses')].sort((a,b)=>(b.spent_on||'').localeCompare(a.spent_on||'')||(b.created_at||'').localeCompare(a.created_at||''));
+  const open=all.filter(x=>x.status==='offen'), done=all.filter(x=>x.status!=='offen');
+  const sum=open.reduce((a,x)=>a+(+x.amount||0),0);
+  ensureReceipts(all.map(x=>x.receipt_path));
+  let html=`<div class="panel"><div class="panel-head"><div><h2>Private Ausgaben</h2><p class="sub">${tr?'Du bist <b>Kassier</b>: Du siehst alle eingereichten Auslagen und markierst sie als erstattet.':'Hast du etwas für die Wehr privat bezahlt? Hier einreichen – der Kassier erstattet es. Du siehst nur deine eigenen Einträge.'}</p></div>
+    ${open.length?`<span class="chip open">${open.length} offen · ${eur(sum)}</span>`:''}</div>
+    <form class="inline" data-form="expense" style="margin:14px 20px">
+      <label for="ex-date">Datum<input type="date" id="ex-date" value="${today()}" required></label>
+      <label for="ex-amount">Betrag in €<input id="ex-amount" inputmode="decimal" required placeholder="z. B. 23,90" maxlength="10"></label>
+      <label for="ex-purpose" class="span-all">Wofür?<input id="ex-purpose" required maxlength="120" placeholder="z. B. Getränke Übungsabend, Batterien Funkgeräte"></label>
+      <label for="ex-file" class="span-all">Beleg (Foto)<input type="file" id="ex-file" accept="image/*,application/pdf"></label>
+      <div class="form-actions"><button class="btn primary" type="submit" ${S.busy?'disabled':''}>Einreichen</button></div>
+      ${errP('expense')}
+    </form></div>`;
+  const row=x=>{
+    const url=S.receiptUrls[x.receipt_path];
+    return `<div class="row">
+    <div class="info">
+      <div style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center"><h3>${esc(eur(x.amount))}</h3><span class="chip ${EST[x.status].c}">${EST[x.status].n}</span>${tr?`<span class="cat-dot">${esc(nameOf(x.user_id))}</span>`:''}</div>
+      <p class="text" style="margin-top:2px">${esc(x.purpose)}</p>
+      <div class="facts"><span>ausgegeben am ${esc(fmtDate(x.spent_on))}</span>${x.paid_at?`<span>${x.status==='erstattet'?'erstattet':'bearbeitet'} am ${esc(new Date(x.paid_at).toLocaleDateString('de-DE'))}${x.paid_by?' von '+esc(nameOf(x.paid_by)):''}</span>`:''}
+        ${x.receipt_path?(url&&url!=='missing'?`<a href="${esc(url)}" target="_blank" rel="noopener">📎 Beleg ansehen</a>`:'<span>📎 Beleg</span>'):'<span>ohne Beleg</span>'}</div>
+    </div>
+    <div class="actions">${tr&&x.status==='offen'?`<button class="btn small primary" data-act="exp-status" data-id="${esc(x.id)}" data-status="erstattet">Erstattet</button><button class="btn small" data-act="exp-status" data-id="${esc(x.id)}" data-status="abgelehnt">Ablehnen</button>`:''}
+      ${tr&&x.status!=='offen'?`<button class="btn small ghost" data-act="exp-status" data-id="${esc(x.id)}" data-status="offen">Zurück auf offen</button>`:''}
+      ${(tr||(x.user_id===S.me&&x.status==='offen'))?delBtn('expenses',x.id):''}</div>
+  </div>`;};
+  let byPerson='';
+  if(tr&&open.length){
+    const m={}; open.forEach(x=>{m[x.user_id]=(m[x.user_id]||0)+(+x.amount||0);});
+    byPerson=`<div class="day-head"><span class="when">Offen je Person</span><span>${Object.entries(m).sort((a,b)=>b[1]-a[1]).map(([u,v])=>`${esc(nameOf(u))}: <b>${esc(eur(v))}</b>`).join(' · ')}</span></div>`;
+  }
+  html+=`<div class="panel"><div class="panel-head"><div><h3>${tr?'Zu erstatten':'Meine offenen Ausgaben'}</h3></div><span class="count">${eur(sum)}</span></div>
+    ${byPerson}${open.length?open.map(row).join(''):'<div class="empty"><strong>Nichts offen.</strong></div>'}
+    ${done.length?`<div class="day-head"><span class="when">Erledigt (${done.length})</span><button class="btn ghost small" data-act="toggle-past" data-key="expenses">${S.showPast.expenses?'Ausblenden':'Anzeigen'}</button></div>${S.showPast.expenses?done.map(row).join(''):''}`:''}
+  </div>`;
+  return loadingOr(['expenses'], html);
+}
+
 /* ---------- Mitglieder (nur Bearbeiter) ---------- */
 function renderMembers(){
   if(!mgr()) return `<div class="panel"><div class="empty"><strong>Nur für Bearbeiter.</strong></div></div>`;
@@ -765,6 +819,7 @@ function renderMembers(){
       ${p.role==='pending'
         ? `<button class="btn primary small" data-act="set-role" data-id="${esc(p.id)}" data-role="member">Freigeben</button><button class="btn small" data-act="set-role" data-id="${esc(p.id)}" data-role="admin">Als Bearbeiter freigeben</button>`
         : `<select class="role-select" data-act-change="role" data-id="${esc(p.id)}" aria-label="Rolle von ${esc(p.name)}">${['member','admin','pending'].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${ROLE_NAME[r]==='wartet'?'Sperren (wartet)':ROLE_NAME[r]}</option>`).join('')}</select>`}
+      ${p.role!=='pending'?`<button class="btn small ${p.treasurer?'primary':''}" data-act="treasurer" data-id="${esc(p.id)}" aria-pressed="${!!p.treasurer}" title="Darf alle privaten Ausgaben sehen und erstatten">${p.treasurer?'💶 Kassier':'Kassier?'}</button>`:''}
       ${p.id!==S.me?delBtn('member',p.id,'Entfernen'):''}
     </div>
   </div>`;
@@ -828,7 +883,7 @@ function render(){
   const v=S.view;
   $('#view-home').hidden = v!=='home';
   $('#view-doc').hidden = v!=='doc';
-  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','members','defects','push','lead'].includes(v);
+  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','members','defects','push','lead','expenses'].includes(v);
   const waiting=D('profiles').filter(p=>p.role==='pending').length;
   $('#me-name').textContent=S.profile.name||'';
   $('#me-role').textContent=ROLE_NAME[S.profile.role]||'';
@@ -841,7 +896,7 @@ function render(){
   } else if(v!=='doc'){
     const page=$('#view-page'); const snap=snapshotForm(page);
     if(S.skipRestore){ snap.vals={}; snap.focus=null; }
-    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg() : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : renderDuty(v));
+    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg() : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : v==='expenses'?renderExpenses() : renderDuty(v));
     restoreForm(page,snap); S.skipRestore=false;
   }
   renderDocs();
@@ -858,7 +913,7 @@ function go(view){
 }
 
 /* ---------- Klicks ---------- */
-const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',docs:'Liste gelöscht',news:'Beitrag gelöscht',duties:'Dienst gelöscht',events:'Veranstaltung gelöscht',shifts:'Arbeitsdienst gelöscht',ice:'Eis-Anmeldung storniert',org:'Funktion entfernt',defects:'Mangel gelöscht',member_quals:'Eintrag entfernt',qual_types:'Aus dem Katalog entfernt'};
+const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',docs:'Liste gelöscht',news:'Beitrag gelöscht',duties:'Dienst gelöscht',events:'Veranstaltung gelöscht',shifts:'Arbeitsdienst gelöscht',ice:'Eis-Anmeldung storniert',org:'Funktion entfernt',defects:'Mangel gelöscht',member_quals:'Eintrag entfernt',expenses:'Ausgabe gelöscht',qual_types:'Aus dem Katalog entfernt'};
 
 document.addEventListener('click', async e=>{
   const gt=e.target.closest('[data-goto]'); if(gt){ go(gt.dataset.goto); return; }
@@ -886,6 +941,7 @@ document.addEventListener('click', async e=>{
       return;
     }
     if(col==='docs'){ const d=D('docs').find(x=>x.id===id); if(d&&d.photo_path) await sb.storage.from('listen').remove([d.photo_path]); }
+    if(col==='expenses'){ const x=D('expenses').find(y=>y.id===id); if(x&&x.receipt_path) await sb.storage.from('belege').remove([x.receipt_path]); }
     await del(col,id,DEL_MSG[col]);
   }
   else if(act==='toggle-doc'){
@@ -906,6 +962,15 @@ document.addEventListener('click', async e=>{
   }
   else if(act==='unsign'){ await del('signups',id,'Ausgetragen'); }
   else if(act==='set-role'){ await setRole(id,b.dataset.role); }
+  else if(act==='treasurer'){
+    const p=D('profiles').find(x=>x.id===id); const on=!(p&&p.treasurer);
+    const {error}=await sb.rpc('set_treasurer',{target:id,flag:on});
+    if(error) toast(errText(error)); else { toast(on?'Als Kassier festgelegt':'Kassier-Recht entfernt'); await load('profiles'); await load('expenses'); route(); }
+  }
+  else if(act==='exp-status'){
+    const st=b.dataset.status;
+    await upd('expenses',id, st==='offen'?{status:'offen',paid_by:null,paid_at:null}:{status:st,paid_by:S.me,paid_at:new Date().toISOString()}, st==='erstattet'?'Als erstattet markiert':st==='abgelehnt'?'Abgelehnt':'Wieder offen');
+  }
   else if(act==='rsvp'){ await setRsvp(id,b.dataset.status); }
   else if(act==='defect-status'){
     const st=b.dataset.status;
@@ -1047,6 +1112,27 @@ document.addEventListener('submit', async e=>{
     const rows=people().map(p=>({duty_id:fid,user_id:p.id,present:!!(document.getElementById('att-'+p.id)||{}).checked}));
     const ok=await run('duty_attendance', sb.from('duty_attendance').upsert(rows,{onConflict:'duty_id,user_id'}), rows.filter(r=>r.present).length+' anwesend gespeichert');
     if(ok){ S.attDuty=null; render(); }
+  }
+  else if(kind==='expense'){
+    const spent_on=val('ex-date'), purpose=val('ex-purpose');
+    const amount=parseFloat(val('ex-amount').replace(/\./g,'').replace(',','.'));
+    if(!spent_on||!purpose) return fail('expense','Bitte Datum und Zweck angeben.');
+    if(!(amount>0)) return fail('expense','Bitte einen gültigen Betrag eingeben, z. B. 23,90.');
+    const file=(document.getElementById('ex-file')||{}).files?.[0];
+    if(file&&file.size>20*1024*1024) return fail('expense','Der Beleg ist zu groß (max. 20 MB).');
+    S.busy=true;
+    try{
+      let receipt_path=null;
+      if(file){
+        const ext=(file.name.split('.').pop()||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'').slice(0,5)||'jpg';
+        receipt_path=`${S.me}/${Date.now()}.${ext}`;
+        const {error}=await sb.storage.from('belege').upload(receipt_path,file,{contentType:file.type||'image/jpeg'});
+        if(error) throw error;
+      }
+      const ok=await ins('expenses',{spent_on,amount:Math.round(amount*100)/100,purpose,receipt_path},`${eur(amount)} eingereicht – der Kassier wird informiert`);
+      if(ok){ S.errs.expense=null; S.skipRestore=true; }
+    }catch(e){ console.warn(e); fail('expense','Der Beleg ließ sich nicht hochladen. Bitte nochmal versuchen.'); }
+    finally{ S.busy=false; render(); }
   }
   else if(kind==='defect'){
     const itemId=val('df-item'), it=D('items').find(i=>i.id===itemId);
