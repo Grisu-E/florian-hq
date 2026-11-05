@@ -299,3 +299,8 @@ label.check input{width:18px;height:18px;flex:none}
 .remind-box label.check{border:0;padding:0;background:none}
 .rm-days{flex-direction:row;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)}
 .rm-days input{width:72px}
+
+/* Zurück-Leiste auf Unterseiten */
+.backbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding-block:10px;margin-top:-8px}
+.backbar .btn{padding-left:0;font-size:15px;color:var(--ink)}
+main{padding-top:20px}

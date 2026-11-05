@@ -13,6 +13,9 @@ const ICONS = {
   'duty-aktive':'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M12 13v5M9.5 15.5h5"/></svg>',
   'duty-jugend':'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></svg>',
   events:'<svg viewBox="0 0 24 24"><path d="M4 21V4"/><path d="M4 4h13l-2.5 4L17 12H4"/><path d="M9 21h6M12 15v6"/></svg>',
+  org:'<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></svg>',
+  lead:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M4 4l2 2M20 4l-2 2"/></svg>',
+  members:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 14.2c3 .2 5.5 2.6 5.5 5.8"/></svg>',
   defects:'<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>'
 };
 const CATS = [
@@ -148,19 +151,27 @@ function renderTiles(){
   const evIds=new Set(evs.map(e=>e.id));
   const gaps=D('shifts').filter(s=>evIds.has(s.eventId)).reduce((sum,s)=>sum+Math.max(0,(+s.need||0)-D('signups').filter(x=>x.shiftId===s.id).length),0);
   const openDocs=D('docs').filter(d=>d.status!=='eingepflegt').length;
+  const od=D('defects').filter(x=>x.status!=='erledigt'); const out=od.filter(x=>x.urgency==='ausser_dienst').length;
   $('#tiles-info').innerHTML =
     tile('news','Neues in der Wehr', news.length?`${fresh?fresh+' neu · ':''}${esc(news[0].title)}`:'Noch keine Beiträge',{attr:'data-goto="news"',alert:fresh>0}) +
-    tile('duty-aktive','Dienstplan Aktive', dutyMeta('aktive'),{attr:'data-goto="duty-aktive"'}) +
-    tile('duty-jugend','Dienstplan Jugend', dutyMeta('jugend'),{attr:'data-goto="duty-jugend"'}) +
     tile('events','Veranstaltungen', evs.length?`${esc(fmtDay(evs[0].date))} · ${esc(evs[0].title)}${gaps?`<br>${gaps} Helfer gesucht`:''}`:'Nichts geplant',{attr:'data-goto="events"',alert:gaps>0}) +
-    tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:openDocs>0}) +
-    (()=>{ const od=D('defects').filter(x=>x.status!=='erledigt'); const out=od.filter(x=>x.urgency==='ausser_dienst').length;
-      return tile('defects','Mängel', od.length?`${od.length} offen${out?` · ${out} außer Dienst`:''}`:'Alles in Ordnung',{attr:'data-goto="defects"',alert:od.length>0}); })();
+    tile('duty-aktive','Dienstplan Aktive', dutyMeta('aktive'),{attr:'data-goto="duty-aktive"'}) +
+    tile('duty-jugend','Dienstplan Jugend', dutyMeta('jugend'),{attr:'data-goto="duty-jugend"'});
   const iceUp=D('ice').filter(x=>x.date>=t);
   const iceToday=D('ice').filter(x=>x.date===t).reduce((s,x)=>s+(+x.bags||0),0);
-  $('#tiles-res').innerHTML = CATS.slice(0,2).map(c=>catTile(c,n)).join('') +
+  $('#tiles-res').innerHTML = CATS.map(c=>catTile(c,n)).join('') +
     tile('eis','Crushed-Eis', `${iceToday} Säcke heute · ${iceUp.length} Anmeldungen`,{attr:'data-cat="eis"',pressed:S.openCat==='eis'}) +
-    CATS.slice(2).map(c=>catTile(c,n)).join('');
+    tile('defects','Mängel', od.length?`${od.length} offen${out?` · ${out} außer Dienst`:''}`:'Alles in Ordnung',{attr:'data-goto="defects"',alert:od.length>0});
+  let org = tile('org','Organigramm', D('org').length?`${D('org').length} Funktionen`:'Noch nicht hinterlegt',{attr:'data-goto="org"'}) +
+    tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:mgr()&&openDocs>0});
+  if(mgr()){
+    const fr=D('member_quals').filter(q=>D('qual_types').some(x=>x.id===q.typeId&&x.kind==='frist'));
+    const red=fr.filter(q=>fristState(q).k===0).length, yel=fr.filter(q=>fristState(q).k===1).length;
+    const waiting=D('profiles').filter(p=>p.role==='pending').length;
+    org += tile('lead','Führung', red||yel?`${red?red+' abgelaufen':''}${red&&yel?' · ':''}${yel?yel+' bald fällig':''}`:'Fristen & Beteiligung',{attr:'data-goto="lead"',alert:red+yel>0}) +
+      tile('members','Mitglieder', waiting?`${waiting} warten auf Freigabe`:`${D('profiles').filter(p=>p.role!=='pending').length} Mitglieder`,{attr:'data-goto="members"',alert:waiting>0});
+  }
+  $('#tiles-org').innerHTML = org;
 }
 function catTile(c,n){
   const items=D('items').filter(i=>i.cat===c.k).length;
@@ -576,7 +587,7 @@ function renderPush(){
     body = `<div class="row"><div class="info"><h3>Benachrichtigungen sind an</h3><p class="note">Wähle, worüber du informiert werden willst. Gilt nur für dieses Gerät.</p></div><div class="actions"><button class="btn danger small" data-act="push-off">Alle ausschalten</button></div></div>
       ${PUSH_CATS.filter(([k])=>(k!=='defects'&&k!=='fristen')||mgr()).map(([k,n])=>{const on=(row.prefs||{})[k]!==false;return `<div class="row"><div class="info"><h3 style="font-size:16px">${esc(n)}</h3></div><div class="actions"><button class="switch" role="switch" aria-checked="${on}" data-act="push-pref" data-key="${k}" aria-label="${esc(n)}"><span></span></button></div></div>`;}).join('')}`;
   }
-  return `<div class="panel"><div class="panel-head"><div><h2>Benachrichtigungen</h2><p class="sub">Push-Meldungen aufs Handy oder den Computer.</p></div><button class="btn ghost" data-goto="home">← Zur Übersicht</button></div>${body}</div>`;
+  return `<div class="panel"><div class="panel-head"><div><h2>Benachrichtigungen</h2><p class="sub">Push-Meldungen aufs Handy oder den Computer.</p></div></div>${body}</div>`;
 }
 
 /* ---------- Wehrführung (nur Bearbeiter) ---------- */
@@ -818,11 +829,7 @@ function render(){
   $('#view-home').hidden = v!=='home';
   $('#view-doc').hidden = v!=='doc';
   $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','members','defects','push','lead'].includes(v);
-  document.querySelectorAll('#tabs .tab').forEach(t=>t.setAttribute('aria-selected',String(t.dataset.view===v)));
-  $('#tab-members').hidden=!mgr();
-  $('#tab-lead').hidden=!mgr();
   const waiting=D('profiles').filter(p=>p.role==='pending').length;
-  const badge=$('#pending-badge'); badge.textContent=waiting+' neu'; badge.hidden=!waiting;
   $('#me-name').textContent=S.profile.name||'';
   $('#me-role').textContent=ROLE_NAME[S.profile.role]||'';
   renderTiles();
@@ -833,7 +840,7 @@ function render(){
   } else if(v!=='doc'){
     const page=$('#view-page'); const snap=snapshotForm(page);
     if(S.skipRestore){ snap.vals={}; snap.focus=null; }
-    page.innerHTML = v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg() : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : renderDuty(v);
+    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg() : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : renderDuty(v));
     restoreForm(page,snap); S.skipRestore=false;
   }
   renderDocs();
@@ -853,7 +860,6 @@ function go(view){
 const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',docs:'Liste gelöscht',news:'Beitrag gelöscht',duties:'Dienst gelöscht',events:'Veranstaltung gelöscht',shifts:'Arbeitsdienst gelöscht',ice:'Eis-Anmeldung storniert',org:'Funktion entfernt',defects:'Mangel gelöscht',member_quals:'Eintrag entfernt',qual_types:'Aus dem Katalog entfernt'};
 
 document.addEventListener('click', async e=>{
-  const tab=e.target.closest('#tabs .tab'); if(tab){ go(tab.dataset.view); return; }
   const gt=e.target.closest('[data-goto]'); if(gt){ go(gt.dataset.goto); return; }
   const tile=e.target.closest('.tile[data-cat]'); if(tile){
     S.openCat = S.openCat===tile.dataset.cat?null:tile.dataset.cat; S.formFor=null; S.openForm=null; S.confirm=null; S.errs={}; render();
