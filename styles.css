@@ -295,3 +295,7 @@ label.check input{width:18px;height:18px;flex:none}
 @media (max-width:560px){.cat-entry{grid-template-columns:1fr}}
 .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;vertical-align:middle}
 .dot.busy{background:var(--red)}.dot.open{background:var(--warn)}.dot.done{background:var(--ok)}.dot.free{background:var(--muted)}
+.remind-box{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.remind-box label.check{border:0;padding:0;background:none}
+.rm-days{flex-direction:row;align-items:center;gap:6px;text-transform:none;letter-spacing:0;font-size:14px;color:var(--ink)}
+.rm-days input{width:72px}

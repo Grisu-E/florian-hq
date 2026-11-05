@@ -523,7 +523,7 @@ function renderDefects(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)']];
+const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)'],['meine_fristen','Meine eigenen Fristen']];
 const pushSupported=()=>('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -585,7 +585,7 @@ const people=()=>D('profiles').filter(p=>p.role==='member'||p.role==='admin').so
 const qTypes=k=>D('qual_types').filter(t=>t.kind===k).sort((a,b)=>(a.sort-b.sort)||a.name.localeCompare(b.name,'de'));
 function addMonths(d,m){ const x=new Date(d+'T00:00'); const day=x.getDate(); x.setMonth(x.getMonth()+m); if(x.getDate()<day) x.setDate(0); return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`; }
 const daysUntil=d=>Math.round((new Date(d+'T00:00')-new Date(today()+'T00:00'))/864e5);
-function fristState(q){ if(!q.expires) return {c:'free',n:'ohne Ablauf',k:3}; const n=daysUntil(q.expires); if(n<0) return {c:'busy',n:`seit ${-n} Tg. abgelaufen`,k:0}; if(n<=60) return {c:'open',n:`noch ${n} Tg.`,k:1}; return {c:'done',n:`noch ${n} Tg.`,k:2}; }
+function fristState(q){ if(!q.expires) return {c:'free',n:'ohne Ablauf',k:3}; const t=D('qual_types').find(x=>x.id===q.typeId); const warn=(t&&t.remind_days!=null)?t.remind_days:60; const n=daysUntil(q.expires); if(n<0) return {c:'busy',n:`seit ${-n} Tg. abgelaufen`,k:0}; if(n<=warn) return {c:'open',n:`noch ${n} Tg.`,k:1}; return {c:'done',n:`noch ${n} Tg.`,k:2}; }
 function personOpts(sel){ return people().map(p=>`<option value="${esc(p.id)}" ${p.id===sel?'selected':''}>${esc(p.name||p.email)}</option>`).join(''); }
 function typeOpts(k,sel){ return qTypes(k).map(t=>`<option value="${esc(t.id)}" ${t.id===sel?'selected':''}>${esc(t.name)}${t.valid_months?` (${t.valid_months} Mon.)`:''}</option>`).join(''); }
 
@@ -691,6 +691,13 @@ function fristDetail(t){
   const missing=people().filter(p=>!withEntry.has(p.id));
   const sel=S.catPerson||(missing[0]&&missing[0].id)||'';
   return `<div class="cat-detail">
+    <form class="remind-box" data-form="remind" data-id="${esc(t.id)}">
+      <label class="check"><input type="checkbox" id="rm-on" ${t.remind_days!=null?'checked':''}> 🔔 Vorab-Erinnerung</label>
+      <label for="rm-days" class="rm-days"><input type="number" id="rm-days" min="0" max="365" value="${t.remind_days!=null?t.remind_days:30}"> Tage vor Ablauf</label>
+      <label class="check"><input type="checkbox" id="rm-person" ${t.remind_person?'checked':''}> betroffene Person auch erinnern</label>
+      <button class="btn small" type="submit">Speichern</button>
+      <p class="sub" style="margin:0;flex-basis:100%">Bearbeiter bekommen dann eine Push-Meldung, wenn die Frist in X Tagen abläuft und wenn sie abgelaufen ist. Ab dieser Zeit wird die Ampel gelb.</p>
+    </form>
     <form class="formbox" data-form="frist" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
       <input type="hidden" id="fr-type" value="${esc(t.id)}">
       <label for="fr-user">Person<select id="fr-user">${personOpts(sel)}</select></label>
@@ -717,7 +724,7 @@ function leadCatalog(){
       <div class="row">
         <button class="cat-head" data-act="cat-open" data-id="${esc(t.id)}" aria-expanded="${open}">
           <span class="cat-arrow" aria-hidden="true">${open?'▾':'▸'}</span>
-          <span style="min-width:0"><span class="cat-name">${esc(t.name)}</span><span class="note">gültig ${t.valid_months} Monate · ${es.length} ${es.length===1?'Person':'Personen'}</span></span>
+          <span style="min-width:0"><span class="cat-name">${esc(t.name)}</span><span class="note">gültig ${t.valid_months} Monate · ${es.length} ${es.length===1?'Person':'Personen'} · ${t.remind_days!=null?`🔔 ${t.remind_days} Tage vorher`:'keine Erinnerung'}</span></span>
           <span class="cat-chips">${red?`<span class="chip busy">${red}</span>`:''}${yel?`<span class="chip open">${yel}</span>`:''}</span>
         </button>
         <div class="actions">${delBtn('qual_types',t.id)}</div>
@@ -730,6 +737,7 @@ function leadCatalog(){
     <form class="inline" data-form="qtype" style="margin:14px 20px">
       <label for="qt-name">Bezeichnung<input id="qt-name" required maxlength="60" placeholder="z. B. Absturzsicherung-Unterweisung"></label>
       <label for="qt-months">Gültigkeit in Monaten<input type="number" id="qt-months" min="1" max="120" required placeholder="z. B. 12"></label>
+      <label for="qt-remind">Erinnerung (Tage vorher)<input type="number" id="qt-remind" min="0" max="365" placeholder="leer = keine"></label>
       <div class="form-actions"><button class="btn primary" type="submit">Hinzufügen</button></div>
       ${errP('qtype')}
     </form></div>`;
@@ -1015,11 +1023,17 @@ document.addEventListener('submit', async e=>{
     const ok=await run('member_quals', sb.from('member_quals').upsert({user_id,type_id,achieved,expires:null},{onConflict:'user_id,type_id'}), 'Lehrgang eingetragen');
     if(ok){ S.qualPrefill=null; S.errs.qual=null; render(); }
   }
+  else if(kind==='remind'){
+    const on=document.getElementById('rm-on').checked, d=parseInt(val('rm-days'),10);
+    if(on && !(d>=0)) return toast('Bitte die Anzahl Tage angeben.');
+    await upd('qual_types',fid,{remind_days:on?d:null,remind_person:document.getElementById('rm-person').checked}, on?`Erinnerung ${d} Tage vorher gespeichert`:'Erinnerung ausgeschaltet');
+  }
   else if(kind==='qtype'){
     const name=val('qt-name'), k='frist', m=parseInt(val('qt-months'),10);
     if(!name) return fail('qtype','Bitte eine Bezeichnung eingeben.');
     if(k==='frist'&&!(m>0)) return fail('qtype','Bei Fristen bitte die Gültigkeit in Monaten angeben.');
-    const ok=await ins('qual_types',{name,kind:k,valid_months:k==='frist'?m:null,sort:100},'„'+name+'“ hinzugefügt');
+    const rd=parseInt(val('qt-remind'),10);
+    const ok=await ins('qual_types',{name,kind:k,valid_months:k==='frist'?m:null,remind_days:rd>=0?rd:null,sort:100},'„'+name+'“ hinzugefügt');
     if(ok){ S.errs.qtype=null; render(); }
   }
   else if(kind==='attendance'){

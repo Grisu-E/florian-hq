@@ -89,3 +89,7 @@ end $$;
 revoke all on function public.fhq_frist_reminder() from public, anon, authenticated;
 select cron.unschedule(jobid) from cron.job where jobname = 'fhq-fristen';
 select cron.schedule('fhq-fristen', '5 6 * * *', 'select public.fhq_frist_reminder()');
+
+-- ---------- v3.1: Vorab-Erinnerung je Frist ----------
+-- remind_days = Tage vor Ablauf (null = keine Erinnerung); remind_person = betroffene Person ebenfalls erinnern
+-- (Siehe Live-Stand: Spalten remind_days/remind_person, Funktion fhq_push_targets_users, neue fhq_frist_reminder)

@@ -43,11 +43,13 @@ Deno.serve(async (req) => {
     if (req.headers.get("x-hook-secret") !== cfg.hook_secret) return json({ error: "unauthorized" }, 401);
 
     const msg = await req.json();
-    const { data: subs, error } = await sb.rpc("fhq_push_targets", {
-      cat: msg.category,
-      excl: msg.exclude ?? null,
-      admin_only: !!msg.adminOnly,
-    });
+    const { data: subs, error } = Array.isArray(msg.userIds)
+      ? await sb.rpc("fhq_push_targets_users", { cat: msg.category, ids: msg.userIds })
+      : await sb.rpc("fhq_push_targets", {
+          cat: msg.category,
+          excl: msg.exclude ?? null,
+          admin_only: !!msg.adminOnly,
+        });
     if (error) throw error;
 
     webpush.setVapidDetails("https://florian-hq.netlify.app", cfg.vapid_public!, cfg.vapid_private!);
