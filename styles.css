@@ -55,7 +55,7 @@ h4{font-family:var(--mono);font-size:12px;letter-spacing:.12em;text-transform:up
 .group-label::after{content:"";flex:1;height:1px;background:var(--line)}
 
 /* Kacheln */
-.tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
 @media (max-width:900px){.tiles{grid-template-columns:repeat(3,1fr)}}
 @media (max-width:560px){.tiles{grid-template-columns:repeat(2,1fr)}}
 .tile{appearance:none;text-align:left;font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;cursor:pointer;display:flex;flex-direction:column;gap:12px;min-height:156px;transition:border-color .15s,transform .2s,box-shadow .2s;min-width:0;box-shadow:var(--shadow)}
@@ -235,3 +235,25 @@ img{max-width:100%}
 .hero .crest{width:clamp(52px,9vw,76px);height:auto;flex:none;filter:drop-shadow(0 4px 10px rgba(0,0,0,.35));align-self:center}
 .hero{align-items:center}
 .gate-card .hero .crest{align-self:flex-start}
+
+/* Zu-/Absage */
+.rsvp{margin-top:10px;display:flex;flex-direction:column;gap:8px}
+.rsvp-btns{display:flex;flex-wrap:wrap;gap:6px}
+.rsvp-btn{appearance:none;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:99px;padding:7px 13px;font:600 13px/1 var(--body);cursor:pointer}
+.rsvp-btn:hover{border-color:var(--ink)}
+.rsvp-btn.yes[aria-pressed="true"]{background:var(--ok);border-color:var(--ok);color:#fff}
+.rsvp-btn.maybe[aria-pressed="true"]{background:var(--warn);border-color:var(--warn);color:#fff}
+.rsvp-btn.no[aria-pressed="true"]{background:var(--red);border-color:var(--red);color:#fff}
+.rsvp-sum{appearance:none;border:0;background:none;padding:0;display:flex;flex-wrap:wrap;gap:6px;align-items:center;cursor:pointer;font:inherit;color:inherit;text-align:left}
+.rsvp-more{font-size:13px;color:var(--muted);text-decoration:underline}
+.rsvp-names{font-size:14px;background:var(--sunk);border-radius:10px;padding:10px 12px}
+.rsvp-names p{margin:2px 0}
+
+/* Schalter */
+.switch{appearance:none;border:0;width:46px;height:28px;border-radius:99px;background:var(--line);position:relative;cursor:pointer;flex:none;transition:background .15s}
+.switch span{position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .15s}
+.switch[aria-checked="true"]{background:var(--ok)}
+.switch[aria-checked="true"] span{transform:translateX(18px)}
+.switch:focus-visible{outline:2px solid var(--red);outline-offset:2px}
+@media (prefers-reduced-motion:reduce){.switch,.switch span{transition:none}}
+.me-chip button[data-goto="push"]{padding:5px 8px}

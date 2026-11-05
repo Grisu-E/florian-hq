@@ -12,7 +12,8 @@ const ICONS = {
   news:'<svg viewBox="0 0 24 24"><path d="M3 10v4h3l6 4V6L6 10H3z"/><path d="M16 9a4 4 0 0 1 0 6M18.5 6.5a7.5 7.5 0 0 1 0 11"/></svg>',
   'duty-aktive':'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="M12 13v5M9.5 15.5h5"/></svg>',
   'duty-jugend':'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></svg>',
-  events:'<svg viewBox="0 0 24 24"><path d="M4 21V4"/><path d="M4 4h13l-2.5 4L17 12H4"/><path d="M9 21h6M12 15v6"/></svg>'
+  events:'<svg viewBox="0 0 24 24"><path d="M4 21V4"/><path d="M4 4h13l-2.5 4L17 12H4"/><path d="M9 21h6M12 15v6"/></svg>',
+  defects:'<svg viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"/></svg>'
 };
 const CATS = [
   {k:'fahrzeuge', n:'Fahrzeuge', ph:'z. B. MTW'},
@@ -22,10 +23,10 @@ const CATS = [
 ];
 const DUTY = {'duty-aktive':{g:'aktive',n:'Dienstplan Aktive'}, 'duty-jugend':{g:'jugend',n:'Dienstplan Jugend'}};
 const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'Bearbeiter'};
-const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','doc','members'];
+const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','doc','members','defects','push'];
 const catName = k => k==='eis'?'Crushed-Eis':((CATS.find(c=>c.k===k)||{}).n || k);
 
-const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org'];
+const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs'];
 const S = {
   view:'home', openCat:null, data:{}, loaded:{},
   me:null, profile:null,
@@ -88,7 +89,7 @@ function norm(r){
   return {...r, by:r.created_by, createdAt:r.created_at, itemId:r.item_id, itemName:r.item_name,
     from:r.starts?String(r.starts).slice(0,16):undefined, to:r.ends?String(r.ends).slice(0,16):undefined,
     doneBy:r.done_by, doneAt:r.done_at, group:r.grp, eventId:r.event_id, shiftId:r.shift_id,
-    parentId:r.parent_id, order:r.sort, time:r.time!=null?String(r.time).slice(0,5):r.time};
+    parentId:r.parent_id, order:r.sort, dutyId:r.duty_id, userId:r.user_id, time:r.time!=null?String(r.time).slice(0,5):r.time};
 }
 
 /* ---------- Laden & Live-Aktualisierung ---------- */
@@ -152,7 +153,9 @@ function renderTiles(){
     tile('duty-aktive','Dienstplan Aktive', dutyMeta('aktive'),{attr:'data-goto="duty-aktive"'}) +
     tile('duty-jugend','Dienstplan Jugend', dutyMeta('jugend'),{attr:'data-goto="duty-jugend"'}) +
     tile('events','Veranstaltungen', evs.length?`${esc(fmtDay(evs[0].date))} · ${esc(evs[0].title)}${gaps?`<br>${gaps} Helfer gesucht`:''}`:'Nichts geplant',{attr:'data-goto="events"',alert:gaps>0}) +
-    tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:openDocs>0});
+    tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:openDocs>0}) +
+    (()=>{ const od=D('defects').filter(x=>x.status!=='erledigt'); const out=od.filter(x=>x.urgency==='ausser_dienst').length;
+      return tile('defects','Mängel', od.length?`${od.length} offen${out?` · ${out} außer Dienst`:''}`:'Alles in Ordnung',{attr:'data-goto="defects"',alert:od.length>0}); })();
   const iceUp=D('ice').filter(x=>x.date>=t);
   const iceToday=D('ice').filter(x=>x.date===t).reduce((s,x)=>s+(+x.bags||0),0);
   $('#tiles-res').innerHTML = CATS.slice(0,2).map(c=>catTile(c,n)).join('') +
@@ -168,6 +171,7 @@ function catTile(c,n){
 /* ---------- Reservierungen ---------- */
 function itemRes(id){ const n=nowISO(); return D('reservations').filter(r=>r.itemId===id && r.to>n).sort((a,b)=>a.from.localeCompare(b.from)); }
 function statusChip(id){
+  if(D('defects').some(x=>x.itemId===id && x.status!=='erledigt' && x.urgency==='ausser_dienst')) return `<span class="chip busy">außer Dienst (Mangel)</span>`;
   const n=nowISO(); const act=D('reservations').find(r=>r.itemId===id && r.from<=n && r.to>n);
   return act ? `<span class="chip busy">belegt bis ${esc(fmtDT(act.to))}</span>` : `<span class="chip free">jetzt frei</span>`;
 }
@@ -297,6 +301,28 @@ function renderNews(){
 }
 
 /* ---------- Dienstplan ---------- */
+const RSVP = {yes:{n:'Komme',c:'done',i:'✓'}, maybe:{n:'Vielleicht',c:'open',i:'?'}, no:{n:'Komme nicht',c:'busy',i:'✗'}};
+function rsvpBlock(d, past){
+  const rs=D('duty_rsvp').filter(r=>r.dutyId===d.id);
+  const my=rs.find(r=>r.userId===S.me);
+  const cnt=k=>rs.filter(r=>r.status===k).length;
+  const open=S.showPast['rsvp-'+d.id];
+  const names=k=>rs.filter(r=>r.status===k).map(r=>esc(nameOf(r.userId))).sort((a,b)=>a.localeCompare(b,'de')).join(', ')||'–';
+  return `<div class="rsvp">
+    ${past?'':`<div class="rsvp-btns" role="group" aria-label="Zu- oder Absage">${Object.entries(RSVP).map(([k,v])=>`<button class="rsvp-btn ${k}" data-act="rsvp" data-id="${esc(d.id)}" data-status="${k}" aria-pressed="${my&&my.status===k?'true':'false'}">${v.i} ${v.n}</button>`).join('')}</div>`}
+    <button class="rsvp-sum" data-act="toggle-past" data-key="rsvp-${esc(d.id)}" aria-expanded="${!!open}">
+      <span class="chip done">${cnt('yes')} kommen</span><span class="chip open">${cnt('maybe')} vielleicht</span><span class="chip busy">${cnt('no')} nicht</span>
+      <span class="rsvp-more">${open?'Namen ausblenden':'Wer kommt?'}</span>
+    </button>
+    ${open?`<div class="rsvp-names"><p><b>Kommen:</b> ${names('yes')}</p><p><b>Vielleicht:</b> ${names('maybe')}</p><p><b>Kommen nicht:</b> ${names('no')}</p></div>`:''}
+  </div>`;
+}
+async function setRsvp(dutyId,status){
+  const mine=D('duty_rsvp').find(r=>r.dutyId===dutyId && r.userId===S.me);
+  if(mine && mine.status===status){ await run('duty_rsvp', sb.from('duty_rsvp').delete().eq('duty_id',dutyId).eq('user_id',S.me), 'Rückmeldung zurückgenommen'); return; }
+  await run('duty_rsvp', sb.from('duty_rsvp').upsert({duty_id:dutyId,user_id:S.me,status,updated_at:new Date().toISOString()},{onConflict:'duty_id,user_id'}), 'Gespeichert: '+RSVP[status].n);
+}
+
 function renderDuty(viewKey){
   const {g,n}=DUTY[viewKey]; const t=today(); const fk='duty-'+g;
   const all=D('duties').filter(d=>d.group===g).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
@@ -321,6 +347,7 @@ function renderDuty(viewKey){
       <h3>${esc(d.topic)}</h3>
       <div class="facts"><span><b>${esc(d.time||'')} Uhr</b></span>${d.place?`<span>${esc(d.place)}</span>`:''}${d.lead?`<span>Leitung: <b>${esc(d.lead)}</b></span>`:''}</div>
       ${d.note?`<p class="note">${esc(d.note)}</p>`:''}
+      ${rsvpBlock(d, d.date<t)}
     </div>
     <div class="actions">${mgr()?delBtn('duties',d.id):''}</div>
   </div>`;
@@ -458,6 +485,100 @@ function renderOrg(){
   return loadingOr(['org'], html+'</div>');
 }
 
+/* ---------- Mängel ---------- */
+const URG={normal:{n:'normal',c:'free'},dringend:{n:'dringend',c:'open'},ausser_dienst:{n:'außer Dienst',c:'busy'}};
+const DST={offen:{n:'offen',c:'open'},in_arbeit:{n:'in Arbeit',c:'ice'},erledigt:{n:'erledigt',c:'done'}};
+function renderDefects(){
+  const items=[...D('items')].sort((a,b)=>(catName(a.cat)+a.name).localeCompare(catName(b.cat)+b.name,'de'));
+  const all=[...D('defects')].sort((a,b)=>{const u={ausser_dienst:0,dringend:1,normal:2};return (u[a.urgency]-u[b.urgency])||(b.createdAt||'').localeCompare(a.createdAt||'');});
+  const open=all.filter(x=>x.status!=='erledigt'), done=all.filter(x=>x.status==='erledigt');
+  let html=`<div class="panel"><div class="panel-head">
+    <div><h2>Mängel melden</h2><p class="sub">Etwas kaputt, fehlt oder nicht einsatzbereit? Kurz eintragen – die Bearbeiter (z. B. Gerätewart) werden benachrichtigt.</p></div></div>
+    <form class="inline" data-form="defect" style="margin:14px 20px">
+      <label for="df-item">Betrifft<select id="df-item">${items.map(i=>`<option value="${esc(i.id)}">${esc(catName(i.cat))}: ${esc(i.name)}</option>`).join('')}<option value="">Sonstiges (unten benennen)</option></select></label>
+      <label for="df-other">Gegenstand (falls Sonstiges)<input id="df-other" maxlength="60" placeholder="z. B. Funkgerät 3"></label>
+      <label for="df-urg">Dringlichkeit<select id="df-urg"><option value="normal">normal</option><option value="dringend">dringend</option><option value="ausser_dienst">außer Dienst – nicht benutzen!</option></select></label>
+      <label for="df-title" class="span-all">Was ist kaputt?<input id="df-title" required maxlength="90" placeholder="z. B. Blaulicht hinten links ohne Funktion"></label>
+      <label for="df-desc" class="span-all">Details<textarea id="df-desc" maxlength="800" style="min-height:70px" placeholder="optional"></textarea></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Mangel melden</button></div>
+      ${errP('defect')}
+    </form></div>`;
+  const row=x=>`<div class="row">
+    <div class="info">
+      <div style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center"><span class="cat-dot">${esc(x.item_name)}</span><span class="chip ${URG[x.urgency].c}">${URG[x.urgency].n}</span><span class="chip ${DST[x.status].c}">${DST[x.status].n}</span></div>
+      <h3 style="margin-top:4px">${esc(x.title)}</h3>
+      ${x.description?`<p class="text">${esc(x.description)}</p>`:''}
+      <div class="facts"><span>gemeldet von ${who(x.by)} am ${esc(new Date(x.createdAt).toLocaleDateString('de-DE'))}</span>${x.status==='erledigt'&&x.doneBy?`<span>erledigt von ${who(x.doneBy)}${x.doneAt?' am '+esc(new Date(x.doneAt).toLocaleDateString('de-DE')):''}</span>`:''}</div>
+    </div>
+    <div class="actions">${mgr()?`
+      ${x.status==='offen'?`<button class="btn small" data-act="defect-status" data-id="${esc(x.id)}" data-status="in_arbeit">In Arbeit</button>`:''}
+      ${x.status!=='erledigt'?`<button class="btn small primary" data-act="defect-status" data-id="${esc(x.id)}" data-status="erledigt">Erledigt</button>`:`<button class="btn small" data-act="defect-status" data-id="${esc(x.id)}" data-status="offen">Wieder öffnen</button>`}
+      ${delBtn('defects',x.id)}`:''}</div>
+  </div>`;
+  html+=`<div class="panel"><div class="panel-head"><div><h2>Offene Mängel</h2>${mgr()?'':'<p class="sub">Status ändern können die Bearbeiter.</p>'}</div><span class="count">${open.length} offen</span></div>
+    ${open.length?open.map(row).join(''):'<div class="empty"><strong>Keine offenen Mängel.</strong>Alles einsatzbereit.</div>'}
+    ${done.length?`<div class="day-head"><span class="when">Erledigt (${done.length})</span><button class="btn ghost small" data-act="toggle-past" data-key="defects">${S.showPast.defects?'Ausblenden':'Anzeigen'}</button></div>${S.showPast.defects?done.map(row).join(''):''}`:''}
+  </div>`;
+  return loadingOr(['defects','items'], html);
+}
+
+/* ---------- Push-Benachrichtigungen ---------- */
+const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)']];
+const pushSupported=()=>('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);
+const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
+S.pushEndpoint=null;
+async function refreshPushState(){
+  if(!pushSupported()) return;
+  try{ const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.getSubscription(); S.pushEndpoint=sub?sub.endpoint:null; }catch(_){ S.pushEndpoint=null; }
+}
+function myPushRow(){ return S.pushEndpoint ? D('push_subs').find(x=>x.endpoint===S.pushEndpoint) : null; }
+function b64ToBytes(b64){ const pad='='.repeat((4-b64.length%4)%4); const raw=atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/')); return Uint8Array.from(raw,c=>c.charCodeAt(0)); }
+async function enablePush(){
+  if(!pushSupported()) return toast('Dieses Gerät bzw. dieser Browser unterstützt keine Benachrichtigungen.');
+  const perm=await Notification.requestPermission();
+  if(perm!=='granted') return toast('Benachrichtigungen wurden nicht erlaubt. Du kannst das in den Browser-Einstellungen ändern.');
+  try{
+    const r=await fetch(CFG.supabaseUrl+'/functions/v1/push',{headers:{apikey:CFG.supabaseAnonKey}});
+    const {publicKey}=await r.json();
+    const reg=await navigator.serviceWorker.ready;
+    let sub=await reg.pushManager.getSubscription();
+    if(!sub) sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64ToBytes(publicKey)});
+    const j=sub.toJSON();
+    const prefs=Object.fromEntries(PUSH_CATS.map(([k])=>[k,true]));
+    const ok=await run('push_subs', sb.from('push_subs').upsert({endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth,prefs},{onConflict:'endpoint'}), 'Benachrichtigungen sind an');
+    if(ok){ S.pushEndpoint=j.endpoint; render(); }
+  }catch(e){ console.warn(e); toast('Einschalten hat nicht geklappt. Bitte nochmal versuchen.'); }
+}
+async function disablePush(){
+  try{
+    const reg=await navigator.serviceWorker.ready; const sub=await reg.pushManager.getSubscription();
+    if(sub){ await sb.from('push_subs').delete().eq('endpoint',sub.endpoint); await sub.unsubscribe(); }
+  }catch(e){ console.warn(e); }
+  S.pushEndpoint=null; await load('push_subs'); toast('Benachrichtigungen sind aus'); render();
+}
+async function setPushPref(cat,on){
+  const row=myPushRow(); if(!row) return;
+  const prefs={...(row.prefs||{}),[cat]:on};
+  await run('push_subs', sb.from('push_subs').update({prefs}).eq('id',row.id), on?'Eingeschaltet':'Ausgeschaltet');
+}
+function renderPush(){
+  const row=myPushRow();
+  let body;
+  if(!pushSupported()){
+    body = isIOS()&&!isStandalone()
+      ? `<div class="empty"><strong>Auf dem iPhone zuerst zum Home-Bildschirm hinzufügen.</strong>Öffne Florian HQ in Safari, tippe auf <b>Teilen</b> → <b>Zum Home-Bildschirm</b> und starte die App dann über das neue Symbol. Danach kannst du hier Benachrichtigungen einschalten.</div>`
+      : `<div class="empty"><strong>Dieser Browser unterstützt keine Benachrichtigungen.</strong>Versuch es mit Chrome, Edge, Firefox oder Safari (Mac/iPhone ab iOS 16.4 über den Home-Bildschirm).</div>`;
+  } else if(!row){
+    body = `<div class="empty"><strong>Benachrichtigungen sind auf diesem Gerät aus.</strong>Du bekommst eine Meldung, wenn es Neuigkeiten, neue Dienste oder Veranstaltungen gibt. Du kannst einzelne Bereiche jederzeit wieder abschalten.</div>
+      <div style="padding:0 20px 20px"><button class="btn primary" data-act="push-on">🔔 Benachrichtigungen einschalten</button></div>`;
+  } else {
+    body = `<div class="row"><div class="info"><h3>Benachrichtigungen sind an</h3><p class="note">Wähle, worüber du informiert werden willst. Gilt nur für dieses Gerät.</p></div><div class="actions"><button class="btn danger small" data-act="push-off">Alle ausschalten</button></div></div>
+      ${PUSH_CATS.filter(([k])=>k!=='defects'||mgr()).map(([k,n])=>{const on=(row.prefs||{})[k]!==false;return `<div class="row"><div class="info"><h3 style="font-size:16px">${esc(n)}</h3></div><div class="actions"><button class="switch" role="switch" aria-checked="${on}" data-act="push-pref" data-key="${k}" aria-label="${esc(n)}"><span></span></button></div></div>`;}).join('')}`;
+  }
+  return `<div class="panel"><div class="panel-head"><div><h2>Benachrichtigungen</h2><p class="sub">Push-Meldungen aufs Handy oder den Computer.</p></div><button class="btn ghost" data-goto="home">← Zur Übersicht</button></div>${body}</div>`;
+}
+
 /* ---------- Mitglieder (nur Bearbeiter) ---------- */
 function renderMembers(){
   if(!mgr()) return `<div class="panel"><div class="empty"><strong>Nur für Bearbeiter.</strong></div></div>`;
@@ -532,7 +653,7 @@ function render(){
   const v=S.view;
   $('#view-home').hidden = v!=='home';
   $('#view-doc').hidden = v!=='doc';
-  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','members'].includes(v);
+  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','members','defects','push'].includes(v);
   document.querySelectorAll('#tabs .tab').forEach(t=>t.setAttribute('aria-selected',String(t.dataset.view===v)));
   $('#tab-members').hidden=!mgr();
   const waiting=D('profiles').filter(p=>p.role==='pending').length;
@@ -547,7 +668,7 @@ function render(){
   } else if(v!=='doc'){
     const page=$('#view-page'); const snap=snapshotForm(page);
     if(S.skipRestore){ snap.vals={}; snap.focus=null; }
-    page.innerHTML = v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg() : v==='members'?renderMembers() : renderDuty(v);
+    page.innerHTML = v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg() : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : renderDuty(v);
     restoreForm(page,snap); S.skipRestore=false;
   }
   renderDocs();
@@ -613,6 +734,14 @@ document.addEventListener('click', async e=>{
   }
   else if(act==='unsign'){ await del('signups',id,'Ausgetragen'); }
   else if(act==='set-role'){ await setRole(id,b.dataset.role); }
+  else if(act==='rsvp'){ await setRsvp(id,b.dataset.status); }
+  else if(act==='defect-status'){
+    const st=b.dataset.status;
+    await upd('defects',id, st==='erledigt'?{status:st,done_by:S.me,done_at:new Date().toISOString()}:{status:st,done_by:null,done_at:null}, 'Status: '+DST[st].n);
+  }
+  else if(act==='push-on'){ await enablePush(); }
+  else if(act==='push-off'){ await disablePush(); }
+  else if(act==='push-pref'){ await setPushPref(b.dataset.key, b.getAttribute('aria-checked')!=='true'); }
   else if(act==='edit-org'){ S.editOrg=id; S.errs={}; S.skipRestore=true; render(); document.getElementById('org-role')?.focus(); }
   else if(act==='copy'){
     const v=b.dataset.v;
@@ -696,6 +825,15 @@ document.addEventListener('submit', async e=>{
     const name=val('an-'+fid); const sh=D('shifts').find(s=>s.id===fid); if(!name||!sh) return;
     const ok=await ins('signups',{shift_id:fid,name},name+' eingetragen');
     if(ok){ const el=document.getElementById('an-'+fid); if(el) el.value=''; }
+  }
+  else if(kind==='defect'){
+    const itemId=val('df-item'), it=D('items').find(i=>i.id===itemId);
+    const itemName=it?`${catName(it.cat)}: ${it.name}`:val('df-other');
+    const title=val('df-title');
+    if(!itemName) return fail('defect','Bitte angeben, was betroffen ist.');
+    if(!title) return fail('defect','Bitte kurz beschreiben, was kaputt ist.');
+    const ok=await ins('defects',{item_id:it?it.id:null,item_name:itemName,title,description:val('df-desc'),urgency:val('df-urg')||'normal'},'Mangel gemeldet – danke!');
+    if(ok){ S.errs.defect=null; ['df-title','df-desc','df-other'].forEach(i=>{const e=document.getElementById(i); if(e) e.value='';}); render(); }
   }
   else if(kind==='org'){
     const role=val('org-role'); if(!role) return fail('org','Bitte eine Funktion eintragen.');
@@ -801,7 +939,7 @@ async function route(){
 
 /* ---------- Start ---------- */
 $('#doc-date').value=today();
-if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(()=>{});
+if('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').then(()=>refreshPushState().then(()=>{ if(isMember()) render(); })).catch(()=>{});
 if(!sb){
   document.body.innerHTML='<div class="gate"><div class="gate-card"><div class="gate-form"><h2>Noch nicht verbunden</h2><p class="sub">Trag in <b>config.js</b> die Project URL und den anon-Schlüssel deines Supabase-Projekts ein. Die Anleitung steht in der README.</p></div></div></div>';
 } else {
