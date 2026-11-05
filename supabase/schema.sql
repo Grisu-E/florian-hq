@@ -228,3 +228,15 @@ begin
     end if;
   end loop;
 end $$;
+
+-- ---------- Übungsdoku: nur Bearbeiter schreiben (alle Mitglieder lesen) ----------
+drop policy if exists docs_insert on public.docs;
+create policy docs_insert on public.docs for insert to authenticated with check (public.is_admin() and created_by = auth.uid());
+drop policy if exists docs_update on public.docs;
+create policy docs_update on public.docs for update to authenticated using (public.is_admin()) with check (public.is_admin());
+drop policy if exists docs_delete on public.docs;
+create policy docs_delete on public.docs for delete to authenticated using (public.is_admin());
+drop policy if exists listen_upload on storage.objects;
+create policy listen_upload on storage.objects for insert to authenticated with check (bucket_id = 'listen' and public.is_admin());
+drop policy if exists listen_delete on storage.objects;
+create policy listen_delete on storage.objects for delete to authenticated using (bucket_id = 'listen' and public.is_admin());

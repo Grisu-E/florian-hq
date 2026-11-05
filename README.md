@@ -55,8 +55,8 @@ Das ist für Bestätigungs- und „Passwort vergessen“-Mails nötig.
 
 | Rolle | Darf |
 |---|---|
-| Mitglied | reservieren, Crushed-Eis anmelden, in Arbeitsdienste eintragen, Anwesenheitslisten hochladen und als eingepflegt markieren |
-| Bearbeiter | zusätzlich Neues, Dienstpläne, Veranstaltungen und Arbeitsdienste, Organigramm, Mitglieder freigeben/sperren/entfernen, fremde Einträge löschen |
+| Mitglied | alles lesen, reservieren, Crushed-Eis anmelden, in Arbeitsdienste eintragen |
+| Bearbeiter | zusätzlich Neues, Dienstpläne, Veranstaltungen und Arbeitsdienste, Übungsdoku, Organigramm, Mitglieder freigeben/sperren/entfernen, fremde Einträge löschen |
 
 ## Aufs Handy legen
 

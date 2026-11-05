@@ -474,7 +474,7 @@ function renderMembers(){
   </div>`;
   return `<div class="panel"><div class="panel-head"><div><h2>Warten auf Freigabe</h2><p class="sub">Neue Registrierungen. Prüfe, ob die Person zur Wehr gehört, bevor du sie freigibst.</p></div></div>
     ${waiting.length?waiting.map(row).join(''):'<div class="empty"><strong>Niemand wartet.</strong>Neue Kameraden registrieren sich über den Link der App und erscheinen dann hier.</div>'}</div>
-    <div class="panel"><div class="panel-head"><div><h2>Mitglieder</h2><p class="sub"><b>Mitglied</b>: reservieren, Eis anmelden, Arbeitsdienste, Übungsdoku. <b>Bearbeiter</b>: zusätzlich Neues, Dienstpläne, Veranstaltungen, Organigramm und Mitglieder.</p></div><span class="count">${rest.length} Personen</span></div>
+    <div class="panel"><div class="panel-head"><div><h2>Mitglieder</h2><p class="sub"><b>Mitglied</b>: alles lesen, reservieren, Eis anmelden, in Arbeitsdienste eintragen. <b>Bearbeiter</b>: zusätzlich Neues, Dienstpläne, Veranstaltungen, Übungsdoku, Organigramm und Mitglieder pflegen.</p></div><span class="count">${rest.length} Personen</span></div>
     ${rest.map(row).join('')}</div>`;
 }
 
@@ -499,7 +499,7 @@ function renderDocs(){
   const el=$('#doc-list');
   if(!S.loaded.docs){ el.innerHTML=`<div class="panel"><div class="empty">Lade Übungen …</div></div>`; return; }
   if(!list.length){
-    el.innerHTML=`<div class="panel"><div class="empty"><strong>${S.docFilter==='offen'?'Alles eingepflegt. Sauber!':'Keine Listen in dieser Ansicht.'}</strong>${docs.length?'':'Lade oben das Foto einer Anwesenheitsliste hoch. Sie landet hier, bis sie im FW-Portal eingepflegt ist.'}</div></div>`;
+    el.innerHTML=`<div class="panel"><div class="empty"><strong>${S.docFilter==='offen'?'Alles eingepflegt. Sauber!':'Keine Listen in dieser Ansicht.'}</strong>${docs.length?'':(mgr()?'Lade oben das Foto einer Anwesenheitsliste hoch. Sie landet hier, bis sie im FW-Portal eingepflegt ist.':'Sobald Anwesenheitslisten hochgeladen sind, erscheinen sie hier.')}</div></div>`;
     return;
   }
   if(S.view==='doc') ensureUrls(list.map(d=>d.photo_path));
@@ -517,10 +517,10 @@ function renderDocs(){
         <h3>${esc(d.title)}</h3>
         ${d.note?`<p class="note">${esc(d.note)}</p>`:''}
         <div class="meta">Hochgeladen von ${who(d.by)}${isDone&&d.doneBy?`<br>Eingepflegt von ${who(d.doneBy)}${d.doneAt?' am '+esc(new Date(d.doneAt).toLocaleDateString('de-DE')):''}`:''}</div>
-        <div class="card-actions">
+        ${mgr()?`<div class="card-actions">
           <button class="btn ${isDone?'':'primary'}" data-act="toggle-doc" data-id="${esc(d.id)}">${isDone?'Zurück auf offen':'Als eingepflegt markieren'}</button>
-          ${mine(d.by)?delBtn('docs',d.id):''}
-        </div>
+          ${delBtn('docs',d.id)}
+        </div>`:''}
       </div>
     </article>`;
   }).join('')}</div>`;
@@ -552,6 +552,8 @@ function render(){
   }
   renderDocs();
   $('#doc-submit').disabled = S.busy;
+  $('#doc-form').hidden = !mgr();
+  $('#doc-lock').hidden = mgr();
 }
 function go(view){
   if(view==='members' && !mgr()) view='home';
