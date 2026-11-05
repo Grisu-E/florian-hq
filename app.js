@@ -835,7 +835,8 @@ function render(){
   renderTiles();
   if(v==='home'){
     const body=$('#res-body'); const snap=snapshotForm(body);
-    body.innerHTML = S.openCat==='eis' ? renderIce() : S.openCat ? renderCat() : renderUpcoming();
+    body.innerHTML = S.openCat==='eis' ? renderIce() : S.openCat ? renderCat() : '';
+    $('#upcoming').innerHTML = renderUpcoming();
     restoreForm(body,snap);
   } else if(v!=='doc'){
     const page=$('#view-page'); const snap=snapshotForm(page);
