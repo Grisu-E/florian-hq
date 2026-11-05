@@ -591,13 +591,14 @@ function typeOpts(k,sel){ return qTypes(k).map(t=>`<option value="${esc(t.id)}" 
 
 function renderLead(){
   if(!mgr()) return `<div class="panel"><div class="empty"><strong>Nur für Bearbeiter.</strong></div></div>`;
-  const tabs=[['fristen','Fristen'],['quals','Qualifikationen'],['attend','Übungsbeteiligung'],['catalog','Katalog']];
+  const tabs=[['fristen','Fristen'],['attend','Übungsbeteiligung'],['catalog','Fristen-Katalog']];
+  if(!tabs.some(([k])=>k===S.leadTab)) S.leadTab='fristen';
   const fr=D('member_quals').filter(q=>D('qual_types').find(t=>t.id===q.typeId&&t.kind==='frist'));
   const red=fr.filter(q=>fristState(q).k===0).length, yel=fr.filter(q=>fristState(q).k===1).length;
-  let html=`<div class="panel"><div class="panel-head"><div><h2>Wehrführung</h2><p class="sub">Nur für Bearbeiter sichtbar. Fristen, Lehrgänge und Übungsbeteiligung der Mannschaft.</p></div>
+  let html=`<div class="panel"><div class="panel-head"><div><h2>Wehrführung</h2><p class="sub">Nur für Bearbeiter sichtbar. Fristen und Übungsbeteiligung der Mannschaft.</p></div>
     <div class="actions">${red?`<span class="chip busy">${red} abgelaufen</span>`:''}${yel?`<span class="chip open">${yel} bald fällig</span>`:''}</div></div>
     <div class="org-tools"><div class="filters">${tabs.map(([k,n])=>`<button class="filter" data-act="lead-tab" data-key="${k}" aria-pressed="${S.leadTab===k}">${n}</button>`).join('')}</div></div></div>`;
-  html += S.leadTab==='quals'?leadQuals() : S.leadTab==='attend'?leadAttend() : S.leadTab==='catalog'?leadCatalog() : leadFristen();
+  html += S.leadTab==='attend'?leadAttend() : S.leadTab==='catalog'?leadCatalog() : leadFristen();
   return loadingOr(['qual_types','member_quals','duty_attendance','profiles'], html);
 }
 function leadFristen(){
@@ -626,6 +627,7 @@ function leadFristen(){
     </div>`).join(''):'<div class="empty"><strong>Noch keine Fristen eingetragen.</strong>Oben Person und Frist wählen und speichern.</div>'}</div>`;
   return html;
 }
+// Qualifikationen vorerst ausgeblendet (Daten bleiben erhalten)
 function leadQuals(){
   const types=qTypes('lehrgang'), ps=people();
   const has=(u,t)=>D('member_quals').find(q=>q.userId===u&&q.typeId===t);
@@ -683,14 +685,13 @@ function leadAttend(){
 function leadCatalog(){
   const block=(k,title)=>`<div class="panel"><div class="panel-head"><div><h3>${title}</h3></div></div>
     ${qTypes(k).map(t=>`<div class="row"><div class="info"><h3 style="font-size:16px">${esc(t.name)}</h3>${t.valid_months?`<p class="note">gültig ${t.valid_months} Monate</p>`:''}</div><div class="actions">${delBtn('qual_types',t.id)}</div></div>`).join('')||'<div class="empty">Noch keine Einträge.</div>'}</div>`;
-  return `<div class="panel"><div class="panel-head"><div><h3>Neuer Eintrag</h3><p class="sub">Löschen entfernt auch alle zugehörigen Einträge bei den Personen.</p></div></div>
+  return `<div class="panel"><div class="panel-head"><div><h3>Neue Frist</h3><p class="sub">Löschen entfernt auch alle zugehörigen Einträge bei den Personen.</p></div></div>
     <form class="inline" data-form="qtype" style="margin:14px 20px">
-      <label for="qt-name">Bezeichnung<input id="qt-name" required maxlength="60" placeholder="z. B. Absturzsicherung"></label>
-      <label for="qt-kind">Art<select id="qt-kind"><option value="lehrgang">Lehrgang / Qualifikation</option><option value="frist">Frist (läuft ab)</option></select></label>
-      <label for="qt-months">Gültigkeit in Monaten<input type="number" id="qt-months" min="1" max="120" placeholder="nur bei Fristen"></label>
+      <label for="qt-name">Bezeichnung<input id="qt-name" required maxlength="60" placeholder="z. B. Absturzsicherung-Unterweisung"></label>
+      <label for="qt-months">Gültigkeit in Monaten<input type="number" id="qt-months" min="1" max="120" required placeholder="z. B. 12"></label>
       <div class="form-actions"><button class="btn primary" type="submit">Hinzufügen</button></div>
       ${errP('qtype')}
-    </form></div>${block('frist','Fristen')}${block('lehrgang','Lehrgänge & Qualifikationen')}`;
+    </form></div>${block('frist','Fristen')}`;
 }
 
 /* ---------- Mitglieder (nur Bearbeiter) ---------- */
@@ -972,7 +973,7 @@ document.addEventListener('submit', async e=>{
     if(ok){ S.qualPrefill=null; S.errs.qual=null; render(); }
   }
   else if(kind==='qtype'){
-    const name=val('qt-name'), k=val('qt-kind'), m=parseInt(val('qt-months'),10);
+    const name=val('qt-name'), k='frist', m=parseInt(val('qt-months'),10);
     if(!name) return fail('qtype','Bitte eine Bezeichnung eingeben.');
     if(k==='frist'&&!(m>0)) return fail('qtype','Bei Fristen bitte die Gültigkeit in Monaten angeben.');
     const ok=await ins('qual_types',{name,kind:k,valid_months:k==='frist'?m:null,sort:100},'„'+name+'“ hinzugefügt');
