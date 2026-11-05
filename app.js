@@ -30,12 +30,12 @@ const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'Bearbeiter'};
 const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','doc','members','defects','push','lead','expenses'];
 const catName = k => k==='eis'?'Crushed-Eis':((CATS.find(c=>c.k===k)||{}).n || k);
 
-const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance','expenses'];
+const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance','expenses','res_contacts'];
 const S = {
   view:'home', openCat:null, data:{}, loaded:{},
   me:null, profile:null,
   formFor:null, openForm:null, editOrg:null, orgQ:'', skipRestore:false,
-  errs:{}, confirm:null, docFilter:'offen', busy:false, showPast:{}, urls:{}, urlPending:new Set()
+  errs:{}, confirm:null, contactEdit:null, lastRes:null, docFilter:'offen', busy:false, showPast:{}, urls:{}, urlPending:new Set()
 };
 TABLES.forEach(t=>{ S.data[t]=[]; S.loaded[t]=false; });
 
@@ -185,6 +185,31 @@ function catTile(c,n){
 }
 
 /* ---------- Reservierungen ---------- */
+/* Verantwortliche: Eintrag am Item überschreibt den der Kategorie */
+const contactRow = key => D('res_contacts').find(c=>c.key===key && (c.user_id||c.phone));
+function contactFor(itemId,cat){ return (itemId&&contactRow(itemId)) || contactRow(cat) || null; }
+function waNumber(p){ let d=String(p||'').replace(/[^\d+]/g,''); if(d.startsWith('+')) d=d.slice(1); else if(d.startsWith('00')) d=d.slice(2); else if(d.startsWith('0')) d='49'+d.slice(1); return d.length>=8?d:''; }
+const contactName = c => c ? (c.user_id?nameOf(c.user_id):'') : '';
+function contactLine(key,cat,label){
+  const own=contactRow(key), c=own||(cat?contactRow(cat):null);
+  const txt=c?`${esc(contactName(c)||'Nummer hinterlegt')}${c.phone?' · 📱':''}${!own&&cat?' <span class="muted">(wie Kategorie)</span>':''}`:'<span class="muted">niemand hinterlegt</span>';
+  return `<p class="contact-line">${esc(label||'Verantwortlich')}: ${txt}${mgr()?` <button class="linkbtn" data-act="contact-edit" data-id="${esc(key)}">${own?'ändern':'festlegen'}</button>`:''}</p>${S.contactEdit===key?contactForm(key,own):''}`;
+}
+function contactForm(key,own){
+  const k=esc(key), members=D('profiles').filter(p=>p.role!=='pending').sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+  return `<form class="inline" data-form="contact" data-id="${k}">
+    <label for="ct-user">Person (bekommt Push)<select id="ct-user"><option value="">– niemand –</option>${members.map(p=>`<option value="${esc(p.id)}" ${own&&own.user_id===p.id?'selected':''}>${esc(p.name||p.email)}</option>`).join('')}</select></label>
+    <label for="ct-phone">WhatsApp-Nummer<input id="ct-phone" type="tel" maxlength="30" placeholder="z. B. 0171 1234567" value="${esc(own?own.phone:'')}"></label>
+    <div class="form-actions"><button class="btn primary" type="submit">Speichern</button>${own?`<button class="btn ghost" type="button" data-act="contact-clear" data-id="${k}">Entfernen</button>`:''}<button class="btn ghost" type="button" data-act="contact-cancel">Abbrechen</button></div>
+    ${errP('contact')}</form>`;
+}
+function lastResBanner(scope){
+  const L=S.lastRes; if(!L||L.scope!==scope) return '';
+  const c=contactFor(L.itemId,L.cat), num=c&&waNumber(c.phone), name=contactName(c);
+  const push=c&&c.user_id&&c.user_id!==S.me;
+  return `<div class="res-done"><p><strong>✓ ${esc(L.title)}</strong>${push?`<br>${esc(name)} wurde per Push informiert.`:''}</p>
+    <div class="actions">${num?`<a class="btn wa" href="https://wa.me/${num}?text=${encodeURIComponent(L.text)}" target="_blank" rel="noopener">📱 ${esc(name||'Verantwortlichen')} per WhatsApp informieren</a>`:''}<button class="btn ghost small" data-act="res-done-close">Schließen</button></div></div>`;
+}
 function itemRes(id){ const n=nowISO(); return D('reservations').filter(r=>r.itemId===id && r.to>n).sort((a,b)=>a.from.localeCompare(b.from)); }
 function statusChip(id){
   if(D('defects').some(x=>x.itemId===id && x.status!=='erledigt' && x.urgency==='ausser_dienst')) return `<span class="chip busy">außer Dienst (Mangel)</span>`;
@@ -207,8 +232,8 @@ function renderCat(){
   const c=CATS.find(x=>x.k===S.openCat);
   const items=D('items').filter(i=>i.cat===c.k).sort((a,b)=>a.name.localeCompare(b.name,'de'));
   let html=`<div class="panel"><div class="panel-head">
-    <div><h2>${esc(c.n)}</h2><p class="sub">„Reservieren“ antippen, Zeitraum und Zweck eintragen. Überschneidungen werden geblockt.</p></div>
-    <div class="actions">${ro()?'':`<button class="btn" data-act="open-form" data-form="add-item">+ Eintrag anlegen</button>`}<button class="btn ghost" data-act="close-cat">Schließen</button></div></div>`;
+    <div><h2>${esc(c.n)}</h2><p class="sub">„Reservieren“ antippen, Zeitraum und Zweck eintragen. Überschneidungen werden geblockt.</p>${contactLine(c.k,null,'Verantwortlich für alle '+c.n)}</div>
+    <div class="actions">${ro()?'':`<button class="btn" data-act="open-form" data-form="add-item">+ Eintrag anlegen</button>`}<button class="btn ghost" data-act="close-cat">Schließen</button></div></div>${lastResBanner(c.k)}`;
   if(S.openForm==='add-item' && !ro()){
     html+=`<form class="inline" data-form="add-item">
       <label for="add-name">Bezeichnung<input id="add-name" required maxlength="60" placeholder="${esc(c.ph)}"></label>
@@ -224,6 +249,7 @@ function renderCat(){
       <div class="info">
         <div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center"><h3>${esc(it.name)}</h3>${statusChip(it.id)}</div>
         ${it.note?`<p class="note">${esc(it.note)}</p>`:''}
+        ${contactLine(it.id,it.cat)}
         ${up.length?`<ul class="slots">${up.map(r=>`<li><span class="when">${esc(fmtRange(r.from,r.to))}</span>${who(r.by)}<span class="why">${esc(r.purpose)}</span></li>`).join('')}</ul>`:''}
       </div>
       <div class="actions">
@@ -242,7 +268,7 @@ function renderIce(){
   const showPast=S.showPast.ice;
   const list=D('ice').filter(x=>showPast?true:x.date>=t).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||'')));
   let html=`<div class="panel"><div class="panel-head">
-    <div><h2>Crushed-Eis</h2><p class="sub">Meld an, wann du wie viel Eis brauchst. Pro Tag wird zusammengezählt, damit die Maschinen rechtzeitig laufen.</p></div>
+    <div><h2>Crushed-Eis</h2><p class="sub">Meld an, wann du wie viel Eis brauchst. Pro Tag wird zusammengezählt, damit die Maschinen rechtzeitig laufen.</p>${contactLine('eis',null,'Verantwortlich für die Eismaschinen')}</div>
     <div class="actions"><button class="btn ghost" data-act="toggle-past" data-key="ice">${showPast?'Nur kommende':'Auch vergangene'}</button><button class="btn ghost" data-act="close-cat">Schließen</button></div></div>
     <form class="inline" data-form="ice">
       <label for="ice-date">Datum<input type="date" id="ice-date" required value="${t}"></label>
@@ -250,7 +276,7 @@ function renderIce(){
       <label for="ice-bags">Menge (Säcke)<input type="number" id="ice-bags" required min="1" max="200" value="2"></label>
       <label for="ice-why">Wofür<input id="ice-why" maxlength="80" placeholder="z. B. Sommerfest Getränkestand" required></label>
       <div class="form-actions"><button class="btn primary" type="submit">Eis anmelden</button></div>
-      ${errP('ice')}</form>`;
+      ${errP('ice')}</form>${lastResBanner('eis')}`;
   if(!S.loaded.ice) return html+`<div class="empty">Lade Anmeldungen …</div></div>`;
   if(!list.length) return html+`<div class="empty"><strong>Noch kein Eis angemeldet.</strong>Trag oben ein, wann du Eis brauchst.</div></div>`;
   const days=[...new Set(list.map(x=>x.date))];
@@ -539,7 +565,7 @@ function renderDefects(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)'],['meine_fristen','Meine eigenen Fristen'],['expenses','Private Ausgaben']];
+const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)'],['meine_fristen','Meine eigenen Fristen'],['expenses','Private Ausgaben'],['reservations','Reservierungen, für die ich verantwortlich bin']];
 const pushSupported=()=>('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -918,7 +944,7 @@ const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',d
 document.addEventListener('click', async e=>{
   const gt=e.target.closest('[data-goto]'); if(gt){ go(gt.dataset.goto); return; }
   const tile=e.target.closest('.tile[data-cat]'); if(tile){
-    S.openCat = S.openCat===tile.dataset.cat?null:tile.dataset.cat; S.formFor=null; S.openForm=null; S.confirm=null; S.errs={}; render();
+    S.openCat = S.openCat===tile.dataset.cat?null:tile.dataset.cat; S.formFor=null; S.openForm=null; S.confirm=null; S.errs={}; S.lastRes=null; S.contactEdit=null; render();
     if(S.openCat) $('#res-body').scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'});
     return; }
   const f=e.target.closest('#doc-filters .filter'); if(f){ S.docFilter=f.dataset.f; renderDocs(); return; }
@@ -926,10 +952,14 @@ document.addEventListener('click', async e=>{
   const b=e.target.closest('[data-act]'); if(!b) return;
   const id=b.dataset.id, act=b.dataset.act;
   if(act==='logout'){ await sb.auth.signOut(); location.hash=''; return; }
-  if(act==='close-cat'){ S.openCat=null; render(); }
+  if(act==='close-cat'){ S.openCat=null; S.lastRes=null; S.contactEdit=null; render(); }
   else if(act==='open-form'){ S.openForm=b.dataset.form; S.errs={}; S.skipRestore=true; render(); }
   else if(act==='close-form'){ S.openForm=null; S.formFor=null; S.editOrg=null; S.errs={}; render(); }
   else if(act==='reserve'){ S.formFor=id; S.errs={}; render(); document.getElementById('rf-why-'+id)?.focus(); }
+  else if(act==='contact-edit'){ S.contactEdit=S.contactEdit===id?null:id; S.errs={}; S.skipRestore=true; render(); }
+  else if(act==='contact-cancel'){ S.contactEdit=null; render(); }
+  else if(act==='contact-clear'){ const ok=await run('res_contacts', sb.from('res_contacts').delete().eq('key',id), 'Verantwortliche Person entfernt'); if(ok){ S.contactEdit=null; render(); } }
+  else if(act==='res-done-close'){ S.lastRes=null; render(); }
   else if(act==='toggle-past'){ S.showPast[b.dataset.key]=!S.showPast[b.dataset.key]; render(); }
   else if(act==='ask'){ S.confirm=b.dataset.key; render(); }
   else if(act==='cancel-confirm'){ S.confirm=null; render(); }
@@ -1047,13 +1077,26 @@ document.addEventListener('submit', async e=>{
     const clash=D('reservations').find(r=>r.itemId===fid && r.from<to && from<r.to);
     if(clash) return fail(key,`Schon belegt: ${fmtRange(clash.from,clash.to)} von ${nameOf(clash.by)} (${clash.purpose}). Bitte anderen Zeitraum wählen.`);
     const ok=await ins('reservations',{item_id:fid,item_name:it.name,cat:it.cat,starts:from,ends:to,purpose},'Reserviert: '+it.name);
-    if(ok){ S.formFor=null; S.errs[key]=null; render(); }
+    if(ok){ S.formFor=null; S.errs[key]=null;
+      S.lastRes={scope:it.cat,itemId:it.id,cat:it.cat,title:'Reserviert: '+it.name,
+        text:`Hallo, ich habe ${it.name} reserviert: ${fmtRange(from,to)} Uhr – ${purpose}. Gruß ${nameOf(S.me)} (über Florian HQ)`};
+      render(); }
+  }
+  else if(kind==='contact'){
+    const user_id=val('ct-user')||null, phone=val('ct-phone');
+    if(phone && !waNumber(phone)) return fail('contact','Die Nummer sieht unvollständig aus.');
+    if(!user_id && !phone) return fail('contact','Bitte eine Person oder eine Nummer angeben – oder „Entfernen“.');
+    const ok=await run('res_contacts', sb.from('res_contacts').upsert({key:fid,user_id,phone,updated_at:new Date().toISOString()}), 'Verantwortliche Person gespeichert');
+    if(ok){ S.contactEdit=null; S.errs.contact=null; render(); }
   }
   else if(kind==='ice'){
     const date=val('ice-date'), time=val('ice-time'), bags=parseInt(val('ice-bags'),10), purpose=val('ice-why');
     if(!date||!time||!purpose||!(bags>0)) return fail('ice','Bitte Datum, Uhrzeit, Menge und Zweck angeben.');
     const ok=await ins('ice',{date,time,bags,purpose},`${bags} ${bags===1?'Sack':'Säcke'} Eis angemeldet`);
-    if(ok){ S.errs.ice=null; const w=document.getElementById('ice-why'); if(w) w.value=''; render(); }
+    if(ok){ S.errs.ice=null; const w=document.getElementById('ice-why'); if(w) w.value='';
+      S.lastRes={scope:'eis',itemId:null,cat:'eis',title:`${bags} ${bags===1?'Sack':'Säcke'} Eis angemeldet`,
+        text:`Hallo, ich brauche ${bags} ${bags===1?'Sack':'Säcke'} Crushed-Eis am ${fmtDay(date)} ab ${time} Uhr – ${purpose}. Gruß ${nameOf(S.me)} (über Florian HQ)`};
+      render(); }
   }
   else if(kind==='news'){
     const title=val('news-title'), text=val('news-text');

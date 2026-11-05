@@ -304,3 +304,13 @@ label.check input{width:18px;height:18px;flex:none}
 .backbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);padding-block:10px;margin-top:-8px}
 .backbar .btn{padding-left:0;font-size:15px;color:var(--ink)}
 main{padding-top:20px}
+
+/* Verantwortliche & WhatsApp */
+.contact-line{margin:6px 0 0;font-size:13px;color:var(--muted)}
+.contact-line .muted{color:var(--muted);opacity:.8}
+.contact-line .linkbtn{font-size:13px;padding:0 0 0 6px}
+.res-done{margin:0;padding:14px 18px;background:var(--ok-soft);border-bottom:1px solid var(--line);display:flex;flex-wrap:wrap;gap:10px 16px;align-items:center;justify-content:space-between}
+.res-done p{margin:0;color:var(--ink)}
+.res-done strong{color:var(--ok)}
+.btn.wa{background:#1FA855;border-color:#1FA855;color:#fff;text-decoration:none}
+.btn.wa:hover{background:#178A45}
