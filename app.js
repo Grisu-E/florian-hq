@@ -23,10 +23,10 @@ const CATS = [
 ];
 const DUTY = {'duty-aktive':{g:'aktive',n:'Dienstplan Aktive'}, 'duty-jugend':{g:'jugend',n:'Dienstplan Jugend'}};
 const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'Bearbeiter'};
-const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','doc','members','defects','push'];
+const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','doc','members','defects','push','lead'];
 const catName = k => k==='eis'?'Crushed-Eis':((CATS.find(c=>c.k===k)||{}).n || k);
 
-const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs'];
+const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance'];
 const S = {
   view:'home', openCat:null, data:{}, loaded:{},
   me:null, profile:null,
@@ -89,7 +89,7 @@ function norm(r){
   return {...r, by:r.created_by, createdAt:r.created_at, itemId:r.item_id, itemName:r.item_name,
     from:r.starts?String(r.starts).slice(0,16):undefined, to:r.ends?String(r.ends).slice(0,16):undefined,
     doneBy:r.done_by, doneAt:r.done_at, group:r.grp, eventId:r.event_id, shiftId:r.shift_id,
-    parentId:r.parent_id, order:r.sort, dutyId:r.duty_id, userId:r.user_id, time:r.time!=null?String(r.time).slice(0,5):r.time};
+    parentId:r.parent_id, order:r.sort, dutyId:r.duty_id, userId:r.user_id, typeId:r.type_id, time:r.time!=null?String(r.time).slice(0,5):r.time};
 }
 
 /* ---------- Laden & Live-Aktualisierung ---------- */
@@ -523,7 +523,7 @@ function renderDefects(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)']];
+const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)']];
 const pushSupported=()=>('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -574,9 +574,123 @@ function renderPush(){
       <div style="padding:0 20px 20px"><button class="btn primary" data-act="push-on">🔔 Benachrichtigungen einschalten</button></div>`;
   } else {
     body = `<div class="row"><div class="info"><h3>Benachrichtigungen sind an</h3><p class="note">Wähle, worüber du informiert werden willst. Gilt nur für dieses Gerät.</p></div><div class="actions"><button class="btn danger small" data-act="push-off">Alle ausschalten</button></div></div>
-      ${PUSH_CATS.filter(([k])=>k!=='defects'||mgr()).map(([k,n])=>{const on=(row.prefs||{})[k]!==false;return `<div class="row"><div class="info"><h3 style="font-size:16px">${esc(n)}</h3></div><div class="actions"><button class="switch" role="switch" aria-checked="${on}" data-act="push-pref" data-key="${k}" aria-label="${esc(n)}"><span></span></button></div></div>`;}).join('')}`;
+      ${PUSH_CATS.filter(([k])=>(k!=='defects'&&k!=='fristen')||mgr()).map(([k,n])=>{const on=(row.prefs||{})[k]!==false;return `<div class="row"><div class="info"><h3 style="font-size:16px">${esc(n)}</h3></div><div class="actions"><button class="switch" role="switch" aria-checked="${on}" data-act="push-pref" data-key="${k}" aria-label="${esc(n)}"><span></span></button></div></div>`;}).join('')}`;
   }
   return `<div class="panel"><div class="panel-head"><div><h2>Benachrichtigungen</h2><p class="sub">Push-Meldungen aufs Handy oder den Computer.</p></div><button class="btn ghost" data-goto="home">← Zur Übersicht</button></div>${body}</div>`;
+}
+
+/* ---------- Wehrführung (nur Bearbeiter) ---------- */
+S.leadTab='fristen'; S.leadYear=new Date().getFullYear(); S.leadGroup='aktive'; S.attDuty=null; S.qualPrefill=null; S.fristFilter='';
+const people=()=>D('profiles').filter(p=>p.role==='member'||p.role==='admin').sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
+const qTypes=k=>D('qual_types').filter(t=>t.kind===k).sort((a,b)=>(a.sort-b.sort)||a.name.localeCompare(b.name,'de'));
+function addMonths(d,m){ const x=new Date(d+'T00:00'); const day=x.getDate(); x.setMonth(x.getMonth()+m); if(x.getDate()<day) x.setDate(0); return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`; }
+const daysUntil=d=>Math.round((new Date(d+'T00:00')-new Date(today()+'T00:00'))/864e5);
+function fristState(q){ if(!q.expires) return {c:'free',n:'ohne Ablauf',k:3}; const n=daysUntil(q.expires); if(n<0) return {c:'busy',n:`seit ${-n} Tg. abgelaufen`,k:0}; if(n<=60) return {c:'open',n:`noch ${n} Tg.`,k:1}; return {c:'done',n:`noch ${n} Tg.`,k:2}; }
+function personOpts(sel){ return people().map(p=>`<option value="${esc(p.id)}" ${p.id===sel?'selected':''}>${esc(p.name||p.email)}</option>`).join(''); }
+function typeOpts(k,sel){ return qTypes(k).map(t=>`<option value="${esc(t.id)}" ${t.id===sel?'selected':''}>${esc(t.name)}${t.valid_months?` (${t.valid_months} Mon.)`:''}</option>`).join(''); }
+
+function renderLead(){
+  if(!mgr()) return `<div class="panel"><div class="empty"><strong>Nur für Bearbeiter.</strong></div></div>`;
+  const tabs=[['fristen','Fristen'],['quals','Qualifikationen'],['attend','Übungsbeteiligung'],['catalog','Katalog']];
+  const fr=D('member_quals').filter(q=>D('qual_types').find(t=>t.id===q.typeId&&t.kind==='frist'));
+  const red=fr.filter(q=>fristState(q).k===0).length, yel=fr.filter(q=>fristState(q).k===1).length;
+  let html=`<div class="panel"><div class="panel-head"><div><h2>Wehrführung</h2><p class="sub">Nur für Bearbeiter sichtbar. Fristen, Lehrgänge und Übungsbeteiligung der Mannschaft.</p></div>
+    <div class="actions">${red?`<span class="chip busy">${red} abgelaufen</span>`:''}${yel?`<span class="chip open">${yel} bald fällig</span>`:''}</div></div>
+    <div class="org-tools"><div class="filters">${tabs.map(([k,n])=>`<button class="filter" data-act="lead-tab" data-key="${k}" aria-pressed="${S.leadTab===k}">${n}</button>`).join('')}</div></div></div>`;
+  html += S.leadTab==='quals'?leadQuals() : S.leadTab==='attend'?leadAttend() : S.leadTab==='catalog'?leadCatalog() : leadFristen();
+  return loadingOr(['qual_types','member_quals','duty_attendance','profiles'], html);
+}
+function leadFristen(){
+  const types=qTypes('frist');
+  const rows=D('member_quals').filter(q=>types.some(t=>t.id===q.typeId)&&(!S.fristFilter||q.typeId===S.fristFilter))
+    .map(q=>({q,t:types.find(t=>t.id===q.typeId),p:D('profiles').find(p=>p.id===q.userId),st:fristState(q)}))
+    .sort((a,b)=>(a.st.k-b.st.k)||(a.q.expires||'9').localeCompare(b.q.expires||'9'));
+  let html=`<div class="panel"><div class="panel-head"><div><h3>Frist eintragen</h3><p class="sub">Ein neuer Eintrag ersetzt den alten für dieselbe Person und Frist.</p></div></div>
+    <form class="inline" data-form="frist" style="margin:14px 20px">
+      <label for="fr-user">Person<select id="fr-user">${personOpts()}</select></label>
+      <label for="fr-type">Frist<select id="fr-type">${typeOpts('frist')}</select></label>
+      <label for="fr-date">Erledigt am<input type="date" id="fr-date" value="${today()}" required></label>
+      <label for="fr-exp">Gültig bis<input type="date" id="fr-exp" placeholder="automatisch"></label>
+      <label for="fr-note" class="span-all">Notiz<input id="fr-note" maxlength="120" placeholder="optional, z. B. Untersuchung bei Dr. …"></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Speichern</button></div>
+      <p class="sub span-all" style="margin:0">„Gültig bis“ leer lassen = wird aus der Gültigkeit der Frist berechnet.</p>
+      ${errP('frist')}
+    </form></div>`;
+  html+=`<div class="panel"><div class="panel-head"><div><h3>Fristen-Ampel</h3></div>
+    <label for="fr-filter" style="min-width:200px">Filter<select id="fr-filter" data-change="frist-filter"><option value="">Alle Fristen</option>${typeOpts('frist',S.fristFilter)}</select></label></div>
+    ${rows.length?rows.map(({q,t,p,st})=>`<div class="row">
+      <div class="info"><div style="display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center"><h3 style="font-size:17px">${esc(p?p.name:'?')}</h3><span class="chip ${st.c}">${st.n}</span></div>
+        <div class="facts"><span><b>${esc(t.name)}</b></span><span>erledigt ${esc(fmtDate(q.achieved))}</span>${q.expires?`<span>gültig bis <b>${esc(fmtDate(q.expires))}</b></span>`:''}</div>
+        ${q.note?`<p class="note">${esc(q.note)}</p>`:''}</div>
+      <div class="actions">${t.valid_months?`<button class="btn small" data-act="frist-renew" data-id="${esc(q.id)}">Heute erneuert</button>`:''}${delBtn('member_quals',q.id)}</div>
+    </div>`).join(''):'<div class="empty"><strong>Noch keine Fristen eingetragen.</strong>Oben Person und Frist wählen und speichern.</div>'}</div>`;
+  return html;
+}
+function leadQuals(){
+  const types=qTypes('lehrgang'), ps=people();
+  const has=(u,t)=>D('member_quals').find(q=>q.userId===u&&q.typeId===t);
+  const pf=S.qualPrefill||{};
+  let html=`<div class="panel"><div class="panel-head"><div><h3>Lehrgang eintragen</h3><p class="sub">Oder in der Tabelle auf <b>+</b> tippen.</p></div></div>
+    <form class="inline" data-form="qual" style="margin:14px 20px">
+      <label for="ql-user">Person<select id="ql-user">${personOpts(pf.user)}</select></label>
+      <label for="ql-type">Lehrgang<select id="ql-type">${typeOpts('lehrgang',pf.type)}</select></label>
+      <label for="ql-date">Abgeschlossen am<input type="date" id="ql-date" value="${today()}" required></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Speichern</button></div>
+      ${errP('qual')}
+    </form></div>`;
+  html+=`<div class="panel"><div class="panel-head"><div><h3>Qualifikationen</h3><p class="sub">✓ = vorhanden (Jahr). Zweimal auf ✓ tippen entfernt den Eintrag.</p></div></div>
+    <div class="qtable-wrap"><table class="qtable"><thead><tr><th>Person</th>${types.map(t=>`<th><span>${esc(t.name)}</span></th>`).join('')}</tr></thead><tbody>
+    ${ps.map(p=>`<tr><th>${esc(p.name||p.email)}</th>${types.map(t=>{const q=has(p.id,t.id);const key='mq-'+p.id+'-'+t.id;
+      return `<td>${q?`<button class="qcell yes ${S.confirm===key?'confirm':''}" data-act="qual-cell" data-user="${esc(p.id)}" data-type="${esc(t.id)}" data-id="${esc(q.id)}" title="${esc(fmtDate(q.achieved))}">${S.confirm===key?'entfernen?':'✓ '+esc(String(q.achieved).slice(0,4))}</button>`:`<button class="qcell" data-act="qual-cell" data-user="${esc(p.id)}" data-type="${esc(t.id)}" aria-label="${esc(t.name)} für ${esc(p.name||'')} eintragen">+</button>`}</td>`;}).join('')}</tr>`).join('')}
+    </tbody><tfoot><tr><th>Anzahl</th>${types.map(t=>`<td><b>${D('member_quals').filter(q=>q.typeId===t.id).length}</b></td>`).join('')}</tr></tfoot></table></div></div>`;
+  return html;
+}
+function leadAttend(){
+  const y=String(S.leadYear), g=S.leadGroup, t=today();
+  const duties=D('duties').filter(d=>d.group===g&&String(d.date).startsWith(y)&&d.date<=t).sort((a,b)=>b.date.localeCompare(a.date));
+  const att=D('duty_attendance');
+  const recorded=duties.filter(d=>att.some(a=>a.dutyId===d.id));
+  const years=[...new Set([new Date().getFullYear(),...D('duties').map(d=>+String(d.date).slice(0,4))])].sort((a,b)=>b-a);
+  let html=`<div class="panel"><div class="panel-head"><div><h3>Übungsbeteiligung ${esc(y)}</h3><p class="sub">Gezählt werden nur Dienste, bei denen die Anwesenheit erfasst wurde (${recorded.length} von ${duties.length}).</p></div>
+    <div class="actions">
+      <div class="filters">${[['aktive','Aktive'],['jugend','Jugend']].map(([k,n])=>`<button class="filter" data-act="lead-group" data-key="${k}" aria-pressed="${g===k}">${n}</button>`).join('')}</div>
+      <label for="lead-year" style="min-width:110px">Jahr<select id="lead-year" data-change="lead-year">${years.map(v=>`<option ${v==S.leadYear?'selected':''}>${v}</option>`).join('')}</select></label>
+    </div></div>`;
+  const ps=people();
+  const stats=ps.map(p=>{const n=recorded.filter(d=>att.some(a=>a.dutyId===d.id&&a.userId===p.id&&a.present)).length;return {p,n,pct:recorded.length?Math.round(n/recorded.length*100):0};}).sort((a,b)=>b.n-a.n||(a.p.name||'').localeCompare(b.p.name||'','de'));
+  html+= recorded.length ? stats.map(s=>`<div class="row"><div class="info"><div class="att-line"><b>${esc(s.p.name||s.p.email)}</b><span class="when">${s.n}/${recorded.length} · ${s.pct} %</span></div><div class="bar"><span style="width:${s.pct}%"></span></div></div></div>`).join('')
+    : '<div class="empty"><strong>Noch keine Anwesenheit erfasst.</strong>Unten einen vergangenen Dienst wählen und abhaken, wer da war.</div>';
+  html+='</div>';
+  html+=`<div class="panel"><div class="panel-head"><div><h3>Anwesenheit erfassen</h3><p class="sub">Vorausgefüllt mit den Zusagen. Nur vergangene und heutige Dienste.</p></div></div>`;
+  if(!duties.length) html+='<div class="empty">Keine Dienste in diesem Zeitraum.</div>';
+  html+=duties.map(d=>{
+    const rec=att.filter(a=>a.dutyId===d.id); const pres=rec.filter(a=>a.present).length; const openNow=S.attDuty===d.id;
+    let block=`<div class="row dated">${dateBox(d.date)}<div class="info"><h3>${esc(d.topic)}</h3><div class="facts">${rec.length?`<span class="chip done">${pres} anwesend</span>`:`<span class="chip open">noch nicht erfasst</span>`}</div></div>
+      <div class="actions"><button class="btn small ${openNow?'':'primary'}" data-act="att-open" data-id="${esc(d.id)}">${openNow?'Schließen':(rec.length?'Bearbeiten':'Erfassen')}</button></div></div>`;
+    if(openNow){
+      const rs=D('duty_rsvp').filter(r=>r.dutyId===d.id);
+      block+=`<form class="formbox" data-form="attendance" data-id="${esc(d.id)}" style="margin:0 20px 16px;grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">
+        ${ps.map(p=>{const a=rec.find(x=>x.userId===p.id); const on=a?a.present:rs.some(r=>r.userId===p.id&&r.status==='yes');
+          const r=rs.find(x=>x.userId===p.id);
+          return `<label class="check"><input type="checkbox" id="att-${esc(p.id)}" ${on?'checked':''}> ${esc(p.name||p.email)}${r?` <span class="chip ${RSVP[r.status].c}" style="margin-left:auto">${RSVP[r.status].i}</span>`:''}</label>`;}).join('')}
+        <div class="form-actions span-all"><button class="btn primary" type="submit">Anwesenheit speichern</button><button class="btn ghost" type="button" data-act="att-open" data-id="${esc(d.id)}">Abbrechen</button></div>
+      </form>`;
+    }
+    return block;
+  }).join('');
+  return html+'</div>';
+}
+function leadCatalog(){
+  const block=(k,title)=>`<div class="panel"><div class="panel-head"><div><h3>${title}</h3></div></div>
+    ${qTypes(k).map(t=>`<div class="row"><div class="info"><h3 style="font-size:16px">${esc(t.name)}</h3>${t.valid_months?`<p class="note">gültig ${t.valid_months} Monate</p>`:''}</div><div class="actions">${delBtn('qual_types',t.id)}</div></div>`).join('')||'<div class="empty">Noch keine Einträge.</div>'}</div>`;
+  return `<div class="panel"><div class="panel-head"><div><h3>Neuer Eintrag</h3><p class="sub">Löschen entfernt auch alle zugehörigen Einträge bei den Personen.</p></div></div>
+    <form class="inline" data-form="qtype" style="margin:14px 20px">
+      <label for="qt-name">Bezeichnung<input id="qt-name" required maxlength="60" placeholder="z. B. Absturzsicherung"></label>
+      <label for="qt-kind">Art<select id="qt-kind"><option value="lehrgang">Lehrgang / Qualifikation</option><option value="frist">Frist (läuft ab)</option></select></label>
+      <label for="qt-months">Gültigkeit in Monaten<input type="number" id="qt-months" min="1" max="120" placeholder="nur bei Fristen"></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Hinzufügen</button></div>
+      ${errP('qtype')}
+    </form></div>${block('frist','Fristen')}${block('lehrgang','Lehrgänge & Qualifikationen')}`;
 }
 
 /* ---------- Mitglieder (nur Bearbeiter) ---------- */
@@ -653,9 +767,10 @@ function render(){
   const v=S.view;
   $('#view-home').hidden = v!=='home';
   $('#view-doc').hidden = v!=='doc';
-  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','members','defects','push'].includes(v);
+  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','members','defects','push','lead'].includes(v);
   document.querySelectorAll('#tabs .tab').forEach(t=>t.setAttribute('aria-selected',String(t.dataset.view===v)));
   $('#tab-members').hidden=!mgr();
+  $('#tab-lead').hidden=!mgr();
   const waiting=D('profiles').filter(p=>p.role==='pending').length;
   const badge=$('#pending-badge'); badge.textContent=waiting+' neu'; badge.hidden=!waiting;
   $('#me-name').textContent=S.profile.name||'';
@@ -668,7 +783,7 @@ function render(){
   } else if(v!=='doc'){
     const page=$('#view-page'); const snap=snapshotForm(page);
     if(S.skipRestore){ snap.vals={}; snap.focus=null; }
-    page.innerHTML = v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg() : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : renderDuty(v);
+    page.innerHTML = v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg() : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : renderDuty(v);
     restoreForm(page,snap); S.skipRestore=false;
   }
   renderDocs();
@@ -677,7 +792,7 @@ function render(){
   $('#doc-lock').hidden = mgr();
 }
 function go(view){
-  if(view==='members' && !mgr()) view='home';
+  if((view==='members'||view==='lead') && !mgr()) view='home';
   S.view=view; S.openForm=null; S.editOrg=null; S.confirm=null; S.errs={};
   try{ localStorage.setItem('fhq-view',view); }catch(_){}
   if(location.hash!=='#'+view) history.replaceState(null,'','#'+view);
@@ -685,7 +800,7 @@ function go(view){
 }
 
 /* ---------- Klicks ---------- */
-const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',docs:'Liste gelöscht',news:'Beitrag gelöscht',duties:'Dienst gelöscht',events:'Veranstaltung gelöscht',shifts:'Arbeitsdienst gelöscht',ice:'Eis-Anmeldung storniert',org:'Funktion entfernt'};
+const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',docs:'Liste gelöscht',news:'Beitrag gelöscht',duties:'Dienst gelöscht',events:'Veranstaltung gelöscht',shifts:'Arbeitsdienst gelöscht',ice:'Eis-Anmeldung storniert',org:'Funktion entfernt',defects:'Mangel gelöscht',member_quals:'Eintrag entfernt',qual_types:'Aus dem Katalog entfernt'};
 
 document.addEventListener('click', async e=>{
   const tab=e.target.closest('#tabs .tab'); if(tab){ go(tab.dataset.view); return; }
@@ -739,6 +854,18 @@ document.addEventListener('click', async e=>{
     const st=b.dataset.status;
     await upd('defects',id, st==='erledigt'?{status:st,done_by:S.me,done_at:new Date().toISOString()}:{status:st,done_by:null,done_at:null}, 'Status: '+DST[st].n);
   }
+  else if(act==='lead-tab'){ S.leadTab=b.dataset.key; S.confirm=null; S.errs={}; S.skipRestore=true; render(); }
+  else if(act==='lead-group'){ S.leadGroup=b.dataset.key; S.attDuty=null; render(); }
+  else if(act==='att-open'){ S.attDuty = S.attDuty===id?null:id; S.skipRestore=true; render(); }
+  else if(act==='frist-renew'){
+    const q=D('member_quals').find(x=>x.id===id); const t=q&&D('qual_types').find(x=>x.id===q.typeId); if(!q||!t) return;
+    await upd('member_quals',id,{achieved:today(),expires:t.valid_months?addMonths(today(),t.valid_months):null},'Erneuert bis '+fmtDate(addMonths(today(),t.valid_months)));
+  }
+  else if(act==='qual-cell'){
+    const key='mq-'+b.dataset.user+'-'+b.dataset.type;
+    if(!id){ S.qualPrefill={user:b.dataset.user,type:b.dataset.type}; S.skipRestore=true; render(); document.getElementById('ql-date')?.focus(); window.scrollTo({top:0,behavior:'smooth'}); return; }
+    if(S.confirm===key){ S.confirm=null; await del('member_quals',id,'Eintrag entfernt'); } else { S.confirm=key; render(); }
+  }
   else if(act==='push-on'){ await enablePush(); }
   else if(act==='push-off'){ await disablePush(); }
   else if(act==='push-pref'){ await setPushPref(b.dataset.key, b.getAttribute('aria-checked')!=='true'); }
@@ -749,6 +876,11 @@ document.addEventListener('click', async e=>{
     catch(_){ toast('Kopieren nicht möglich – bitte Text markieren'); }
   }
   else if(act==='zoom'){ const u=S.urls[b.dataset.path]; if(u&&u!=='missing'){ $('#lightbox-img').src=u; $('#lightbox').hidden=false; } }
+});
+document.addEventListener('change', e=>{
+  const c=e.target.closest('[data-change]'); if(!c) return;
+  if(c.dataset.change==='frist-filter'){ S.fristFilter=c.value; render(); }
+  if(c.dataset.change==='lead-year'){ S.leadYear=+c.value; S.attDuty=null; render(); }
 });
 document.addEventListener('change', async e=>{
   const sel=e.target.closest('[data-act-change="role"]'); if(sel) await setRole(sel.dataset.id, sel.value);
@@ -825,6 +957,31 @@ document.addEventListener('submit', async e=>{
     const name=val('an-'+fid); const sh=D('shifts').find(s=>s.id===fid); if(!name||!sh) return;
     const ok=await ins('signups',{shift_id:fid,name},name+' eingetragen');
     if(ok){ const el=document.getElementById('an-'+fid); if(el) el.value=''; }
+  }
+  else if(kind==='frist'){
+    const user_id=val('fr-user'), type_id=val('fr-type'), achieved=val('fr-date'); const t=D('qual_types').find(x=>x.id===type_id);
+    if(!user_id||!type_id||!achieved) return fail('frist','Bitte Person, Frist und Datum angeben.');
+    const expires=val('fr-exp')||(t&&t.valid_months?addMonths(achieved,t.valid_months):null);
+    const ok=await run('member_quals', sb.from('member_quals').upsert({user_id,type_id,achieved,expires,note:val('fr-note')},{onConflict:'user_id,type_id'}), 'Frist gespeichert'+(expires?' – gültig bis '+fmtDate(expires):''));
+    if(ok){ S.errs.frist=null; ['fr-exp','fr-note'].forEach(i=>{const e=document.getElementById(i); if(e) e.value='';}); render(); }
+  }
+  else if(kind==='qual'){
+    const user_id=val('ql-user'), type_id=val('ql-type'), achieved=val('ql-date');
+    if(!user_id||!type_id||!achieved) return fail('qual','Bitte Person, Lehrgang und Datum angeben.');
+    const ok=await run('member_quals', sb.from('member_quals').upsert({user_id,type_id,achieved,expires:null},{onConflict:'user_id,type_id'}), 'Lehrgang eingetragen');
+    if(ok){ S.qualPrefill=null; S.errs.qual=null; render(); }
+  }
+  else if(kind==='qtype'){
+    const name=val('qt-name'), k=val('qt-kind'), m=parseInt(val('qt-months'),10);
+    if(!name) return fail('qtype','Bitte eine Bezeichnung eingeben.');
+    if(k==='frist'&&!(m>0)) return fail('qtype','Bei Fristen bitte die Gültigkeit in Monaten angeben.');
+    const ok=await ins('qual_types',{name,kind:k,valid_months:k==='frist'?m:null,sort:100},'„'+name+'“ hinzugefügt');
+    if(ok){ S.errs.qtype=null; render(); }
+  }
+  else if(kind==='attendance'){
+    const rows=people().map(p=>({duty_id:fid,user_id:p.id,present:!!(document.getElementById('att-'+p.id)||{}).checked}));
+    const ok=await run('duty_attendance', sb.from('duty_attendance').upsert(rows,{onConflict:'duty_id,user_id'}), rows.filter(r=>r.present).length+' anwesend gespeichert');
+    if(ok){ S.attDuty=null; render(); }
   }
   else if(kind==='defect'){
     const itemId=val('df-item'), it=D('items').find(i=>i.id===itemId);
@@ -932,7 +1089,7 @@ async function route(){
     let v=VIEWS.includes(h)?h:null;
     if(!v){ try{ v=localStorage.getItem('fhq-view'); }catch(_){} }
     S.view=VIEWS.includes(v)?v:'home';
-    if(S.view==='members'&&!mgr()) S.view='home';
+    if((S.view==='members'||S.view==='lead')&&!mgr()) S.view='home';
   }
   render();
 }

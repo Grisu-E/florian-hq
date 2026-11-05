@@ -257,3 +257,21 @@ img{max-width:100%}
 .switch:focus-visible{outline:2px solid var(--red);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.switch,.switch span{transition:none}}
 .me-chip button[data-goto="push"]{padding:5px 8px}
+
+/* Wehrführung */
+.qtable-wrap{overflow-x:auto;padding:0 0 8px}
+.qtable{border-collapse:collapse;font-size:13px;min-width:100%}
+.qtable th,.qtable td{border-bottom:1px solid var(--line);padding:6px 8px;text-align:center;white-space:nowrap}
+.qtable tbody th,.qtable tfoot th{text-align:left;font-weight:600;position:sticky;left:0;background:var(--surface);z-index:1}
+.qtable thead th{vertical-align:bottom;height:130px;padding-bottom:10px}
+.qtable thead th span{display:inline-block;writing-mode:vertical-rl;transform:rotate(180deg);font-family:var(--mono);font-size:11px;letter-spacing:.04em;font-weight:500;color:var(--muted)}
+.qtable thead th:first-child{vertical-align:bottom;text-align:left}
+.qcell{appearance:none;border:1px dashed var(--line);background:none;color:var(--muted);border-radius:8px;min-width:54px;padding:5px 6px;font:600 12px/1 var(--mono);cursor:pointer}
+.qcell:hover{border-color:var(--ink);color:var(--ink)}
+.qcell.yes{border:0;background:var(--ok-soft);color:var(--ok)}
+.qcell.confirm{background:var(--red-soft);color:var(--red)}
+.att-line{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.bar{height:8px;border-radius:99px;background:var(--sunk);margin-top:6px;overflow:hidden}
+.bar span{display:block;height:100%;background:var(--red);border-radius:99px}
+label.check{flex-direction:row;align-items:center;gap:8px;text-transform:none;letter-spacing:0;font-size:15px;font-weight:500;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:9px 10px}
+label.check input{width:18px;height:18px;flex:none}
