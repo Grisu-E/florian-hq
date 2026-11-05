@@ -92,4 +92,53 @@ select cron.schedule('fhq-fristen', '5 6 * * *', 'select public.fhq_frist_remind
 
 -- ---------- v3.1: Vorab-Erinnerung je Frist ----------
 -- remind_days = Tage vor Ablauf (null = keine Erinnerung); remind_person = betroffene Person ebenfalls erinnern
--- (Siehe Live-Stand: Spalten remind_days/remind_person, Funktion fhq_push_targets_users, neue fhq_frist_reminder)
+alter table public.qual_types add column if not exists remind_days int check (remind_days between 0 and 365);
+alter table public.qual_types add column if not exists remind_person boolean not null default false;
+update public.qual_types set remind_days = case name
+  when 'G26.3 Untersuchung' then 90 when 'Atemschutz-Belastungsübung' then 60 when 'Führerscheinkontrolle' then 14 else null end
+where kind = 'frist' and remind_days is null;
+
+create or replace function public.fhq_push_targets_users(cat text, ids uuid[])
+returns setof public.push_subs language sql security definer set search_path = public as $$
+  select s.* from public.push_subs s join public.profiles p on p.id = s.user_id
+  where p.role in ('member','admin') and s.user_id = any(ids) and coalesce((s.prefs ->> cat)::boolean, true);
+$$;
+revoke all on function public.fhq_push_targets_users(text, uuid[]) from public, anon, authenticated;
+grant execute on function public.fhq_push_targets_users(text, uuid[]) to service_role;
+
+create or replace function public.fhq_frist_reminder() returns void
+language plpgsql security definer set search_path = public, fhq_private, extensions as $$
+declare c record; r record; hdr jsonb;
+begin
+  select function_url, hook_secret into c from fhq_private.push_config where id = 1;
+  hdr := jsonb_build_object('Content-Type','application/json','x-hook-secret', c.hook_secret);
+  for r in
+    select t.name,
+      string_agg(case when q.expires = current_date + t.remind_days then p.name end, ', ' order by p.name) as soon,
+      string_agg(case when q.expires = current_date - 1 then p.name end, ', ' order by p.name) as over,
+      min(t.remind_days) as days
+    from public.member_quals q join public.qual_types t on t.id = q.type_id join public.profiles p on p.id = q.user_id
+    where t.kind = 'frist' and t.remind_days is not null and q.expires is not null
+      and (q.expires = current_date + t.remind_days or q.expires = current_date - 1)
+    group by t.id, t.name
+  loop
+    perform net.http_post(url := c.function_url, headers := hdr,
+      body := jsonb_build_object('category','fristen','title','Frist: ' || r.name,
+        'body', concat_ws(' · ', case when r.soon is not null then 'in ' || r.days || ' Tagen fällig: ' || r.soon end,
+                                  case when r.over is not null then 'abgelaufen: ' || r.over end),
+        'url','#lead','adminOnly',true));
+  end loop;
+  for r in
+    select q.user_id, t.name, q.expires, (q.expires < current_date) as over
+    from public.member_quals q join public.qual_types t on t.id = q.type_id
+    where t.kind = 'frist' and t.remind_days is not null and t.remind_person and q.expires is not null
+      and (q.expires = current_date + t.remind_days or q.expires = current_date - 1)
+  loop
+    perform net.http_post(url := c.function_url, headers := hdr,
+      body := jsonb_build_object('category','meine_fristen',
+        'title', case when r.over then 'Deine Frist ist abgelaufen' else 'Deine Frist läuft bald ab' end,
+        'body', r.name || ' – gültig bis ' || to_char(r.expires,'DD.MM.YYYY'),
+        'url','#home','userIds', jsonb_build_array(r.user_id)));
+  end loop;
+end $$;
+revoke all on function public.fhq_frist_reminder() from public, anon, authenticated;
