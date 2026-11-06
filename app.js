@@ -31,7 +31,8 @@ const CATS = [
   {k:'fest', n:'Festzubehör', ph:'z. B. Biertischgarnitur'}
 ];
 const DUTY = {'duty-aktive':{g:'aktive',n:'Dienstplan Aktive'}, 'duty-jugend':{g:'jugend',n:'Dienstplan Jugend'}};
-const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'Bearbeiter'};
+const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'App-Master'};
+const FN_NAME = {kommandant:'Kommandant', gruppenfuehrer:'Gruppenführer', geraetewart:'Gerätewart', kassier:'Kassier'};
 const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','who','doc','members','me','quiz','clothing','todo','defects','push','lead','expenses'];
 const catName = k => k==='eis'?'Crushed-Eis':((CATS.find(c=>c.k===k)||{}).n || k);
 
@@ -69,12 +70,20 @@ function nameOf(id){ const p=D('profiles').find(x=>x.id===id); return (p&&p.name
 const who = id => `<span class="who">${esc(nameOf(id))}</span>`;
 const isMember = () => !!S.profile && (S.profile.role==='member'||S.profile.role==='admin');
 const isAdmin = () => !!S.profile && S.profile.role==='admin';
-const mgr = isAdmin;
-const isTreasurer = () => !!S.profile && !!S.profile.treasurer && isMember();
+const isMaster = isAdmin;
+const fns = () => (S.profile && S.profile.functions) || [];
+const hasFn = f => isMember() && fns().includes(f);
+const canLead = () => isMaster() || hasFn('kommandant') || hasFn('gruppenfuehrer');
+const canGear = () => isMaster() || hasFn('kommandant') || hasFn('geraetewart');
+const canCmd  = () => isMaster() || hasFn('kommandant');
+const canStaff = () => canLead() || canGear();
+const mgr = canLead;
+const isTreasurer = () => isMember() && (isMaster() || hasFn('kassier') || !!S.profile.treasurer);
+const roleLabel = p => [p.role==='admin'?'App-Master':null, ...((p.functions||[]).map(f=>FN_NAME[f]))].filter(Boolean).join(' · ') || ROLE_NAME[p.role] || '';
 const eur = n => (Math.round((+n||0)*100)/100).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
 const ro = () => !isMember();
-const mine = by => isAdmin() || (S.me && by===S.me);
-const lockNote = () => mgr()?'':'<p class="sub" style="margin-top:4px">Anlegen und Ändern ist den Bearbeitern vorbehalten.</p>';
+const mine = by => canStaff() || (S.me && by===S.me);
+const lockNote = () => mgr()?'':'<p class="sub" style="margin-top:4px">Anlegen und Ändern ist Kommandant und Gruppenführern vorbehalten.</p>';
 function delBtn(col,id,label='Löschen'){
   const key=col+'-'+id;
   return S.confirm===key
@@ -177,12 +186,12 @@ function renderTiles(){
     tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:mgr()&&openDocs>0}) +
     (()=>{ const ex=D('expenses').filter(x=>x.status==='offen'); const sum=ex.reduce((a,x)=>a+(+x.amount||0),0);
       return tile('expenses','Private Ausgaben', ex.length?`${ex.length} offen · ${eur(sum)}`:(isTreasurer()?'Nichts zu erstatten':'Auslage einreichen'),{attr:'data-goto="expenses"',alert:isTreasurer()&&ex.length>0}); })();
-  if(mgr()){
+  if(canLead()||canCmd()){
     const fr=D('member_quals').filter(q=>D('qual_types').some(x=>x.id===q.typeId&&x.kind==='frist'));
     const red=fr.filter(q=>fristState(q).k===0).length, yel=fr.filter(q=>fristState(q).k===1).length;
     const waiting=D('profiles').filter(p=>p.role==='pending').length;
-    org += tile('lead','Führung', red||yel?`${red?red+' abgelaufen':''}${red&&yel?' · ':''}${yel?yel+' bald fällig':''}`:'Fristen & Beteiligung',{attr:'data-goto="lead"',alert:red+yel>0}) +
-      tile('members','Mitglieder', waiting?`${waiting} warten auf Freigabe`:`${D('profiles').filter(p=>p.role!=='pending').length} Mitglieder`,{attr:'data-goto="members"',alert:waiting>0});
+    org += (canLead()?tile('lead','Führung', red||yel?`${red?red+' abgelaufen':''}${red&&yel?' · ':''}${yel?yel+' bald fällig':''}`:'Fristen & Beteiligung',{attr:'data-goto="lead"',alert:red+yel>0}):'') +
+      (canCmd()?      tile('members','Mitglieder', waiting?`${waiting} warten auf Freigabe`:`${D('profiles').filter(p=>p.role!=='pending').length} Mitglieder`,{attr:'data-goto="members"',alert:waiting>0}):'');
   }
   $('#tiles-org').innerHTML = org;
   const myOpenDuties=D('duties').filter(d=>d.date>=t&&!D('duty_rsvp').some(r=>r.dutyId===d.id&&r.userId===S.me)&&d.date<=addDays(t,14)).length;
@@ -190,7 +199,7 @@ function renderTiles(){
   $('#tiles-me').innerHTML =
     tile('me','Meine Seite', myOpenDuties?`${myOpenDuties} Dienste ohne Rückmeldung`:'Dienste, Fristen, Kalender',{attr:'data-goto="me"',alert:myOpenDuties>0}) +
     tile('quiz','Wissenstest & Leistungs\u00ADabzeichen', `${D('quiz_questions').length} Übungsfragen`,{attr:'data-goto="quiz"'}) +
-    tile('clothing','Kleiderkammer', mgr()?(clOpen.length?`${clOpen.length} offene Anfragen`:'Nichts offen'):'Größen & Bedarf melden',{attr:'data-goto="clothing"',alert:mgr()&&clOpen.length>0});
+    tile('clothing','Kleiderkammer', canGear()?(clOpen.length?`${clOpen.length} offene Anfragen`:'Nichts offen'):'Größen & Bedarf melden',{attr:'data-goto="clothing"',alert:canGear()&&clOpen.length>0});
 }
 function catTile(c,n){
   const items=D('items').filter(i=>i.cat===c.k).length;
@@ -207,7 +216,7 @@ const contactName = c => c ? (c.user_id?nameOf(c.user_id):'') : '';
 function contactLine(key,cat,label){
   const own=contactRow(key), c=own||(cat?contactRow(cat):null);
   const txt=c?`${esc(contactName(c)||'Nummer hinterlegt')}${c.phone?' · 📱':''}${!own&&cat?' <span class="muted">(wie Kategorie)</span>':''}`:'<span class="muted">niemand hinterlegt</span>';
-  return `<p class="contact-line">${esc(label||'Verantwortlich')}: ${txt}${mgr()?` <button class="linkbtn" data-act="contact-edit" data-id="${esc(key)}">${own?'ändern':'festlegen'}</button>`:''}</p>${S.contactEdit===key?contactForm(key,own):''}`;
+  return `<p class="contact-line">${esc(label||'Verantwortlich')}: ${txt}${canGear()?` <button class="linkbtn" data-act="contact-edit" data-id="${esc(key)}">${own?'ändern':'festlegen'}</button>`:''}</p>${S.contactEdit===key?contactForm(key,own):''}`;
 }
 function contactForm(key,own){
   const k=esc(key), members=D('profiles').filter(p=>p.role!=='pending').sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
@@ -336,22 +345,22 @@ function renderNews(){
   const weekAgo=new Date(Date.now()-7*864e5).toISOString();
   let html=`<div class="panel"><div class="panel-head">
     <div><h2>Neues in der Wehr</h2><p class="sub">Infos, Termine, Durchsagen. Was alle wissen sollten.</p>${lockNote()}</div>
-    ${mgr()?`<div class="actions"><button class="btn primary" data-act="open-form" data-form="news">+ Neuigkeit</button></div>`:''}</div>`;
-  if(S.openForm==='news' && mgr()){
+    ${canStaff()?`<div class="actions"><button class="btn primary" data-act="open-form" data-form="news">+ Neuigkeit</button></div>`:''}</div>`;
+  if(S.openForm==='news' && canStaff()){
     html+=`<form class="inline" data-form="news" style="grid-template-columns:1fr">
       <label for="news-title">Überschrift<input id="news-title" required maxlength="90" placeholder="z. B. Neue Atemschutzgeräte sind da"></label>
       <label for="news-text">Text<textarea id="news-text" required maxlength="2000"></textarea></label>
       <div class="form-actions"><button class="btn primary" type="submit">Veröffentlichen</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>
       ${errP('news')}</form>`;
   }
-  if(!list.length) html+=`<div class="empty"><strong>Noch keine Neuigkeiten.</strong>${mgr()?'Über „+ Neuigkeit“ schreibst du den ersten Beitrag.':'Sobald die Bearbeiter etwas posten, steht es hier.'}</div>`;
+  if(!list.length) html+=`<div class="empty"><strong>Noch keine Neuigkeiten.</strong>${canStaff()?'Über „+ Neuigkeit“ schreibst du den ersten Beitrag.':'Sobald die Bearbeiter etwas posten, steht es hier.'}</div>`;
   else html+=list.map(x=>`<div class="row">
     <div class="info">
       <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center">${(x.createdAt||'')>weekAgo?'<span class="news-new">neu</span>':''}<h3>${esc(x.title)}</h3></div>
       <div class="facts">${who(x.by)} · ${esc(x.createdAt?new Date(x.createdAt).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}):'')}</div>
       <p class="text">${esc(x.text)}</p>
     </div>
-    <div class="actions">${mgr()?delBtn('news',x.id):''}</div>
+    <div class="actions">${canStaff()?delBtn('news',x.id):''}</div>
   </div>`).join('');
   return loadingOr(['news'], html+'</div>');
 }
@@ -503,7 +512,7 @@ function contact(label,v,href){ return v?`<span class="contact"><span aria-hidde
 function orgCard(n,withPath){
   return `<div class="org-card">
     <div style="min-width:0"><div class="org-role">${esc(n.role)}</div><div class="org-name">${esc(n.name||'– unbesetzt –')}</div></div>
-    <div class="actions">${mgr()&&S.orgEdit?`<button class="btn ghost small" data-act="edit-org" data-id="${esc(n.id)}">Bearbeiten</button>`:''}</div>
+    <div class="actions">${canCmd()&&S.orgEdit?`<button class="btn ghost small" data-act="edit-org" data-id="${esc(n.id)}">Bearbeiten</button>`:''}</div>
     ${withPath&&n.parentId?`<div class="crumb">${esc(orgPath(n))}</div>`:''}
     ${n.area?`<p class="note"><b style="color:var(--ink)">Verantwortlich für:</b> ${esc(n.area)}</p>`:''}
     ${(n.phone||n.email)?`<div class="contacts">${contact('Tel.',n.phone,'tel:'+String(n.phone||'').replace(/[^\d+]/g,''))}${contact('Mail',n.email,'mailto:'+(n.email||''))}</div>`:''}
@@ -527,8 +536,8 @@ function orgForm(){
     ${errP('org')}</form>`;
 }
 /* ---------- Organigramm: Schaubild + Bereiche zum Aufklappen + Ansicht „Wer macht was?“ ---------- */
-const orgEditBtn = (n,label='✎') => mgr()&&S.orgEdit?`<button class="org-ed" data-act="edit-org" data-id="${esc(n.id)}" aria-label="${esc(n.role)} bearbeiten">${label}</button>`:'';
-const orgAddBtn = n => mgr()&&S.orgEdit?`<button class="org-add" data-act="org-add-under" data-id="${esc(n.id)}">+ Unterpunkt</button>`:'';
+const orgEditBtn = (n,label='✎') => canCmd()&&S.orgEdit?`<button class="org-ed" data-act="edit-org" data-id="${esc(n.id)}" aria-label="${esc(n.role)} bearbeiten">${label}</button>`:'';
+const orgAddBtn = n => canCmd()&&S.orgEdit?`<button class="org-add" data-act="org-add-under" data-id="${esc(n.id)}">+ Unterpunkt</button>`:'';
 function orgContacts(n){
   const tel=n.phone?`<a class="org-c" href="tel:${esc(String(n.phone).replace(/[^\d+]/g,''))}" aria-label="${esc(n.name||n.role)} anrufen">📞</a>`:'';
   const mail=n.email?`<a class="org-c" href="mailto:${esc(n.email)}" aria-label="${esc(n.name||n.role)} mailen">✉️</a>`:'';
@@ -618,9 +627,9 @@ function renderOrg(tab){
   const all=D('org'); const q=S.orgQ.trim().toLowerCase();
   let html=`<div class="panel"><div class="panel-head">
     <div><h2>${tab==='people'?'Wer macht was?':'Organigramm'}</h2><p class="sub">${tab==='people'?'Alle Kameraden mit ihren Aufgaben. Aufgabe antippen zeigt sie im Organigramm.':'Wer ist wofür zuständig? Namen antippen zeigt alle Aufgaben der Person.'}</p></div>
-    ${mgr()?`<div class="actions">${S.orgEdit?`<button class="btn primary" data-act="edit-org" data-id="new">+ Funktion</button>`:''}<button class="btn ${S.orgEdit?'':'ghost'}" data-act="org-edit-mode" aria-pressed="${!!S.orgEdit}">${S.orgEdit?'Fertig':'✎ Bearbeiten'}</button></div>`:''}</div>`;
-  if(S.editOrg && mgr()) html+=orgForm();
-  if(!all.length) return loadingOr(['org'], html+`<div class="empty"><strong>Noch kein Organigramm hinterlegt.</strong>${mgr()?'Über „✎ Bearbeiten“ → „+ Funktion“ anlegen.':'Sobald die Bearbeiter es anlegen, steht es hier.'}</div></div>`);
+    ${canCmd()?`<div class="actions">${S.orgEdit?`<button class="btn primary" data-act="edit-org" data-id="new">+ Funktion</button>`:''}<button class="btn ${S.orgEdit?'':'ghost'}" data-act="org-edit-mode" aria-pressed="${!!S.orgEdit}">${S.orgEdit?'Fertig':'✎ Bearbeiten'}</button></div>`:''}</div>`;
+  if(S.editOrg && canCmd()) html+=orgForm();
+  if(!all.length) return loadingOr(['org'], html+`<div class="empty"><strong>Noch kein Organigramm hinterlegt.</strong>${canCmd()?'Über „✎ Bearbeiten“ → „+ Funktion“ anlegen.':'Sobald die Bearbeiter es anlegen, steht es hier.'}</div></div>`);
   html+=`<div class="org-tools">
     <input id="org-q" type="search" placeholder="${tab==='people'?'Name suchen':'Suchen: Aufgabe oder Name'}" value="${esc(S.orgQ)}" aria-label="Organigramm durchsuchen">
   </div>`;
@@ -644,7 +653,7 @@ function renderDefects(){
   const all=[...D('defects')].sort((a,b)=>{const u={ausser_dienst:0,dringend:1,normal:2};return (u[a.urgency]-u[b.urgency])||(b.createdAt||'').localeCompare(a.createdAt||'');});
   const open=all.filter(x=>x.status!=='erledigt'), done=all.filter(x=>x.status==='erledigt');
   let html=`<div class="panel"><div class="panel-head">
-    <div><h2>Mängel melden</h2><p class="sub">Etwas kaputt, fehlt oder nicht einsatzbereit? Kurz eintragen – die Bearbeiter (z. B. Gerätewart) werden benachrichtigt.</p></div></div>
+    <div><h2>Mängel melden</h2><p class="sub">Etwas kaputt, fehlt oder nicht einsatzbereit? Kurz eintragen – Gerätewart und Kommandant werden benachrichtigt.</p></div></div>
     <form class="inline" data-form="defect" style="margin:14px 20px">
       <label for="df-item">Betrifft<select id="df-item">${items.map(i=>`<option value="${esc(i.id)}">${esc(catName(i.cat))}: ${esc(i.name)}</option>`).join('')}<option value="">Sonstiges (unten benennen)</option></select></label>
       <label for="df-other">Gegenstand (falls Sonstiges)<input id="df-other" maxlength="60" placeholder="z. B. Funkgerät 3"></label>
@@ -661,12 +670,12 @@ function renderDefects(){
       ${x.description?`<p class="text">${esc(x.description)}</p>`:''}
       <div class="facts"><span>gemeldet von ${who(x.by)} am ${esc(new Date(x.createdAt).toLocaleDateString('de-DE'))}</span>${x.status==='erledigt'&&x.doneBy?`<span>erledigt von ${who(x.doneBy)}${x.doneAt?' am '+esc(new Date(x.doneAt).toLocaleDateString('de-DE')):''}</span>`:''}</div>
     </div>
-    <div class="actions">${mgr()?`
+    <div class="actions">${canGear()?`
       ${x.status==='offen'?`<button class="btn small" data-act="defect-status" data-id="${esc(x.id)}" data-status="in_arbeit">In Arbeit</button>`:''}
       ${x.status!=='erledigt'?`<button class="btn small primary" data-act="defect-status" data-id="${esc(x.id)}" data-status="erledigt">Erledigt</button>`:`<button class="btn small" data-act="defect-status" data-id="${esc(x.id)}" data-status="offen">Wieder öffnen</button>`}
       ${delBtn('defects',x.id)}`:''}</div>
   </div>`;
-  html+=`<div class="panel"><div class="panel-head"><div><h2>Offene Mängel</h2>${mgr()?'':'<p class="sub">Status ändern können die Bearbeiter.</p>'}</div><span class="count">${open.length} offen</span></div>
+  html+=`<div class="panel"><div class="panel-head"><div><h2>Offene Mängel</h2>${canGear()?'':'<p class="sub">Status ändern können Gerätewart und Kommandant.</p>'}</div><span class="count">${open.length} offen</span></div>
     ${open.length?open.map(row).join(''):'<div class="empty"><strong>Keine offenen Mängel.</strong>Alles einsatzbereit.</div>'}
     ${done.length?`<div class="day-head"><span class="when">Erledigt (${done.length})</span><button class="btn ghost small" data-act="toggle-past" data-key="defects">${S.showPast.defects?'Ausblenden':'Anzeigen'}</button></div>${S.showPast.defects?done.map(row).join(''):''}`:''}
   </div>`;
@@ -674,7 +683,7 @@ function renderDefects(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)'],['meine_fristen','Meine eigenen Fristen'],['expenses','Private Ausgaben'],['reservations','Reservierungen, für die ich verantwortlich bin'],['kleider','Kleiderkammer-Anfragen (nur Bearbeiter)'],['erinnerung','Erinnerung am Vortag eines Dienstes'],['aufgaben','Meine Aufgaben (To-do)']];
+const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (Gerätewart/Kommandant)'],['fristen','Fristen-Erinnerung (Führung)'],['meine_fristen','Meine eigenen Fristen'],['expenses','Private Ausgaben'],['reservations','Reservierungen, für die ich verantwortlich bin'],['kleider','Kleiderkammer-Anfragen (Gerätewart/Kommandant)'],['erinnerung','Erinnerung am Vortag eines Dienstes'],['aufgaben','Meine Aufgaben (To-do)']];
 const pushSupported=()=>('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -725,7 +734,7 @@ function renderPush(){
       <div style="padding:0 20px 20px"><button class="btn primary" data-act="push-on">🔔 Benachrichtigungen einschalten</button></div>`;
   } else {
     body = `<div class="row"><div class="info"><h3>Benachrichtigungen sind an</h3><p class="note">Wähle, worüber du informiert werden willst. Gilt nur für dieses Gerät.</p></div><div class="actions"><button class="btn danger small" data-act="push-off">Alle ausschalten</button></div></div>
-      ${PUSH_CATS.filter(([k])=>(k!=='defects'&&k!=='fristen'&&k!=='kleider')||mgr()).map(([k,n])=>{const on=(row.prefs||{})[k]!==false;return `<div class="row"><div class="info"><h3 style="font-size:16px">${esc(n)}</h3></div><div class="actions"><button class="switch" role="switch" aria-checked="${on}" data-act="push-pref" data-key="${k}" aria-label="${esc(n)}"><span></span></button></div></div>`;}).join('')}`;
+      ${PUSH_CATS.filter(([k])=>(k==='defects'||k==='kleider')?canGear():(k==='fristen'?canLead():true)).map(([k,n])=>{const on=(row.prefs||{})[k]!==false;return `<div class="row"><div class="info"><h3 style="font-size:16px">${esc(n)}</h3></div><div class="actions"><button class="switch" role="switch" aria-checked="${on}" data-act="push-pref" data-key="${k}" aria-label="${esc(n)}"><span></span></button></div></div>`;}).join('')}`;
   }
   return `<div class="panel"><div class="panel-head"><div><h2>Benachrichtigungen</h2><p class="sub">Push-Meldungen aufs Handy oder den Computer.</p></div></div>${body}</div>`;
 }
@@ -741,12 +750,12 @@ function personOpts(sel){ return people().map(p=>`<option value="${esc(p.id)}" $
 function typeOpts(k,sel){ return qTypes(k).map(t=>`<option value="${esc(t.id)}" ${t.id===sel?'selected':''}>${esc(t.name)}${t.valid_months?` (${t.valid_months} Mon.)`:''}</option>`).join(''); }
 
 function renderLead(){
-  if(!mgr()) return `<div class="panel"><div class="empty"><strong>Nur für Bearbeiter.</strong></div></div>`;
+  if(!mgr()) return `<div class="panel"><div class="empty"><strong>Nur für die Führung.</strong></div></div>`;
   const tabs=[['catalog','Fristen'],['attend','Übungsbeteiligung'],['avail','Verfügbarkeit']];
   if(!tabs.some(([k])=>k===S.leadTab)) S.leadTab='catalog';
   const fr=D('member_quals').filter(q=>D('qual_types').find(t=>t.id===q.typeId&&t.kind==='frist'));
   const red=fr.filter(q=>fristState(q).k===0).length, yel=fr.filter(q=>fristState(q).k===1).length;
-  let html=`<div class="panel"><div class="panel-head"><div><h2>Führung</h2><p class="sub">Nur für Bearbeiter sichtbar. Fristen und Übungsbeteiligung der Mannschaft.</p></div>
+  let html=`<div class="panel"><div class="panel-head"><div><h2>Führung</h2><p class="sub">Nur für Kommandant, Gruppenführer und App-Master sichtbar.</p></div>
     <div class="actions">${red?`<span class="chip busy">${red} abgelaufen</span>`:''}${yel?`<span class="chip open">${yel} bald fällig</span>`:''}</div></div>
     <div class="org-tools"><div class="filters">${tabs.map(([k,n])=>`<button class="filter" data-act="lead-tab" data-key="${k}" aria-pressed="${S.leadTab===k}">${n}</button>`).join('')}</div></div></div>`;
   html += S.leadTab==='attend'?leadAttend() : S.leadTab==='avail'?leadAvail() : leadCatalog();
@@ -847,7 +856,7 @@ function fristDetail(t){
       <label for="rm-days" class="rm-days"><input type="number" id="rm-days" min="0" max="365" value="${t.remind_days!=null?t.remind_days:30}"> Tage vor Ablauf</label>
       <label class="check"><input type="checkbox" id="rm-person" ${t.remind_person?'checked':''}> betroffene Person auch erinnern</label>
       <button class="btn small" type="submit">Speichern</button>
-      <p class="sub" style="margin:0;flex-basis:100%">Bearbeiter bekommen dann eine Push-Meldung, wenn die Frist in X Tagen abläuft und wenn sie abgelaufen ist. Ab dieser Zeit wird die Ampel gelb.</p>
+      <p class="sub" style="margin:0;flex-basis:100%">Die Führung bekommt dann eine Push-Meldung, wenn die Frist in X Tagen abläuft und wenn sie abgelaufen ist. Ab dieser Zeit wird die Ampel gelb.</p>
     </form>
     <form class="formbox" data-form="frist" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
       <input type="hidden" id="fr-type" value="${esc(t.id)}">
@@ -945,22 +954,38 @@ function renderExpenses(){
 
 /* ---------- Mitglieder (nur Bearbeiter) ---------- */
 function renderMembers(){
-  if(!mgr()) return `<div class="panel"><div class="empty"><strong>Nur für Bearbeiter.</strong></div></div>`;
+  if(!canCmd()) return `<div class="panel"><div class="empty"><strong>Nur für Kommandant und App-Master.</strong></div></div>`;
   const all=[...D('profiles')].sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
   const waiting=all.filter(p=>p.role==='pending'), rest=all.filter(p=>p.role!=='pending');
-  const row=p=>`<div class="row">
-    <div class="info"><h3>${esc(p.name||'Ohne Namen')}${p.id===S.me?' <span class="chip free">du</span>':''}</h3><p class="note">${esc(p.email||'')} · seit ${esc(new Date(p.created_at).toLocaleDateString('de-DE'))}</p></div>
+  const master=isMaster();
+  const row=p=>{
+    const f=p.functions||[];
+    return `<div class="row member-row">
+    <div class="info"><h3>${esc(p.name||'Ohne Namen')}${p.id===S.me?' <span class="chip free">du</span>':''}</h3>
+      <p class="note">${esc(p.email||'')} · seit ${esc(new Date(p.created_at).toLocaleDateString('de-DE'))}</p>
+      ${p.role!=='pending'?`<div class="fn-chips">${p.role==='admin'?'<span class="fn-chip master">👑 App-Master</span>':''}${Object.entries(FN_NAME).map(([k,n])=>master
+        ? `<button class="fn-chip ${f.includes(k)?'on':''}" data-act="fn-toggle" data-id="${esc(p.id)}" data-key="${k}" aria-pressed="${f.includes(k)}">${f.includes(k)?'✓ ':''}${n}</button>`
+        : (f.includes(k)?`<span class="fn-chip on">${n}</span>`:'')).join('')}${!master&&!f.length&&p.role!=='admin'?'<span class="sub">Mitglied</span>':''}</div>`:''}
+    </div>
     <div class="actions">
       ${p.role==='pending'
-        ? `<button class="btn primary small" data-act="set-role" data-id="${esc(p.id)}" data-role="member">Freigeben</button><button class="btn small" data-act="set-role" data-id="${esc(p.id)}" data-role="admin">Als Bearbeiter freigeben</button>`
-        : `<select class="role-select" data-act-change="role" data-id="${esc(p.id)}" aria-label="Rolle von ${esc(p.name)}">${['member','admin','pending'].map(r=>`<option value="${r}" ${p.role===r?'selected':''}>${ROLE_NAME[r]==='wartet'?'Sperren (wartet)':ROLE_NAME[r]}</option>`).join('')}</select>`}
-      ${p.role!=='pending'?`<button class="btn small ${p.treasurer?'primary':''}" data-act="treasurer" data-id="${esc(p.id)}" aria-pressed="${!!p.treasurer}" title="Darf alle privaten Ausgaben sehen und erstatten">${p.treasurer?'💶 Kassier':'Kassier?'}</button>`:''}
-      ${p.id!==S.me?delBtn('member',p.id,'Entfernen'):''}
+        ? `<button class="btn primary small" data-act="set-role" data-id="${esc(p.id)}" data-role="member">Freigeben</button>`
+        : `${master?`<button class="btn small ${p.role==='admin'?'primary':''}" data-act="set-role" data-id="${esc(p.id)}" data-role="${p.role==='admin'?'member':'admin'}" title="App-Master darf alles, auch Rollen vergeben">${p.role==='admin'?'Master entziehen':'Zum Master machen'}</button>`:''}
+           ${(p.role!=='admin'||master)&&p.id!==S.me?`<button class="btn ghost small" data-act="set-role" data-id="${esc(p.id)}" data-role="pending">Sperren</button>`:''}`}
+      ${p.id!==S.me&&(p.role!=='admin'||master)?delBtn('member',p.id,'Entfernen'):''}
     </div>
-  </div>`;
+  </div>`;};
   return `<div class="panel"><div class="panel-head"><div><h2>Warten auf Freigabe</h2><p class="sub">Neue Registrierungen. Prüfe, ob die Person zur Wehr gehört, bevor du sie freigibst.</p></div></div>
     ${waiting.length?waiting.map(row).join(''):'<div class="empty"><strong>Niemand wartet.</strong>Neue Kameraden registrieren sich über den Link der App und erscheinen dann hier.</div>'}</div>
-    <div class="panel"><div class="panel-head"><div><h2>Mitglieder</h2><p class="sub"><b>Mitglied</b>: alles lesen, reservieren, Eis anmelden, in Arbeitsdienste eintragen. <b>Bearbeiter</b>: zusätzlich Neues, Dienstpläne, Veranstaltungen, Übungsdoku, Organigramm und Mitglieder pflegen.</p></div><span class="count">${rest.length} Personen</span></div>
+    <div class="panel"><div class="panel-head"><div><h2>Mitglieder & Rollen</h2><p class="sub">${master?'Funktion antippen zum Vergeben oder Entziehen. Mehrere Funktionen pro Person sind möglich.':'Rollen vergibt der App-Master.'}</p></div><span class="count">${rest.length} Personen</span></div>
+    <details class="role-help"><summary>Wer darf was?</summary><div class="role-grid">
+      <div><b>Mitglied</b><span>alles lesen, zu-/absagen, reservieren, Eis, Mängel melden, Arbeitsdienste, Auslagen, Kleiderkammer-Bedarf</span></div>
+      <div><b>Gruppenführer</b><span>+ Dienstpläne, Neues, Veranstaltungen, Übungsdoku, Führung (Fristen, Beteiligung, Verfügbarkeit), Aufgaben, Wissenstest-Fragen</span></div>
+      <div><b>Gerätewart</b><span>+ Mängel bearbeiten, Fahrzeuge/Material, Verantwortliche, Kleiderkammer & Lager, Neues</span></div>
+      <div><b>Kassier</b><span>+ alle privaten Ausgaben sehen und erstatten</span></div>
+      <div><b>Kommandant</b><span>alles von Gruppenführer und Gerätewart + Organigramm, Mitglieder freigeben und entfernen</span></div>
+      <div><b>👑 App-Master</b><span>darf alles, auch Rollen und Master-Rechte vergeben</span></div>
+    </div></details>
     ${rest.map(row).join('')}</div>`;
 }
 
@@ -1087,7 +1112,7 @@ function renderMe(){
   const myAbs=D('absences').filter(a=>a.userId===S.me&&a.ends>=t).sort((a,b)=>a.starts.localeCompare(b.starts));
   const best=c=>{const r=D('quiz_results').filter(x=>x.userId===S.me&&x.cat===c); return r.length?Math.max(...r.map(x=>Math.round(100*x.score/x.total))):null;};
   const absToday=absOn(t,S.me).length>0;
-  let html=`<div class="panel me-head"><div class="panel-head"><div style="display:flex;gap:14px;align-items:center"><span class="av big">${esc(initials(myName()||'?'))}</span><div><h2>Hallo ${esc((myName().split(' ')[0])||'')}!</h2><p class="sub">${esc(ROLE_NAME[S.profile.role]||'')}${S.profile.treasurer?' · Kassier':''}${absToday?' · <b>heute abgemeldet</b>':''}</p></div></div>
+  let html=`<div class="panel me-head"><div class="panel-head"><div style="display:flex;gap:14px;align-items:center"><span class="av big">${esc(initials(myName()||'?'))}</span><div><h2>Hallo ${esc((myName().split(' ')[0])||'')}!</h2><p class="sub">${esc(roleLabel(S.profile))}${absToday?' · <b>heute abgemeldet</b>':''}</p></div></div>
     <div class="actions"><button class="btn ghost" data-goto="push">🔔 Benachrichtigungen</button></div></div></div>
   <div class="me-grid">`;
   // Dienste
@@ -1122,7 +1147,7 @@ function clothRow(x,admin){
   const st=CST[x.status]||CST.offen;
   return `<div class="row"><div class="info"><div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center"><h3 style="font-size:16px">${+x.qty||1}× ${esc(x.item)}${x.size?' · Gr. '+esc(x.size):''}</h3><span class="chip ${st.c}">${st.n}</span></div>
     <p class="note">${admin?esc(nameOf(x.userId))+' · ':''}${esc(fmtDay(String(x.createdAt||'').slice(0,10)))}${x.note?' · '+esc(x.note):''}</p></div>
-    <div class="actions">${admin?`${x.status==='offen'?`<button class="btn small" data-act="cloth-st" data-id="${esc(x.id)}" data-status="bestellt">Bestellt</button>`:''}<button class="btn small primary" data-act="cloth-st" data-id="${esc(x.id)}" data-status="ausgegeben">Ausgegeben</button><button class="btn ghost small" data-act="cloth-st" data-id="${esc(x.id)}" data-status="abgelehnt">Ablehnen</button>`:''}${(x.userId===S.me&&x.status==='offen')||mgr()?delBtn('clothing_requests',x.id,'Löschen'):''}</div></div>`;
+    <div class="actions">${admin?`${x.status==='offen'?`<button class="btn small" data-act="cloth-st" data-id="${esc(x.id)}" data-status="bestellt">Bestellt</button>`:''}<button class="btn small primary" data-act="cloth-st" data-id="${esc(x.id)}" data-status="ausgegeben">Ausgegeben</button><button class="btn ghost small" data-act="cloth-st" data-id="${esc(x.id)}" data-status="abgelehnt">Ablehnen</button>`:''}${(x.userId===S.me&&x.status==='offen')||canGear()?delBtn('clothing_requests',x.id,'Löschen'):''}</div></div>`;
 }
 
 /* ---------- Wissenstest & Leistungsabzeichen ---------- */
@@ -1162,12 +1187,12 @@ function renderQuiz(){
   const mine=c=>D('quiz_results').filter(r=>r.userId===S.me&&r.cat===c);
   html+=`<div class="quiz-pick">${Object.entries(QCAT).map(([c,n])=>{const r=mine(c); const best=r.length?Math.max(...r.map(x=>Math.round(100*x.score/x.total))):null;
     return `<button class="quiz-card" data-act="quiz-start" data-id="${c}"><span class="qc-ico">${c==='wissenstest'?'🧠':'🏅'}</span><span class="qc-name">${n}</span><span class="sub">${cnt(c)} Fragen${best!=null?` · dein Bestwert ${best} %`:''}</span><span class="btn primary small">Los geht’s</span></button>`;}).join('')}</div>
-    <p class="sub" style="padding:0 20px 18px">Fragen ohne Gewähr – die Jugendwarte und Bearbeiter können Fragen ergänzen und korrigieren.</p>`;
+    <p class="sub" style="padding:0 20px 18px">Fragen ohne Gewähr – Gruppenführer, Kommandant und App-Master können Fragen ergänzen und korrigieren.</p>`;
   if(mgr()){
     const res=D('quiz_results'); const by={};
     res.forEach(r=>{const k=r.userId+'|'+r.cat; const p=Math.round(100*r.score/r.total); if(!by[k]||p>by[k].p) by[k]={p,r,n:(by[k]?by[k].n:0)}; by[k].n=(by[k].n||0)+1;});
     const rows=Object.values(by).sort((a,b)=>nameOf(a.r.userId).localeCompare(nameOf(b.r.userId),'de'));
-    html+=`<div class="day-head"><span class="when">Übungsstand der Mannschaft</span><span class="count">nur Bearbeiter</span></div>`+
+    html+=`<div class="day-head"><span class="when">Übungsstand der Mannschaft</span><span class="count">nur Führung</span></div>`+
       (rows.length?rows.map(x=>`<div class="me-line" style="padding:10px 20px"><span>${esc(nameOf(x.r.userId))} · ${esc(QCAT[x.r.cat]||x.r.cat)}</span><span class="sub">Bestwert <b>${x.p} %</b> · ${x.n} Runde(n)</span></div>`).join(''):`<div class="empty" style="padding:16px 20px">Noch hat niemand geübt.</div>`);
   }
   return loadingOr(['quiz_questions'], html+'</div>');
@@ -1213,7 +1238,7 @@ function renderClothing(){
     </div>`;
   if(mine.length) html+=`<div class="day-head"><span class="when">Meine Anfragen</span></div>`+mine.map(x=>clothRow(x,false)).join('');
   html+='</div>';
-  if(mgr()) html+=clothAdmin();
+  if(canGear()) html+=clothAdmin();
   return loadingOr(['clothing_requests','clothing_sizes','clothing_issued','clothing_stock'], html);
 }
 function gearLine(g,admin){
@@ -1227,7 +1252,7 @@ function clothAdmin(){
   const tabs=[['req','Anfragen'],['issued','Ausgegeben'],['stock','Lager'],['sizes','Größen']];
   const tab=S.clothTab||'req';
   const openReq=D('clothing_requests').filter(x=>x.status==='offen'||x.status==='bestellt');
-  let html=`<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h2>Verwaltung</h2><p class="sub">Nur für Bearbeiter sichtbar.</p></div></div>
+  let html=`<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h2>Verwaltung</h2><p class="sub">Für Gerätewart, Kommandant und App-Master.</p></div></div>
     <div class="org-tools"><div class="filters">${tabs.map(([k,n])=>`<button class="filter" data-act="cloth-tab" data-id="${k}" aria-pressed="${tab===k}">${n}${k==='req'&&openReq.length?` (${openReq.length})`:''}</button>`).join('')}</div></div>`;
   if(tab==='req'){
     const sum={}; openReq.filter(x=>x.status==='offen').forEach(x=>{const k=x.item+'|'+(x.size||''); sum[k]=(sum[k]||0)+(+x.qty||1);});
@@ -1304,7 +1329,7 @@ function renderTodo(){
   if(S.openForm==='todo-list'&&mgr()) html+=`<form class="inline" data-form="todo-list" style="margin:14px 20px">
       <label for="tl-title" class="span-all">Titel<input id="tl-title" required maxlength="80" placeholder="z. B. Gruppenführer-Besprechung"></label>
       <label for="tl-date">Besprechung am<input id="tl-date" type="date"></label>
-      <label for="tl-vis">Sichtbar für<select id="tl-vis"><option value="fuehrung">nur Bearbeiter (+ Zuständige)</option><option value="alle">alle Mitglieder</option></select></label>
+      <label for="tl-vis">Sichtbar für<select id="tl-vis"><option value="fuehrung">nur Führung (+ Zuständige)</option><option value="alle">alle Mitglieder</option></select></label>
       <div class="form-actions"><button class="btn primary" type="submit">Liste anlegen</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>${errP('todo-list')}</form>`;
   if(myOpen.length) html+=`<div class="day-head"><span class="when">Für mich offen (${myOpen.length})</span></div><div class="todo-wrap">${myOpen.map(t=>todoItem(t,true)).join('')}</div>`;
   html+='</div>';
@@ -1314,7 +1339,7 @@ function renderTodo(){
     const showDone=S.showPast['tdone-'+l.id]; const vis=ts.filter(t=>!t.done||showDone);
     return `<div class="panel todo-list ${l.archived?'arch':''}" style="margin-top:14px"><div class="panel-head"><div>
         <h3 class="tl-title">${esc(l.title)}</h3>
-        <p class="sub">${l.meet_on?'📅 '+esc(fmtDayLong(l.meet_on))+' · ':''}${l.visibility==='alle'?'für alle sichtbar':'nur Bearbeiter'}${l.archived?' · archiviert':''}</p>
+        <p class="sub">${l.meet_on?'📅 '+esc(fmtDayLong(l.meet_on))+' · ':''}${l.visibility==='alle'?'für alle sichtbar':'nur Führung'}${l.archived?' · archiviert':''}</p>
         <div class="tl-prog"><span style="width:${ts.length?Math.round(100*done/ts.length):0}%"></span></div><span class="sub">${done} von ${ts.length} erledigt</span></div>
       <div class="actions"><button class="btn ghost small" data-act="copy" data-v="${esc(listText(l))}" title="Als Text für WhatsApp kopieren">📋 Teilen</button>${mgr()?`<button class="btn ghost small" data-act="todo-arch" data-id="${esc(l.id)}">${l.archived?'Zurückholen':'Archivieren'}</button>${delBtn('todo_lists',l.id,'Liste löschen')}`:''}</div></div>
       ${mgr()&&!l.archived?`<form class="inline todo-add" data-form="todo" data-id="${esc(l.id)}">
@@ -1341,7 +1366,7 @@ function render(){
   $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','who','members','me','quiz','clothing','todo','defects','push','lead','expenses'].includes(v);
   const waiting=D('profiles').filter(p=>p.role==='pending').length;
   $('#me-name').textContent=S.profile.name||'';
-  $('#me-role').textContent=ROLE_NAME[S.profile.role]||'';
+  $('#me-role').textContent=roleLabel(S.profile);
   renderTiles();
   if(v==='home'){
     const body=$('#res-body'); const snap=snapshotForm(body);
@@ -1360,7 +1385,7 @@ function render(){
   $('#doc-lock').hidden = mgr();
 }
 function go(view){
-  if((view==='members'||view==='lead') && !mgr()) view='home';
+  if((view==='members'&&!canCmd())||(view==='lead'&&!canLead())) view='home';
   if(view!==S.view) S.orgQ='';
   S.view=view; S.openForm=null; S.editOrg=null; S.confirm=null; S.errs={};
   try{ localStorage.setItem('fhq-view',view); }catch(_){}
@@ -1422,6 +1447,12 @@ document.addEventListener('click', async e=>{
   }
   else if(act==='unsign'){ await del('signups',id,'Ausgetragen'); }
   else if(act==='set-role'){ await setRole(id,b.dataset.role); }
+  else if(act==='fn-toggle'){
+    const p=D('profiles').find(x=>x.id===id); if(!p) return; const k=b.dataset.key;
+    const f=new Set(p.functions||[]); f.has(k)?f.delete(k):f.add(k);
+    const {error}=await sb.rpc('set_functions',{target:id,fns:[...f]});
+    if(error) toast(errText(error)); else { toast((f.has(k)?'Vergeben: ':'Entzogen: ')+FN_NAME[k]); await load('profiles'); render(); }
+  }
   else if(act==='treasurer'){
     const p=D('profiles').find(x=>x.id===id); const on=!(p&&p.treasurer);
     const {error}=await sb.rpc('set_treasurer',{target:id,flag:on});
@@ -1490,7 +1521,7 @@ document.addEventListener('change', async e=>{
 });
 async function setRole(id,role){
   const {error}=await sb.rpc('set_role',{target:id,new_role:role});
-  if(error) toast(error.message.includes('Bearbeiter')?error.message:errText(error));
+  if(error) toast(/Master|Kommandant|Mindestens/.test(error.message)?error.message:errText(error));
   else toast('Rolle geändert: '+ROLE_NAME[role]);
   await load('profiles'); route();
 }
@@ -1775,7 +1806,7 @@ async function route(){
   subscribe();
   if(!isMember()){
     show('gate-pending');
-    $('#pending-text').textContent=`Hallo ${S.profile.name||''}! Dein Konto wartet auf Freigabe durch einen Bearbeiter der Wehr. Sobald du freigeschaltet bist, geht es hier automatisch weiter.`;
+    $('#pending-text').textContent=`Hallo ${S.profile.name||''}! Dein Konto wartet auf Freigabe durch den Kommandanten oder App-Master. Sobald du freigeschaltet bist, geht es hier automatisch weiter.`;
     return;
   }
   show('app');
@@ -1786,7 +1817,7 @@ async function route(){
     let v=VIEWS.includes(h)?h:null;
     if(!v){ try{ v=localStorage.getItem('fhq-view'); }catch(_){} }
     S.view=VIEWS.includes(v)?v:'home';
-    if((S.view==='members'||S.view==='lead')&&!mgr()) S.view='home';
+    if((S.view==='members'&&!canCmd())||(S.view==='lead'&&!canLead())) S.view='home';
   }
   render();
 }
