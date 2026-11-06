@@ -31,7 +31,7 @@ function nextDay(date: string) {
   const [y, m, d] = date.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10).replaceAll("-", "");
 }
-function vevent(uid: string, date: string, time: string, summary: string, location: string, desc: string, hours: number) {
+function vevent(uid: string, date: string, time: string, summary: string, location: string, desc: string, hours: number, alarm = "") {
   const L = ["BEGIN:VEVENT", `UID:${uid}@florian-hq`, `DTSTAMP:${stamp()}`];
   const m = /^(\d{1,2}):(\d{2})/.exec(time || "");
   if (m) {
@@ -43,6 +43,7 @@ function vevent(uid: string, date: string, time: string, summary: string, locati
   L.push(`SUMMARY:${esc(summary)}`);
   if (location) L.push(`LOCATION:${esc(location)}`);
   if (desc) L.push(`DESCRIPTION:${esc(desc)}`);
+  if (alarm) L.push("BEGIN:VALARM", "ACTION:DISPLAY", `DESCRIPTION:${esc(summary)}`, `TRIGGER:${alarm}`, "END:VALARM");
   L.push("END:VEVENT");
   return L.map(fold).join("\r\n");
 }
@@ -70,7 +71,7 @@ Deno.serve(async (req) => {
     if (g !== "alle" && d.grp !== g) continue;
     const pre = g === "alle" ? (d.grp === "jugend" ? "Jugend: " : "Aktive: ") : "";
     const desc = [d.lead && `Leitung: ${d.lead}`, d.note].filter(Boolean).join("\n");
-    ev.push(vevent(`duty-${d.id}`, d.date, d.time, `🚒 ${pre}${d.topic}`, d.place, desc, 2));
+    ev.push(vevent(`duty-${d.id}`, d.date, d.time, `🚒 ${pre}${d.topic}`, d.place, desc, 2, /^\d/.test(d.time || "") ? "-PT2H" : "-PT12H"));
   }
   if (withEvents) {
     for (const e of data.events as Array<Record<string, string>>) {

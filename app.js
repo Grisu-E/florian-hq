@@ -17,6 +17,7 @@ const ICONS = {
   me:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>',
   quiz:'<svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.3 6.8 19l1-5.8L3.6 9.1l5.8-.8z"/></svg>',
   clothing:'<svg viewBox="0 0 24 24"><path d="M8 3l4 3 4-3 5 4-3 4-2-1.5V21H8V9.5L6 11 3 7z"/></svg>',
+  todo:'<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>',
   who:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.2 5 2.6 5 5.8"/></svg>',
   org:'<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></svg>',
   lead:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M4 4l2 2M20 4l-2 2"/></svg>',
@@ -31,10 +32,10 @@ const CATS = [
 ];
 const DUTY = {'duty-aktive':{g:'aktive',n:'Dienstplan Aktive'}, 'duty-jugend':{g:'jugend',n:'Dienstplan Jugend'}};
 const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'Bearbeiter'};
-const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','who','doc','members','me','quiz','clothing','defects','push','lead','expenses'];
+const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','who','doc','members','me','quiz','clothing','todo','defects','push','lead','expenses'];
 const catName = k => k==='eis'?'Crushed-Eis':((CATS.find(c=>c.k===k)||{}).n || k);
 
-const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance','expenses','res_contacts','absences','clothing_sizes','clothing_requests','quiz_questions','quiz_results','cal_tokens'];
+const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance','expenses','res_contacts','absences','clothing_sizes','clothing_requests','quiz_questions','quiz_results','cal_tokens','clothing_issued','clothing_stock','todo_lists','todos'];
 const S = {
   view:'home', openCat:null, data:{}, loaded:{},
   me:null, profile:null,
@@ -170,6 +171,8 @@ function renderTiles(){
   $('#tiles-res').innerHTML = CATS.map(c=>catTile(c,n)).join('') +
     tile('eis','Crushed-Eis', `${iceToday} Säcke heute · ${iceUp.length} Anmeldungen`,{attr:'data-cat="eis"',pressed:S.openCat==='eis'});
   let org = tile('org','Organigramm', D('org').length?`${D('org').length} Funktionen`:'Noch nicht hinterlegt',{attr:'data-goto="org"'}) +
+    (()=>{ const open=D('todos').filter(x=>!x.done); const mine=open.filter(x=>x.assignee===S.me).length;
+      return tile('todo','Aufgaben', mine?`${mine} für mich offen`:(open.length?`${open.length} offen`:(mgr()?'To-do-Listen':'Nichts offen')),{attr:'data-goto="todo"',alert:mine>0}); })() +
     tile('who','Wer macht was?', D('org').length?`${orgPersons().length} Personen`:'Noch nicht hinterlegt',{attr:'data-goto="who"'}) +
     tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:mgr()&&openDocs>0}) +
     (()=>{ const ex=D('expenses').filter(x=>x.status==='offen'); const sum=ex.reduce((a,x)=>a+(+x.amount||0),0);
@@ -671,7 +674,7 @@ function renderDefects(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)'],['meine_fristen','Meine eigenen Fristen'],['expenses','Private Ausgaben'],['reservations','Reservierungen, für die ich verantwortlich bin'],['kleider','Kleiderkammer-Anfragen (nur Bearbeiter)']];
+const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)'],['meine_fristen','Meine eigenen Fristen'],['expenses','Private Ausgaben'],['reservations','Reservierungen, für die ich verantwortlich bin'],['kleider','Kleiderkammer-Anfragen (nur Bearbeiter)'],['erinnerung','Erinnerung am Vortag eines Dienstes'],['aufgaben','Meine Aufgaben (To-do)']];
 const pushSupported=()=>('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -1093,6 +1096,8 @@ function renderMe(){
         <div class="rsvp-btns sm">${Object.entries(RSVP).map(([k,v])=>`<button class="rsvp-btn ${k}" data-act="rsvp" data-id="${esc(d.id)}" data-status="${k}" aria-pressed="${my&&my.status===k?'true':'false'}">${v.i} ${v.n}</button>`).join('')}</div></div></div>`;}).join(''):'<p class="note">Keine kommenden Dienste.</p>'}</div>`;
   // Abwesenheit
   html+=`<div class="me-card span2"><h3>Abwesenheit melden</h3><p class="note">Urlaub, Schicht oder krank? Nur du und die Führung sehen das.</p>${absForm()}${myAbs.length?`<div class="me-list">${myAbs.map(a=>absRow(a,false)).join('')}</div>`:''}</div>`;
+  const myTodos=D('todos').filter(x=>x.assignee===S.me&&!x.done).sort(todoSort);
+  if(myTodos.length) html+=`<div class="me-card span2"><h3>Meine Aufgaben (To-do)</h3><div class="todo-wrap flat">${myTodos.map(x=>todoItem(x,true)).join('')}</div></div>`;
   // Fristen
   html+=`<div class="me-card"><h3>Meine Fristen</h3>${myQ.length?myQ.map(({q,t})=>{const s=fristState(q);return `<div class="me-line"><span><span class="dot-st ${s.c}"></span>${esc(t.name)}</span><span class="sub">${q.expires?'bis '+esc(fmtDate(q.expires)):''} · ${esc(s.n)}</span></div>`;}).join(''):'<p class="note">Keine Fristen hinterlegt.</p>'}</div>`;
   // Aufgaben
@@ -1113,31 +1118,6 @@ const CLOTH_ITEMS=['Einsatzjacke','Einsatzhose','Stiefel','Handschuhe','Helm','F
 const CLOTH_MAP={'Einsatzjacke':'jacke','Einsatzhose':'hose','Stiefel':'stiefel','Handschuhe':'handschuhe','Helm':'helm','T-Shirt':'shirt','Poloshirt':'shirt','Pullover / Softshell':'pullover'};
 const CST={offen:{n:'offen',c:'open'},bestellt:{n:'bestellt',c:'ice'},ausgegeben:{n:'ausgegeben',c:'done'},abgelehnt:{n:'abgelehnt',c:'busy'}};
 const mySizes=()=>((D('clothing_sizes').find(x=>x.userId===S.me)||{}).sizes)||{};
-function renderClothing(){
-  const sz=mySizes(); const mine=D('clothing_requests').filter(x=>x.userId===S.me).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
-  let html=`<div class="panel"><div class="panel-head"><div><h2>Kleiderkammer</h2><p class="sub">Trag deine Größen einmal ein und melde, was du brauchst. Die Bearbeiter sehen alles gesammelt als Bestellliste.</p></div></div>
-    <div class="me-grid" style="padding:16px 20px 20px">
-    <div class="me-card"><h3>Meine Größen</h3><form class="inline sizes" data-form="sizes">${CLOTH_SIZES.map(([k,n])=>`<label for="sz-${k}">${n}<input id="sz-${k}" maxlength="12" value="${esc(sz[k]||'')}" placeholder="–"></label>`).join('')}
-      <div class="form-actions"><button class="btn primary" type="submit">Größen speichern</button></div></form></div>
-    <div class="me-card"><h3>Ich brauche …</h3><form class="inline" data-form="cloth-req">
-      <label for="cr-item">Was<select id="cr-item">${CLOTH_ITEMS.map(i=>`<option>${esc(i)}</option>`).join('')}</select></label>
-      <label for="cr-size">Größe<input id="cr-size" maxlength="20" value="${esc(sz.jacke||'')}" placeholder="z. B. 52 oder L"></label>
-      <label for="cr-qty">Anzahl<input id="cr-qty" type="number" min="1" max="20" value="1"></label>
-      <label for="cr-note">Hinweis<input id="cr-note" maxlength="140" placeholder="z. B. alte Jacke gerissen"></label>
-      <div class="form-actions"><button class="btn primary" type="submit">Bedarf melden</button></div>${errP('cloth')}</form></div>
-    </div>`;
-  if(mine.length) html+=`<div class="day-head"><span class="when">Meine Anfragen</span></div>`+mine.map(x=>clothRow(x,false)).join('');
-  if(mgr()){
-    const open=D('clothing_requests').filter(x=>x.status==='offen'||x.status==='bestellt');
-    const sum={}; open.filter(x=>x.status==='offen').forEach(x=>{const k=x.item+(x.size?' · Gr. '+x.size:''); sum[k]=(sum[k]||0)+(+x.qty||1);});
-    html+=`<div class="day-head"><span class="when">Bestellliste (offen)</span><span class="count">nur Bearbeiter</span></div>`+
-      (Object.keys(sum).length?`<div class="order-list">${Object.entries(sum).sort().map(([k,q])=>`<span class="order-item"><b>${q}×</b> ${esc(k)}</span>`).join('')}</div>`:`<div class="empty" style="padding:16px 20px">Nichts zu bestellen.</div>`)+
-      `<div class="day-head"><span class="when">Alle offenen Anfragen (${open.length})</span></div>`+(open.length?open.map(x=>clothRow(x,true)).join(''):'')+
-      `<div class="day-head"><span class="when">Größen der Mannschaft</span><button class="btn ghost small" data-act="toggle-past" data-key="sizes">${S.showPast.sizes?'Ausblenden':'Anzeigen'}</button></div>`+
-      (S.showPast.sizes?`<div class="qtable-wrap"><table class="qtable"><thead><tr><th>Name</th>${CLOTH_SIZES.map(([,n])=>`<th>${esc(n.split(' ')[0])}</th>`).join('')}</tr></thead><tbody>${people().map(p=>{const s=((D('clothing_sizes').find(x=>x.userId===p.id)||{}).sizes)||{};return `<tr><th>${esc(p.name||'')}</th>${CLOTH_SIZES.map(([k])=>`<td>${esc(s[k]||'–')}</td>`).join('')}</tr>`;}).join('')}</tbody></table></div>`:'');
-  }
-  return loadingOr(['clothing_requests','clothing_sizes'], html+'</div>');
-}
 function clothRow(x,admin){
   const st=CST[x.status]||CST.offen;
   return `<div class="row"><div class="info"><div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center"><h3 style="font-size:16px">${+x.qty||1}× ${esc(x.item)}${x.size?' · Gr. '+esc(x.size):''}</h3><span class="chip ${st.c}">${st.n}</span></div>
@@ -1214,13 +1194,151 @@ async function quizNext(){
   render(); window.scrollTo({top:0,behavior:'smooth'});
 }
 
+/* ---------- Kleiderkammer v2: Anfragen · Ausgegeben · Lager · Größen ---------- */
+const stockOf=(item,size)=>D('clothing_stock').find(s=>s.item===item&&(s.size||'')===(size||''));
+function renderClothing(){
+  const sz=mySizes(); const mine=D('clothing_requests').filter(x=>x.userId===S.me).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  const myGear=D('clothing_issued').filter(x=>x.userId===S.me&&!x.returned_on).sort((a,b)=>a.item.localeCompare(b.item,'de'));
+  let html=`<div class="panel"><div class="panel-head"><div><h2>Kleiderkammer</h2><p class="sub">Größen eintragen, Bedarf melden und sehen, welche Ausrüstung du hast.</p></div></div>
+    <div class="me-grid" style="padding:16px 20px 20px">
+    <div class="me-card"><h3>Meine Größen</h3><form class="inline sizes" data-form="sizes">${CLOTH_SIZES.map(([k,n])=>`<label for="sz-${k}">${n}<input id="sz-${k}" maxlength="12" value="${esc(sz[k]||'')}" placeholder="–"></label>`).join('')}
+      <div class="form-actions"><button class="btn primary" type="submit">Größen speichern</button></div></form></div>
+    <div class="me-card"><h3>Ich brauche …</h3><form class="inline" data-form="cloth-req">
+      <label for="cr-item">Was<select id="cr-item">${CLOTH_ITEMS.map(i=>`<option>${esc(i)}</option>`).join('')}</select></label>
+      <label for="cr-size">Größe<input id="cr-size" maxlength="20" value="${esc(sz.jacke||'')}" placeholder="z. B. 52 oder L"></label>
+      <label for="cr-qty">Anzahl<input id="cr-qty" type="number" min="1" max="20" value="1"></label>
+      <label for="cr-note">Hinweis<input id="cr-note" maxlength="140" placeholder="z. B. alte Jacke gerissen"></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Bedarf melden</button></div>${errP('cloth')}</form></div>
+    <div class="me-card span2"><h3>Meine Ausrüstung</h3>${myGear.length?myGear.map(g=>gearLine(g,false)).join(''):'<p class="note">Noch keine Ausgabe eingetragen.</p>'}</div>
+    </div>`;
+  if(mine.length) html+=`<div class="day-head"><span class="when">Meine Anfragen</span></div>`+mine.map(x=>clothRow(x,false)).join('');
+  html+='</div>';
+  if(mgr()) html+=clothAdmin();
+  return loadingOr(['clothing_requests','clothing_sizes','clothing_issued','clothing_stock'], html);
+}
+function gearLine(g,admin){
+  const due=g.replace_by?daysUntil(g.replace_by):null;
+  const chip=due==null?'':due<0?`<span class="chip busy">Austausch überfällig</span>`:due<=30?`<span class="chip open">Austausch in ${due} Tg.</span>`:`<span class="chip done">bis ${esc(fmtDate(g.replace_by))}</span>`;
+  return `<div class="gear ${g.returned_on?'past':''}"><div class="info"><b>${esc(g.item)}${g.size?' · Gr. '+esc(g.size):''}</b>${chip}
+      <span class="sub">${admin?esc(nameOf(g.userId))+' · ':''}ausgegeben ${esc(fmtDate(g.issued_on))}${g.inv_no?' · Inv.-Nr. '+esc(g.inv_no):''}${g.note?' · '+esc(g.note):''}${g.returned_on?' · zurück am '+esc(fmtDate(g.returned_on)):''}</span></div>
+    ${admin?`<div class="actions">${g.returned_on?'':`<button class="btn small" data-act="gear-return" data-id="${esc(g.id)}">Zurückgegeben</button>`}${delBtn('clothing_issued',g.id,'Löschen')}</div>`:''}</div>`;
+}
+function clothAdmin(){
+  const tabs=[['req','Anfragen'],['issued','Ausgegeben'],['stock','Lager'],['sizes','Größen']];
+  const tab=S.clothTab||'req';
+  const openReq=D('clothing_requests').filter(x=>x.status==='offen'||x.status==='bestellt');
+  let html=`<div class="panel" style="margin-top:14px"><div class="panel-head"><div><h2>Verwaltung</h2><p class="sub">Nur für Bearbeiter sichtbar.</p></div></div>
+    <div class="org-tools"><div class="filters">${tabs.map(([k,n])=>`<button class="filter" data-act="cloth-tab" data-id="${k}" aria-pressed="${tab===k}">${n}${k==='req'&&openReq.length?` (${openReq.length})`:''}</button>`).join('')}</div></div>`;
+  if(tab==='req'){
+    const sum={}; openReq.filter(x=>x.status==='offen').forEach(x=>{const k=x.item+'|'+(x.size||''); sum[k]=(sum[k]||0)+(+x.qty||1);});
+    html+=`<div class="day-head"><span class="when">Bestellliste (offen)</span>${Object.keys(sum).length?`<button class="btn ghost small" data-act="copy" data-v="${esc('Bestellung Kleiderkammer FF Nonnenhorn:\n'+Object.entries(sum).map(([k,q])=>{const [i,s]=k.split('|');const st=stockOf(i,s);const need=Math.max(0,q-(st?+st.qty:0));return need?`${need}× ${i}${s?' Gr. '+s:''}`:'';}).filter(Boolean).join('\n'))}">Bestellliste kopieren</button>`:''}</div>`+
+      (Object.keys(sum).length?`<div class="order-list">${Object.entries(sum).sort().map(([k,q])=>{const [i,s]=k.split('|');const st=stockOf(i,s);const have=st?+st.qty:0;
+        return `<span class="order-item"><b>${q}×</b> ${esc(i)}${s?' · Gr. '+esc(s):''}${have?` <span class="chip done">${Math.min(have,q)} im Lager</span>`:''}</span>`;}).join('')}</div>`:`<div class="empty" style="padding:16px 20px">Nichts zu bestellen.</div>`)+
+      (openReq.length?openReq.map(x=>clothRow(x,true)).join(''):'');
+  } else if(tab==='issued'){
+    const f=S.gearPerson||'';
+    const list=D('clothing_issued').filter(g=>(!f||g.userId===f)&&(S.showPast.gearRet||!g.returned_on)).sort((a,b)=>nameOf(a.userId).localeCompare(nameOf(b.userId),'de')||a.item.localeCompare(b.item,'de'));
+    html+=`<form class="inline" data-form="gear" style="margin:14px 20px">
+        <label for="gr-user">Person<select id="gr-user">${personOpts(f)}</select></label>
+        <label for="gr-item">Was<select id="gr-item">${CLOTH_ITEMS.map(i=>`<option>${esc(i)}</option>`).join('')}</select></label>
+        <label for="gr-size">Größe<input id="gr-size" maxlength="20"></label>
+        <label for="gr-inv">Inventar-Nr.<input id="gr-inv" maxlength="40" placeholder="optional"></label>
+        <label for="gr-date">Ausgegeben am<input id="gr-date" type="date" value="${today()}"></label>
+        <label for="gr-repl">Austausch fällig am<input id="gr-repl" type="date" title="z. B. Helm laut Hersteller"></label>
+        <label for="gr-note" class="span-all">Notiz<input id="gr-note" maxlength="140" placeholder="optional"></label>
+        <label class="span-all check"><input type="checkbox" id="gr-stock" checked> vom Lagerbestand abziehen</label>
+        <div class="form-actions"><button class="btn primary" type="submit">Ausgabe eintragen</button></div>${errP('gear')}</form>
+      <div class="org-tools"><select id="gear-filter" aria-label="Nach Person filtern"><option value="">Alle Personen</option>${personOpts(f)}</select>
+        <label class="check"><input type="checkbox" data-act="toggle-past" data-key="gearRet" ${S.showPast.gearRet?'checked':''}> auch Zurückgegebenes</label></div>
+      ${list.length?`<div class="gear-list">${list.map(g=>gearLine(g,true)).join('')}</div>`:`<div class="empty" style="padding:16px 20px">Noch nichts ausgegeben.</div>`}`;
+  } else if(tab==='stock'){
+    const st=[...D('clothing_stock')].sort((a,b)=>a.item.localeCompare(b.item,'de')||String(a.size).localeCompare(String(b.size),'de',{numeric:true}));
+    html+=`<form class="inline" data-form="stock" style="margin:14px 20px">
+        <label for="st-item">Was<select id="st-item">${CLOTH_ITEMS.map(i=>`<option>${esc(i)}</option>`).join('')}</select></label>
+        <label for="st-size">Größe<input id="st-size" maxlength="20"></label>
+        <label for="st-qty">Anzahl dazu<input id="st-qty" type="number" min="1" max="999" value="1"></label>
+        <div class="form-actions"><button class="btn primary" type="submit">Zum Lager hinzufügen</button></div>${errP('stock')}</form>
+      ${st.length?st.map(s=>`<div class="row"><div class="info"><h3 style="font-size:16px">${esc(s.item)}${s.size?' · Gr. '+esc(s.size):''}</h3></div>
+        <div class="actions stock-ctl"><button class="btn ghost small" data-act="stock-step" data-id="${esc(s.id)}" data-v="-1" aria-label="weniger">−</button><b class="${+s.qty?'':'zero'}">${+s.qty}</b><button class="btn ghost small" data-act="stock-step" data-id="${esc(s.id)}" data-v="1" aria-label="mehr">+</button>${delBtn('clothing_stock',s.id,'Entfernen')}</div></div>`).join(''):`<div class="empty" style="padding:16px 20px">Noch kein Lagerbestand erfasst.</div>`}`;
+  } else {
+    html+=`<div class="qtable-wrap" style="padding:14px 20px"><table class="qtable"><thead><tr><th>Name</th>${CLOTH_SIZES.map(([,n])=>`<th>${esc(n.split(' ')[0])}</th>`).join('')}</tr></thead><tbody>${people().map(p=>{const s=((D('clothing_sizes').find(x=>x.userId===p.id)||{}).sizes)||{};return `<tr><th>${esc(p.name||'')}</th>${CLOTH_SIZES.map(([k])=>`<td>${esc(s[k]||'–')}</td>`).join('')}</tr>`;}).join('')}</tbody></table></div>`;
+  }
+  return html+'</div>';
+}
+async function clothIssueFromRequest(x){
+  const st=stockOf(x.item,x.size);
+  if(st && +st.qty>0) await sb.from('clothing_stock').update({qty:Math.max(0,+st.qty-(+x.qty||1)),updated_at:new Date().toISOString()}).eq('id',st.id);
+  const rows=[...Array(Math.max(1,+x.qty||1))].map(()=>({user_id:x.userId,item:x.item,size:x.size||'',issued_on:today()}));
+  await sb.from('clothing_issued').insert(rows);
+  await Promise.all([load('clothing_stock'),load('clothing_issued')]);
+}
+
+/* ---------- Aufgabenlisten (To-Do) ---------- */
+const todoWho=t=>t.assignee?nameOf(t.assignee):(t.assignee_txt||'');
+const canTick=t=>mgr()||t.assignee===S.me;
+function dueChip(t){
+  if(!t.due||t.done) return t.due?`<span class="sub">bis ${esc(fmtDay(t.due))}</span>`:'';
+  const n=daysUntil(t.due);
+  return `<span class="chip ${n<0?'busy':n<=2?'open':'free'}">${n<0?`${-n} Tg. überfällig`:n===0?'heute fällig':n===1?'morgen fällig':'bis '+esc(fmtDay(t.due))}</span>`;
+}
+function todoItem(t,showList){
+  const lst=showList?D('todo_lists').find(l=>l.id===t.list_id):null;
+  return `<div class="todo ${t.done?'done':''}">
+    <button class="tick" data-act="todo-toggle" data-id="${esc(t.id)}" aria-pressed="${!!t.done}" ${canTick(t)?'':'disabled'} aria-label="${t.done?'Wieder öffnen':'Erledigt'}">${t.done?'✓':''}</button>
+    <div class="info"><span class="tt">${esc(t.title)}</span>
+      <span class="meta">${todoWho(t)?`<span class="who-chip">👤 ${esc(todoWho(t))}</span>`:''}${dueChip(t)}${lst?`<span class="sub">${esc(lst.title)}</span>`:''}${t.done&&t.done_by?`<span class="sub">erledigt von ${esc(nameOf(t.done_by))}</span>`:''}</span>
+      ${t.note?`<span class="note">${esc(t.note)}</span>`:''}</div>
+    ${mgr()?`<div class="actions">${delBtn('todos',t.id,'×')}</div>`:''}
+  </div>`;
+}
+function listText(l){
+  const ts=D('todos').filter(t=>t.list_id===l.id).sort(todoSort);
+  return `${l.title}${l.meet_on?' ('+fmtDate(l.meet_on)+')':''}\n`+ts.map(t=>`${t.done?'✅':'⬜'} ${t.title}${todoWho(t)?' – '+todoWho(t):''}${t.due&&!t.done?' – bis '+fmtDate(t.due):''}`).join('\n');
+}
+const todoSort=(a,b)=>(a.done-b.done)||((a.due||'9999')).localeCompare(b.due||'9999')||(a.sort-b.sort)||(a.createdAt||'').localeCompare(b.createdAt||'');
+function renderTodo(){
+  const lists=D('todo_lists').filter(l=>S.showPast.todoArch||!l.archived).sort((a,b)=>(a.archived-b.archived)||((b.meet_on||b.createdAt||'')).localeCompare(a.meet_on||a.createdAt||''));
+  const myOpen=D('todos').filter(t=>t.assignee===S.me&&!t.done).sort(todoSort);
+  let html=`<div class="panel"><div class="panel-head"><div><h2>Aufgaben</h2><p class="sub">To-do-Listen, z. B. für die Gruppenführer-Besprechung. Wer zuständig ist, bekommt eine Push-Nachricht und eine Erinnerung am Tag vor der Frist.</p></div>
+    ${mgr()?`<div class="actions"><button class="btn primary" data-act="open-form" data-form="todo-list">+ Neue Liste</button></div>`:''}</div>`;
+  if(S.openForm==='todo-list'&&mgr()) html+=`<form class="inline" data-form="todo-list" style="margin:14px 20px">
+      <label for="tl-title" class="span-all">Titel<input id="tl-title" required maxlength="80" placeholder="z. B. Gruppenführer-Besprechung"></label>
+      <label for="tl-date">Besprechung am<input id="tl-date" type="date"></label>
+      <label for="tl-vis">Sichtbar für<select id="tl-vis"><option value="fuehrung">nur Bearbeiter (+ Zuständige)</option><option value="alle">alle Mitglieder</option></select></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Liste anlegen</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>${errP('todo-list')}</form>`;
+  if(myOpen.length) html+=`<div class="day-head"><span class="when">Für mich offen (${myOpen.length})</span></div><div class="todo-wrap">${myOpen.map(t=>todoItem(t,true)).join('')}</div>`;
+  html+='</div>';
+  if(!lists.length) html+=`<div class="panel" style="margin-top:14px"><div class="empty"><strong>Noch keine Aufgabenliste.</strong>${mgr()?'Leg oben mit „+ Neue Liste“ die erste an, z. B. für die nächste Gruppenführer-Besprechung.':'Sobald dir eine Aufgabe zugewiesen wird, steht sie hier.'}</div></div>`;
+  html+=lists.map(l=>{
+    const ts=D('todos').filter(t=>t.list_id===l.id).sort(todoSort); const done=ts.filter(t=>t.done).length;
+    const showDone=S.showPast['tdone-'+l.id]; const vis=ts.filter(t=>!t.done||showDone);
+    return `<div class="panel todo-list ${l.archived?'arch':''}" style="margin-top:14px"><div class="panel-head"><div>
+        <h3 class="tl-title">${esc(l.title)}</h3>
+        <p class="sub">${l.meet_on?'📅 '+esc(fmtDayLong(l.meet_on))+' · ':''}${l.visibility==='alle'?'für alle sichtbar':'nur Bearbeiter'}${l.archived?' · archiviert':''}</p>
+        <div class="tl-prog"><span style="width:${ts.length?Math.round(100*done/ts.length):0}%"></span></div><span class="sub">${done} von ${ts.length} erledigt</span></div>
+      <div class="actions"><button class="btn ghost small" data-act="copy" data-v="${esc(listText(l))}" title="Als Text für WhatsApp kopieren">📋 Teilen</button>${mgr()?`<button class="btn ghost small" data-act="todo-arch" data-id="${esc(l.id)}">${l.archived?'Zurückholen':'Archivieren'}</button>${delBtn('todo_lists',l.id,'Liste löschen')}`:''}</div></div>
+      ${mgr()&&!l.archived?`<form class="inline todo-add" data-form="todo" data-id="${esc(l.id)}">
+        <label for="td-t-${esc(l.id)}" class="span-all">Neue Aufgabe<input id="td-t-${esc(l.id)}" required maxlength="160" placeholder="z. B. Angebot für neue Helme einholen"></label>
+        <label for="td-w-${esc(l.id)}">Zuständig<select id="td-w-${esc(l.id)}"><option value="">– niemand –</option>${personOpts()}<option value="__txt">Andere Person …</option></select></label>
+        <label for="td-x-${esc(l.id)}">Name (ohne App)<input id="td-x-${esc(l.id)}" maxlength="60" placeholder="nur bei „Andere Person“"></label>
+        <label for="td-d-${esc(l.id)}">Fällig bis<input id="td-d-${esc(l.id)}" type="date"></label>
+        <label for="td-n-${esc(l.id)}">Notiz<input id="td-n-${esc(l.id)}" maxlength="400" placeholder="optional"></label>
+        <div class="form-actions"><button class="btn primary" type="submit">Hinzufügen</button></div>${errP('todo-'+l.id)}</form>`:''}
+      <div class="todo-wrap">${vis.length?vis.map(t=>todoItem(t,false)).join(''):`<div class="empty" style="padding:14px 20px">${ts.length?'Alles erledigt 🎉':'Noch keine Aufgaben.'}</div>`}</div>
+      ${done?`<div class="day-head"><button class="linkbtn" data-act="toggle-past" data-key="tdone-${esc(l.id)}">${showDone?'Erledigte ausblenden':`${done} erledigte anzeigen`}</button></div>`:''}
+    </div>`;
+  }).join('');
+  if(mgr()&&D('todo_lists').some(l=>l.archived)) html+=`<p style="text-align:center;margin:14px 0"><button class="linkbtn" data-act="toggle-past" data-key="todoArch">${S.showPast.todoArch?'Archiv ausblenden':'Archivierte Listen anzeigen'}</button></p>`;
+  return loadingOr(['todo_lists','todos'], html);
+}
+
 /* ---------- Gesamt-Render ---------- */
 function render(){
   if(!isMember()) return;
   const v=S.view;
   $('#view-home').hidden = v!=='home';
   $('#view-doc').hidden = v!=='doc';
-  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','who','members','me','quiz','clothing','defects','push','lead','expenses'].includes(v);
+  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','who','members','me','quiz','clothing','todo','defects','push','lead','expenses'].includes(v);
   const waiting=D('profiles').filter(p=>p.role==='pending').length;
   $('#me-name').textContent=S.profile.name||'';
   $('#me-role').textContent=ROLE_NAME[S.profile.role]||'';
@@ -1233,7 +1351,7 @@ function render(){
   } else if(v!=='doc'){
     const page=$('#view-page'); const snap=snapshotForm(page);
     if(S.skipRestore){ snap.vals={}; snap.focus=null; }
-    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg('areas') : v==='who'?renderOrg('people') : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : v==='expenses'?renderExpenses() : v==='me'?renderMe() : v==='quiz'?renderQuiz() : v==='clothing'?renderClothing() : renderDuty(v));
+    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg('areas') : v==='who'?renderOrg('people') : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : v==='expenses'?renderExpenses() : v==='me'?renderMe() : v==='quiz'?renderQuiz() : v==='clothing'?renderClothing() : v==='todo'?renderTodo() : renderDuty(v));
     restoreForm(page,snap); S.skipRestore=false;
   }
   renderDocs();
@@ -1251,7 +1369,7 @@ function go(view){
 }
 
 /* ---------- Klicks ---------- */
-const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',docs:'Liste gelöscht',news:'Beitrag gelöscht',duties:'Dienst gelöscht',events:'Veranstaltung gelöscht',shifts:'Arbeitsdienst gelöscht',ice:'Eis-Anmeldung storniert',org:'Funktion entfernt',defects:'Mangel gelöscht',member_quals:'Eintrag entfernt',expenses:'Ausgabe gelöscht',qual_types:'Aus dem Katalog entfernt',absences:'Abwesenheit entfernt',clothing_requests:'Anfrage gelöscht',quiz_questions:'Frage gelöscht'};
+const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',docs:'Liste gelöscht',news:'Beitrag gelöscht',duties:'Dienst gelöscht',events:'Veranstaltung gelöscht',shifts:'Arbeitsdienst gelöscht',ice:'Eis-Anmeldung storniert',org:'Funktion entfernt',defects:'Mangel gelöscht',member_quals:'Eintrag entfernt',expenses:'Ausgabe gelöscht',qual_types:'Aus dem Katalog entfernt',absences:'Abwesenheit entfernt',clothing_requests:'Anfrage gelöscht',quiz_questions:'Frage gelöscht',clothing_issued:'Eintrag gelöscht',clothing_stock:'Aus dem Lager entfernt',todos:'Aufgabe gelöscht',todo_lists:'Liste gelöscht'};
 
 document.addEventListener('click', async e=>{
   const gt=e.target.closest('[data-goto]'); if(gt){ go(gt.dataset.goto); return; }
@@ -1335,7 +1453,12 @@ document.addEventListener('click', async e=>{
   else if(act==='push-on'){ await enablePush(); }
   else if(act==='push-off'){ await disablePush(); }
   else if(act==='cal-create'){ await ensureCalToken(); render(); }
-  else if(act==='cloth-st'){ await upd('clothing_requests',id,{status:b.dataset.status,done_by:S.me},'Status: '+(CST[b.dataset.status]||{}).n); }
+  else if(act==='cloth-st'){ const x=D('clothing_requests').find(y=>y.id===id); const ok=await upd('clothing_requests',id,{status:b.dataset.status,done_by:S.me},'Status: '+(CST[b.dataset.status]||{}).n); if(ok&&x&&b.dataset.status==='ausgegeben'){ await clothIssueFromRequest(x); toast('Ausgegeben – bei der Person eingetragen'); render(); } }
+  else if(act==='cloth-tab'){ S.clothTab=id; S.errs={}; S.skipRestore=true; render(); }
+  else if(act==='gear-return'){ await upd('clothing_issued',id,{returned_on:today()},'Als zurückgegeben markiert'); }
+  else if(act==='stock-step'){ const st=D('clothing_stock').find(y=>y.id===id); if(st) await upd('clothing_stock',id,{qty:Math.max(0,(+st.qty||0)+(+b.dataset.v)),updated_at:new Date().toISOString()}); }
+  else if(act==='todo-toggle'){ const t=D('todos').find(y=>y.id===id); if(t) await run('todos', sb.rpc('toggle_todo',{tid:id,flag:!t.done}), t.done?'Wieder offen':'Erledigt ✓'); }
+  else if(act==='todo-arch'){ const l=D('todo_lists').find(y=>y.id===id); if(l) await upd('todo_lists',id,{archived:!l.archived},l.archived?'Liste zurückgeholt':'Liste archiviert'); }
   else if(act==='quiz-start'){ startQuiz(id); render(); window.scrollTo({top:0}); }
   else if(act==='quiz-pick'){ await quizPick(+id); }
   else if(act==='quiz-next'){ await quizNext(); }
@@ -1373,7 +1496,7 @@ async function setRole(id,role){
 }
 $('#lightbox').addEventListener('click',()=>{$('#lightbox').hidden=true});
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') $('#lightbox').hidden=true; });
-document.addEventListener('change',e=>{ if(e.target.id==='cr-item'){ const k=CLOTH_MAP[e.target.value]; const f=document.getElementById('cr-size'); if(f) f.value=k?(mySizes()[k]||''):''; } });
+document.addEventListener('change',e=>{ if(e.target.id==='gear-filter'){ S.gearPerson=e.target.value; render(); return; } if(e.target.id==='cr-item'){ const k=CLOTH_MAP[e.target.value]; const f=document.getElementById('cr-size'); if(f) f.value=k?(mySizes()[k]||''):''; } });
 document.addEventListener('input',e=>{ if(e.target.id==='org-q'){ S.orgQ=e.target.value; render(); } });
 window.addEventListener('hashchange',()=>{ const v=location.hash.slice(1); if(VIEWS.includes(v) && v!==S.view && isMember()) go(v); });
 
@@ -1499,6 +1622,33 @@ document.addEventListener('submit', async e=>{
     if(item==='Sonstiges'&&!note) return fail('cloth','Bitte unter „Hinweis“ schreiben, was du brauchst.');
     const ok=await ins('clothing_requests',{item,size,qty,note},'Bedarf gemeldet');
     if(ok){ S.errs.cloth=null; render(); }
+  }
+  else if(kind==='gear'){
+    const user_id=val('gr-user'), item=val('gr-item'), size=val('gr-size');
+    if(!user_id) return fail('gear','Bitte eine Person wählen.');
+    const row={user_id,item,size,inv_no:val('gr-inv'),issued_on:val('gr-date')||today(),replace_by:val('gr-repl')||null,note:val('gr-note')};
+    const ok=await ins('clothing_issued',row,item+' ausgegeben an '+nameOf(user_id));
+    if(ok && document.getElementById('gr-stock')?.checked){ const st=stockOf(item,size); if(st&&+st.qty>0) await upd('clothing_stock',st.id,{qty:+st.qty-1,updated_at:new Date().toISOString()}); }
+    if(ok){ S.errs.gear=null; ['gr-size','gr-inv','gr-note','gr-repl'].forEach(i=>{const e=document.getElementById(i); if(e) e.value='';}); }
+  }
+  else if(kind==='stock'){
+    const item=val('st-item'), size=val('st-size'), qty=parseInt(val('st-qty'),10)||0;
+    if(qty<1) return fail('stock','Bitte eine Anzahl angeben.');
+    const st=stockOf(item,size);
+    const ok= st ? await upd('clothing_stock',st.id,{qty:+st.qty+qty,updated_at:new Date().toISOString()},`Lager: ${item} jetzt ${+st.qty+qty}`) : await ins('clothing_stock',{item,size,qty},`${qty}× ${item} ins Lager`);
+    if(ok){ S.errs.stock=null; }
+  }
+  else if(kind==='todo-list'){
+    const title=val('tl-title'); if(!title) return fail('todo-list','Bitte einen Titel eingeben.');
+    addRow('todo_lists',{title,meet_on:val('tl-date')||null,visibility:val('tl-vis')},'Liste angelegt','todo-list');
+  }
+  else if(kind==='todo'){
+    const lid=fid, title=val('td-t-'+lid); let who=val('td-w-'+lid); const txt=val('td-x-'+lid);
+    if(!title) return fail('todo-'+lid,'Bitte die Aufgabe beschreiben.');
+    if(who==='__txt'&&!txt) return fail('todo-'+lid,'Bitte den Namen der Person eintragen.');
+    const row={list_id:lid,title,assignee:who&&who!=='__txt'?who:null,assignee_txt:who==='__txt'?txt:'',due:val('td-d-'+lid)||null,note:val('td-n-'+lid)};
+    const ok=await ins('todos',row,'Aufgabe hinzugefügt');
+    if(ok){ S.errs['todo-'+lid]=null; ['td-t-','td-x-','td-n-','td-d-'].forEach(k=>{const e=document.getElementById(k+lid); if(e) e.value='';}); document.getElementById('td-t-'+lid)?.focus(); }
   }
   else if(kind==='quiz-q'){
     const opts=[0,1,2,3].map(i=>val('qq-o'+i)); const okIdx=+val('qq-ok');
