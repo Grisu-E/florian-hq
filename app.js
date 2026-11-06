@@ -577,6 +577,29 @@ function renderOrgPeople(q){
       <div class="ptasks">${tasks.map(t=>`<button class="tchip hue${t.hue??'r'}" data-act="org-open" data-id="${esc((t.area||t.n).id)}" title="${esc(orgPath(t.n))}">${esc(t.n.role)}</button>`).join('')}</div>
     </div>`).join('')}</div>`;
 }
+/* Klassisches Organigramm: Wurzel → Bereiche nebeneinander → Aufgaben als Baum darunter */
+function otNames(s){
+  if(!s) return '<span class="free">unbesetzt</span>';
+  return orgPeople(s).map(t=>isPerson(t)?`<button class="ot-person" data-act="org-person" data-v="${esc(t)}">${esc(t)}</button>`:`<span class="ot-grp">${esc(t)}</span>`).join('<span class="ot-sep">, </span>');
+}
+function otNode(n,cls,hue){
+  return `<div class="ot-node ${cls} hue${hue??'r'}" id="org-${esc(n.id)}">
+    <div class="ot-role">${esc(n.role)}${orgEditBtn(n)}</div>
+    <div class="ot-names">${otNames(n.name)}${orgContacts(n)}</div>
+    ${n.area?`<div class="ot-note">${esc(n.area)}</div>`:''}
+  </div>`;
+}
+function otVert(pid,hue,depth){
+  const kids=depth<8?orgChildren(pid):[];
+  return kids.length?`<ul class="ot-v">${kids.map(k=>`<li>${otNode(k,'leaf',hue)}${otVert(k.id,hue,depth+1)}</li>`).join('')}</ul>`:'';
+}
+function orgTree(r){
+  const hue=orgHueMap(), kids=orgChildren(r.id);
+  return `<div class="ot-tree ${kids.length>1?'':'solo'}">
+    ${otNode(r,'root',null)}
+    ${kids.length?`<ul class="ot-h">${kids.map(k=>`<li>${otNode(k,'l1',hue[k.id])}${otVert(k.id,hue[k.id],1)}${orgAddBtn(k)}</li>`).join('')}</ul>`:''}
+  </div>`;
+}
 function renderOrg(){
   const all=D('org'); const q=S.orgQ.trim().toLowerCase(); const tab=S.orgTab||'areas';
   let html=`<div class="panel"><div class="panel-head">
@@ -594,16 +617,8 @@ function renderOrg(){
     const hits=all.filter(n=>[n.role,n.name,n.area].some(x=>(x||'').toLowerCase().includes(q)));
     html+= hits.length?`<ul class="org-ul org-hits">${hits.map(n=>`<li class="org-li"><div class="org-row"><span class="fn"><span class="dot hue${hue[n.id]??'r'}"></span>${esc(n.role)}<small>${esc(orgPath(n))}</small></span><span class="nm">${nameChips(n.name,{small:true})}${orgContacts(n)}${orgEditBtn(n)}</span></div></li>`).join('')}</ul>`:`<div class="empty"><strong>Nichts gefunden.</strong>Versuch es mit einem anderen Stichwort.</div>`;
   } else {
-    const hue=orgHueMap();
-    html+=orgChart();
-    html+=`<div class="org-bar"><span class="count">${all.length} Funktionen · ${orgPersons().length} Personen</span><button class="linkbtn" data-act="org-all">${S.orgAll?'Alle zuklappen':'Alle aufklappen'}</button></div>`;
-    html+=orgChildren(null).map(r=>{
-      const kids=orgChildren(r.id);
-      return `<section class="org-sec" id="org-${esc(r.id)}">
-        <div class="org-sec-h"><div><span class="o-role">${esc(r.role)}</span><div class="org-sec-n">${nameChips(r.name)}${orgContacts(r)}</div>${r.area?`<p class="org-area-note">${esc(r.area)}</p>`:''}</div><div class="actions">${orgEditBtn(r)}${orgAddBtn(r)}</div></div>
-        ${kids.length?`<div class="org-grid">${kids.map(k=>orgBox(k,hue[k.id])).join('')}</div>`:''}
-      </section>`;
-    }).join('');
+    html+=`<div class="org-bar"><span class="count">${all.length} Funktionen · ${orgPersons().length} Personen</span><span class="count ot-hint">← zum Verschieben wischen →</span></div>`;
+    html+=`<div class="ot-scroll"><div class="ot-canvas">${orgChildren(null).map(r=>orgTree(r)).join('')}</div></div>`;
   }
   return loadingOr(['org'], html+'</div>');
 }

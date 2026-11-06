@@ -411,3 +411,49 @@ button.onode:hover{transform:translateY(-2px);border-color:var(--h)}
 .org-add:hover{color:var(--red)}
 @media (max-width:520px){.org-sec{padding:12px 12px 18px}.org-grid{grid-template-columns:1fr}.ochart{padding:18px 12px 6px}.pgrid{padding:14px 12px}.obox-lead,.obox .org-area-note{padding-left:14px}.org-bar{padding:12px 12px 0}}
 .org-seg button{padding:9px 14px;white-space:nowrap}
+
+/* Organigramm – klassische Hierarchie */
+.ot-hint{display:none}
+@media (max-width:900px){.ot-hint{display:inline}}
+.ot-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;padding:18px 0 26px}
+.ot-canvas{display:flex;gap:40px;align-items:flex-start;width:max-content;min-width:100%;padding:0 20px;justify-content:center;box-sizing:border-box}
+.ot-tree{display:flex;flex-direction:column;align-items:center}
+.ot-node{position:relative;background:var(--surface);border:1px solid var(--line);border-top:4px solid var(--h);border-radius:10px;padding:8px 10px 9px;box-shadow:var(--shadow);text-align:left;min-width:0}
+.ot-node.root{background:var(--hero);color:#fff;border:0;text-align:center;padding:12px 26px;min-width:240px}
+.ot-tree.solo .ot-node.root{background:color-mix(in srgb,var(--muted) 65%,var(--hero))}
+.ot-node.root .ot-role{font-size:17px;justify-content:center}
+.ot-node.root .ot-names,.ot-node.root .ot-person,.ot-node.root .ot-grp{color:#E8DEDF;justify-content:center}
+.ot-node.root .ot-note{color:#CFC6C7}
+.ot-node.l1{text-align:center;background:color-mix(in srgb,var(--h) 9%,var(--surface));border-color:color-mix(in srgb,var(--h) 35%,var(--line));border-top-color:var(--h)}
+.ot-node.l1 .ot-role{font-size:15px;justify-content:center}
+.ot-node.l1 .ot-names{justify-content:center}
+.ot-role{font-family:var(--display);font-weight:800;font-size:13.5px;line-height:1.25;display:flex;gap:6px;align-items:flex-start;justify-content:space-between}
+.ot-names{display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;font-size:12.5px;margin-top:2px;color:var(--h)}
+.ot-person{appearance:none;border:0;background:none;padding:0;font:600 12.5px var(--body);color:inherit;cursor:pointer;text-decoration:underline;text-decoration-color:transparent;text-underline-offset:2px}
+.ot-person:hover{text-decoration-color:currentColor}
+.ot-grp{font-style:italic;color:var(--muted)}
+.ot-sep{color:var(--muted)}
+.ot-note{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.3}
+.ot-node .free{font-size:12px}
+.ot-node .org-c{font-size:12px;margin-left:4px}
+.ot-node .org-ed{font-size:11px;padding:0 5px}
+/* waagerechte Ebene */
+.ot-h{list-style:none;margin:0;padding:22px 0 0;display:flex;position:relative}
+.ot-h::before{content:"";position:absolute;top:0;left:50%;height:22px;border-left:2px solid var(--line)}
+.ot-h > li{position:relative;padding:22px 7px 0;width:200px;flex:none;display:flex;flex-direction:column}
+.ot-h > li::before,.ot-h > li::after{content:"";position:absolute;top:0;right:50%;width:50%;height:22px;border-top:2px solid var(--line)}
+.ot-h > li::after{right:auto;left:50%;border-left:2px solid var(--line)}
+.ot-h > li:first-child::before,.ot-h > li:last-child::after{border:0}
+.ot-h > li:last-child::before{border-right:2px solid var(--line);border-radius:0 8px 0 0}
+.ot-h > li:first-child::after{border-radius:8px 0 0 0}
+.ot-h > li:only-child::before{display:none}
+.ot-h > li:only-child::after{border-top:0;border-radius:0}
+/* senkrechte Unterebenen */
+.ot-v{list-style:none;margin:0;padding:0 0 0 12px;position:relative}
+.ot-v > li{position:relative;padding:8px 0 0 16px}
+.ot-v > li::before{content:"";position:absolute;left:0;top:0;bottom:0;border-left:2px solid color-mix(in srgb,var(--h) 45%,var(--line))}
+.ot-v > li:last-child::before{bottom:auto;height:26px}
+.ot-v > li::after{content:"";position:absolute;left:0;top:26px;width:14px;border-top:2px solid color-mix(in srgb,var(--h) 45%,var(--line))}
+.ot-v .ot-v{padding-left:10px}
+.ot-v .ot-node{border-top-width:1px;border-left:3px solid var(--h);box-shadow:none}
+.ot-h > li > .org-add{margin-top:8px;border:1px dashed var(--line);border-radius:8px;width:auto}
