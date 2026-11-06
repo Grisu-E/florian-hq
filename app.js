@@ -489,7 +489,7 @@ function contact(label,v,href){ return v?`<span class="contact"><span aria-hidde
 function orgCard(n,withPath){
   return `<div class="org-card">
     <div style="min-width:0"><div class="org-role">${esc(n.role)}</div><div class="org-name">${esc(n.name||'– unbesetzt –')}</div></div>
-    <div class="actions">${mgr()?`<button class="btn ghost small" data-act="edit-org" data-id="${esc(n.id)}">Bearbeiten</button>${delBtn('org',n.id)}`:''}</div>
+    <div class="actions">${mgr()&&S.orgEdit?`<button class="btn ghost small" data-act="edit-org" data-id="${esc(n.id)}">Bearbeiten</button>`:''}</div>
     ${withPath&&n.parentId?`<div class="crumb">${esc(orgPath(n))}</div>`:''}
     ${n.area?`<p class="note"><b style="color:var(--ink)">Verantwortlich für:</b> ${esc(n.area)}</p>`:''}
     ${(n.phone||n.email)?`<div class="contacts">${contact('Tel.',n.phone,'tel:'+String(n.phone||'').replace(/[^\d+]/g,''))}${contact('Mail',n.email,'mailto:'+(n.email||''))}</div>`:''}
@@ -504,26 +504,58 @@ function orgForm(){
   return `<form class="inline" data-form="org" style="margin:14px 20px">
     <label for="org-role">Funktion<input id="org-role" required maxlength="60" value="${v('role')}" placeholder="z. B. Gerätewart"></label>
     <label for="org-name">Name<input id="org-name" maxlength="60" value="${v('name')}" placeholder="Vor- und Nachname"></label>
-    <label for="org-parent">Untergeordnet unter<select id="org-parent"><option value="">— oberste Ebene —</option>${opts.map(n=>`<option value="${esc(n.id)}" ${ed&&ed.parentId===n.id?'selected':''}>${esc(n.role)}${n.name?' · '+esc(n.name):''}</option>`).join('')}</select></label>
+    <label for="org-parent">Untergeordnet unter<select id="org-parent"><option value="">— oberste Ebene —</option>${opts.map(n=>`<option value="${esc(n.id)}" ${(ed?ed.parentId:S.orgParent)===n.id?'selected':''}>${esc(n.role)}${n.name?' · '+esc(n.name):''}</option>`).join('')}</select></label>
     <label for="org-order">Reihenfolge<input id="org-order" type="number" min="0" max="99" value="${ed?esc(ed.order??0):0}"></label>
     <label for="org-area" class="span-all">Verantwortlich für<input id="org-area" maxlength="200" value="${v('area')}" placeholder="z. B. Atemschutzgeräte, Prüffristen, Schlüsselverwaltung"></label>
     <label for="org-phone">Telefon<input id="org-phone" type="tel" maxlength="40" value="${v('phone')}"></label>
     <label for="org-mail">E-Mail<input id="org-mail" type="email" maxlength="80" value="${v('email')}"></label>
-    <div class="form-actions"><button class="btn primary" type="submit">${ed?'Speichern':'Hinzufügen'}</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button></div>
+    <div class="form-actions"><button class="btn primary" type="submit">${ed?'Speichern':'Hinzufügen'}</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button>${ed?delBtn('org',ed.id,'Funktion löschen'):''}</div>
     ${errP('org')}</form>`;
+}
+/* Übersichtliche Darstellung: oberste Ebene als Band, darunter je Bereich eine Karte mit kompakter Liste */
+const orgEditBtn = (n,label='✎') => mgr()&&S.orgEdit?`<button class="org-ed" data-act="edit-org" data-id="${esc(n.id)}" aria-label="${esc(n.role)} bearbeiten">${label}</button>`:'';
+const orgAddBtn = n => mgr()&&S.orgEdit?`<button class="org-add" data-act="org-add-under" data-id="${esc(n.id)}">+ Unterpunkt</button>`:'';
+function orgContacts(n){
+  const tel=n.phone?`<a class="org-c" href="tel:${esc(String(n.phone).replace(/[^\d+]/g,''))}" aria-label="${esc(n.name||n.role)} anrufen">📞</a>`:'';
+  const mail=n.email?`<a class="org-c" href="mailto:${esc(n.email)}" aria-label="${esc(n.name||n.role)} mailen">✉️</a>`:'';
+  return tel+mail;
+}
+function orgRows(pid,depth){
+  return orgChildren(pid).map(n=>`<li class="org-li d${Math.min(depth,3)}">
+      <div class="org-row"><span class="fn">${esc(n.role)}${n.area?`<small>${esc(n.area)}</small>`:''}</span><span class="nm">${n.name?esc(n.name):'<span class="free">–</span>'}${orgContacts(n)}${orgEditBtn(n)}</span></div>
+    </li>${depth<8?orgRows(n.id,depth+1):''}`).join('');
+}
+function orgAreaCard(n){
+  const rows=orgRows(n.id,1);
+  return `<article class="org-box" id="org-${esc(n.id)}">
+    <header><div class="org-box-t"><h3>${esc(n.role)}</h3>${orgEditBtn(n)}</div>
+      <div class="org-lead">${n.name?esc(n.name):'<span class="free">unbesetzt</span>'}${orgContacts(n)}</div>
+      ${n.area?`<p class="org-area-note">${esc(n.area)}</p>`:''}</header>
+    ${rows?`<ul class="org-ul">${rows}</ul>`:''}${orgAddBtn(n)}
+  </article>`;
 }
 function renderOrg(){
   const all=D('org'); const q=S.orgQ.trim().toLowerCase();
   let html=`<div class="panel"><div class="panel-head">
-    <div><h2>Organigramm</h2><p class="sub">Wer ist wofür zuständig und wen rufe ich an?</p>${lockNote()}</div>
-    ${mgr()?`<div class="actions"><button class="btn primary" data-act="edit-org" data-id="new">+ Funktion</button></div>`:''}</div>`;
+    <div><h2>Organigramm</h2><p class="sub">Wer ist wofür zuständig? Suchen oder Bereich anschauen.</p></div>
+    ${mgr()?`<div class="actions">${S.orgEdit?`<button class="btn primary" data-act="edit-org" data-id="new">+ Funktion</button>`:''}<button class="btn ${S.orgEdit?'':'ghost'}" data-act="org-edit-mode" aria-pressed="${!!S.orgEdit}">${S.orgEdit?'Fertig':'✎ Bearbeiten'}</button></div>`:''}</div>`;
   if(S.editOrg && mgr()) html+=orgForm();
-  if(all.length) html+=`<div class="org-tools"><input id="org-q" type="search" placeholder="Suchen: Funktion, Name oder Zuständigkeit" value="${esc(S.orgQ)}" aria-label="Organigramm durchsuchen"><span class="count">${all.length} Funktionen</span></div>`;
-  if(!all.length) html+=`<div class="empty"><strong>Noch kein Organigramm hinterlegt.</strong>${mgr()?'Fang oben mit „+ Funktion“ an, z. B. mit dem Kommandanten, und hänge darunter Stellvertreter, Gruppenführer und Gerätewarte ein.':'Sobald die Bearbeiter es anlegen, steht es hier.'}</div>`;
+  if(all.length){
+    const roots=orgChildren(null);
+    html+=`<div class="org-tools"><input id="org-q" type="search" placeholder="Suchen: Funktion oder Name" value="${esc(S.orgQ)}" aria-label="Organigramm durchsuchen"><span class="count">${all.length} Funktionen</span></div>`;
+    if(!q) html+=`<nav class="org-jump">${roots.flatMap(r=>orgChildren(r.id).length?orgChildren(r.id):[r]).map(n=>`<button class="filter" data-act="org-jump" data-id="${esc(n.id)}">${esc(n.role)}</button>`).join('')}</nav>`;
+  }
+  if(!all.length) html+=`<div class="empty"><strong>Noch kein Organigramm hinterlegt.</strong>${mgr()?'Über „✎ Bearbeiten“ → „+ Funktion“ anlegen.':'Sobald die Bearbeiter es anlegen, steht es hier.'}</div>`;
   else if(q){
     const hits=all.filter(n=>[n.role,n.name,n.area].some(x=>(x||'').toLowerCase().includes(q)));
-    html+= hits.length?`<div class="org"><ul>${hits.map(n=>`<li>${orgCard(n,true)}</li>`).join('')}</ul></div>`:`<div class="empty"><strong>Nichts gefunden.</strong>Versuch es mit einem anderen Stichwort.</div>`;
-  } else html+=`<div class="org"><ul>${orgChildren(null).map(n=>orgBranch(n,0)).join('')}</ul></div>`;
+    html+= hits.length?`<ul class="org-ul org-hits">${hits.map(n=>`<li class="org-li"><div class="org-row"><span class="fn">${esc(n.role)}<small>${esc(orgPath(n))}</small></span><span class="nm">${n.name?esc(n.name):'<span class="free">–</span>'}${orgContacts(n)}${orgEditBtn(n)}</span></div></li>`).join('')}</ul>`:`<div class="empty"><strong>Nichts gefunden.</strong>Versuch es mit einem anderen Stichwort.</div>`;
+  } else html+=orgChildren(null).map(r=>{
+    const kids=orgChildren(r.id);
+    return `<section class="org-sec" id="org-${esc(r.id)}">
+      <div class="org-top"><div><div class="org-role">${esc(r.role)}</div><div class="org-name">${r.name?esc(r.name):'– unbesetzt –'}${orgContacts(r)}</div>${r.area?`<p class="org-area-note">${esc(r.area)}</p>`:''}</div><div class="actions">${orgEditBtn(r)}${orgAddBtn(r)}</div></div>
+      ${kids.length?`<div class="org-grid">${kids.map(orgAreaCard).join('')}</div>`:''}
+    </section>`;
+  }).join('');
   return loadingOr(['org'], html+'</div>');
 }
 
@@ -1023,7 +1055,10 @@ document.addEventListener('click', async e=>{
   else if(act==='push-on'){ await enablePush(); }
   else if(act==='push-off'){ await disablePush(); }
   else if(act==='push-pref'){ await setPushPref(b.dataset.key, b.getAttribute('aria-checked')!=='true'); }
-  else if(act==='edit-org'){ S.editOrg=id; S.errs={}; S.skipRestore=true; render(); document.getElementById('org-role')?.focus(); }
+  else if(act==='edit-org'){ S.editOrg=id; S.orgParent=null; S.errs={}; S.skipRestore=true; render(); const f=document.getElementById('org-role'); if(f){ f.focus({preventScroll:true}); f.closest('form').scrollIntoView({block:'center'}); } }
+  else if(act==='org-add-under'){ S.editOrg='new'; S.orgParent=id; S.errs={}; S.skipRestore=true; render(); const f=document.getElementById('org-role'); if(f){ f.focus({preventScroll:true}); f.closest('form').scrollIntoView({block:'center'}); } }
+  else if(act==='org-edit-mode'){ S.orgEdit=!S.orgEdit; S.editOrg=null; render(); }
+  else if(act==='org-jump'){ document.getElementById('org-'+id)?.scrollIntoView({behavior:'smooth',block:'start'}); }
   else if(act==='copy'){
     const v=b.dataset.v;
     try{ await navigator.clipboard.writeText(v); toast('Kopiert: '+v); }
