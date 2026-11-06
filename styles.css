@@ -577,3 +577,20 @@ span.fn-chip{cursor:default}
 .role-grid div{display:grid;grid-template-columns:140px 1fr;gap:10px;font-size:13.5px}
 .role-grid span{color:var(--muted)}
 @media (max-width:520px){.role-grid div{grid-template-columns:1fr;gap:2px}}
+
+/* v9: Zuständigkeiten */
+.assign-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:8px}
+.assign-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:8px;min-width:0}
+.assign-card h3{margin:0;font-family:var(--display);font-weight:800;font-size:17px}
+.assign-card .sub{margin:0}
+.assign-names{display:flex;flex-wrap:wrap;gap:6px}
+.aname{display:inline-flex;align-items:center;gap:6px;background:var(--ok-soft);border:1px solid color-mix(in srgb,var(--ok) 35%,var(--line));border-radius:99px;padding:4px 6px 4px 11px;font-size:13.5px;font-weight:600}
+.aname.wait{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 35%,var(--line))}
+.aname button{appearance:none;border:0;background:none;color:var(--muted);font-size:16px;line-height:1;cursor:pointer;padding:0 4px;border-radius:50%}
+.aname button:hover{color:var(--red)}
+.aname:not(:has(button)){padding-right:11px}
+.assign-add{display:flex;gap:6px;flex-wrap:wrap;margin-top:auto}
+.assign-add input{flex:1;min-width:140px}
+.assign-add.two input[type=tel]{flex:0 1 170px}
+.contact-edit{display:flex;flex-direction:column;gap:8px;margin-top:8px;padding:10px;border:1px dashed var(--line);border-radius:12px}
+.contact-edit .aname{align-self:flex-start}

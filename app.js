@@ -18,6 +18,7 @@ const ICONS = {
   quiz:'<svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.3 6.8 19l1-5.8L3.6 9.1l5.8-.8z"/></svg>',
   clothing:'<svg viewBox="0 0 24 24"><path d="M8 3l4 3 4-3 5 4-3 4-2-1.5V21H8V9.5L6 11 3 7z"/></svg>',
   todo:'<svg viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><path d="M3.5 6l1.2 1.2L7 5M3.5 12l1.2 1.2L7 11M3.5 18l1.2 1.2L7 17"/></svg>',
+  assign:'<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M9 3v3h6V3M8 11h8M8 15h5"/></svg>',
   who:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.2 5 2.6 5 5.8"/></svg>',
   org:'<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></svg>',
   lead:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M4 4l2 2M20 4l-2 2"/></svg>',
@@ -33,10 +34,10 @@ const CATS = [
 const DUTY = {'duty-aktive':{g:'aktive',n:'Dienstplan Aktive'}, 'duty-jugend':{g:'jugend',n:'Dienstplan Jugend'}};
 const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'App-Master'};
 const FN_NAME = {kommandant:'Kommandant', gruppenfuehrer:'Gruppenführer', geraetewart:'Gerätewart', kassier:'Kassier'};
-const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','who','doc','members','me','quiz','clothing','todo','defects','push','lead','expenses'];
+const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','who','doc','members','me','quiz','clothing','todo','assign','defects','push','lead','expenses'];
 const catName = k => k==='eis'?'Crushed-Eis':((CATS.find(c=>c.k===k)||{}).n || k);
 
-const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance','expenses','res_contacts','absences','clothing_sizes','clothing_requests','quiz_questions','quiz_results','cal_tokens','clothing_issued','clothing_stock','todo_lists','todos'];
+const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance','expenses','res_contacts','absences','clothing_sizes','clothing_requests','quiz_questions','quiz_results','cal_tokens','clothing_issued','clothing_stock','todo_lists','todos','role_assign'];
 const S = {
   view:'home', openCat:null, data:{}, loaded:{},
   me:null, profile:null,
@@ -182,6 +183,7 @@ function renderTiles(){
   let org = tile('org','Organigramm', D('org').length?`${D('org').length} Funktionen`:'Noch nicht hinterlegt',{attr:'data-goto="org"'}) +
     (()=>{ const open=D('todos').filter(x=>!x.done); const mine=open.filter(x=>x.assignee===S.me).length;
       return tile('todo','Aufgaben', mine?`${mine} für mich offen`:(open.length?`${open.length} offen`:(mgr()?'To-do-Listen':'Nichts offen')),{attr:'data-goto="todo"',alert:mine>0}); })() +
+    (canStaff()?tile('assign','Zuständigkeiten', `${D('role_assign').length} Rollen · ${D('res_contacts').length} Verantwortliche`,{attr:'data-goto="assign"'}):'') +
     tile('who','Wer macht was?', D('org').length?`${orgPersons().length} Personen`:'Noch nicht hinterlegt',{attr:'data-goto="who"'}) +
     tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:mgr()&&openDocs>0}) +
     (()=>{ const ex=D('expenses').filter(x=>x.status==='offen'); const sum=ex.reduce((a,x)=>a+(+x.amount||0),0);
@@ -209,29 +211,28 @@ function catTile(c,n){
 
 /* ---------- Reservierungen ---------- */
 /* Verantwortliche: Eintrag am Item überschreibt den der Kategorie */
-const contactRow = key => D('res_contacts').find(c=>c.key===key && (c.user_id||c.phone));
-function contactFor(itemId,cat){ return (itemId&&contactRow(itemId)) || contactRow(cat) || null; }
+const contactsOf = key => D('res_contacts').filter(c=>c.key===key && (c.user_id||c.phone||c.name));
+function contactFor(itemId,cat){ const own=itemId?contactsOf(itemId):[]; return own.length?own:contactsOf(cat); }
 function waNumber(p){ let d=String(p||'').replace(/[^\d+]/g,''); if(d.startsWith('+')) d=d.slice(1); else if(d.startsWith('00')) d=d.slice(2); else if(d.startsWith('0')) d='49'+d.slice(1); return d.length>=8?d:''; }
-const contactName = c => c ? (c.user_id?nameOf(c.user_id):'') : '';
+const contactName = c => c ? (c.user_id?nameOf(c.user_id):(c.name||'')) : '';
 function contactLine(key,cat,label){
-  const own=contactRow(key), c=own||(cat?contactRow(cat):null);
-  const txt=c?`${esc(contactName(c)||'Nummer hinterlegt')}${c.phone?' · 📱':''}${!own&&cat?' <span class="muted">(wie Kategorie)</span>':''}`:'<span class="muted">niemand hinterlegt</span>';
-  return `<p class="contact-line">${esc(label||'Verantwortlich')}: ${txt}${canGear()?` <button class="linkbtn" data-act="contact-edit" data-id="${esc(key)}">${own?'ändern':'festlegen'}</button>`:''}</p>${S.contactEdit===key?contactForm(key,own):''}`;
+  const own=contactsOf(key), list=own.length?own:(cat?contactsOf(cat):[]);
+  const txt=list.length?`${list.map(c=>esc(contactName(c)||'Nummer hinterlegt')+(c.phone?' 📱':'')).join(', ')}${!own.length&&cat?' <span class="muted">(wie Kategorie)</span>':''}`:'<span class="muted">niemand hinterlegt</span>';
+  const edit=!canGear()?'':(cat?` <button class="linkbtn" data-act="contact-edit" data-id="${esc(key)}">${own.length?'ändern':'eigene festlegen'}</button>`:` <button class="linkbtn" data-goto="assign">ändern</button>`);
+  return `<p class="contact-line">${esc(label||'Verantwortlich')}: ${txt}${edit}</p>${S.contactEdit===key?contactForm(key,own):''}`;
 }
 function contactForm(key,own){
-  const k=esc(key), members=D('profiles').filter(p=>p.role!=='pending').sort((a,b)=>(a.name||'').localeCompare(b.name||'','de'));
-  return `<form class="inline" data-form="contact" data-id="${k}">
-    <label for="ct-user">Person (bekommt Push)<select id="ct-user"><option value="">– niemand –</option>${members.map(p=>`<option value="${esc(p.id)}" ${own&&own.user_id===p.id?'selected':''}>${esc(p.name||p.email)}</option>`).join('')}</select></label>
-    <label for="ct-phone">WhatsApp-Nummer<input id="ct-phone" type="tel" maxlength="30" placeholder="z. B. 0171 1234567" value="${esc(own?own.phone:'')}"></label>
-    <div class="form-actions"><button class="btn primary" type="submit">Speichern</button>${own?`<button class="btn ghost" type="button" data-act="contact-clear" data-id="${k}">Entfernen</button>`:''}<button class="btn ghost" type="button" data-act="contact-cancel">Abbrechen</button></div>
-    ${errP('contact')}</form>`;
+  const k=esc(key);
+  return `<div class="contact-edit">${own.map(c=>`<span class="aname">${esc(contactName(c))}${c.phone?' · 📱':''}<button data-act="rc-del" data-id="${esc(c.id)}" aria-label="entfernen">×</button></span>`).join('')}
+    <form class="assign-add two" data-form="rc-add" data-id="${k}"><input id="rc-n-${k}" list="dl-members" maxlength="60" placeholder="Name" autocomplete="off"><input id="rc-p-${k}" type="tel" maxlength="30" placeholder="WhatsApp-Nr. (optional)"><button class="btn primary small" type="submit">+ Hinzufügen</button><button class="btn ghost small" type="button" data-act="contact-cancel">Fertig</button></form>${errP('rc-'+key)}${memberDatalist()}</div>`;
 }
 function lastResBanner(scope){
   const L=S.lastRes; if(!L||L.scope!==scope) return '';
-  const c=contactFor(L.itemId,L.cat), num=c&&waNumber(c.phone), name=contactName(c);
-  const push=c&&c.user_id&&c.user_id!==S.me;
-  return `<div class="res-done"><p><strong>✓ ${esc(L.title)}</strong>${push?`<br>${esc(name)} wurde per Push informiert.`:''}</p>
-    <div class="actions">${num?`<a class="btn wa" href="https://wa.me/${num}?text=${encodeURIComponent(L.text)}" target="_blank" rel="noopener">📱 ${esc(name||'Verantwortlichen')} per WhatsApp informieren</a>`:''}<button class="btn ghost small" data-act="res-done-close">Schließen</button></div></div>`;
+  const list=contactFor(L.itemId,L.cat);
+  const pushed=list.filter(c=>c.user_id&&c.user_id!==S.me).map(contactName);
+  const wa=list.filter(c=>waNumber(c.phone));
+  return `<div class="res-done"><p><strong>✓ ${esc(L.title)}</strong>${pushed.length?`<br>${esc(pushed.join(', '))} ${pushed.length>1?'wurden':'wurde'} per Push informiert.`:''}</p>
+    <div class="actions">${wa.map(c=>`<a class="btn wa" href="https://wa.me/${waNumber(c.phone)}?text=${encodeURIComponent(L.text)}" target="_blank" rel="noopener">📱 ${esc(contactName(c)||'Verantwortlichen')} per WhatsApp</a>`).join('')}<button class="btn ghost small" data-act="res-done-close">Schließen</button></div></div>`;
 }
 function itemRes(id){ const n=nowISO(); return D('reservations').filter(r=>r.itemId===id && r.to>n).sort((a,b)=>a.from.localeCompare(b.from)); }
 function statusChip(id){
@@ -963,6 +964,7 @@ function renderMembers(){
     return `<div class="row member-row">
     <div class="info"><h3>${esc(p.name||'Ohne Namen')}${p.id===S.me?' <span class="chip free">du</span>':''}</h3>
       <p class="note">${esc(p.email||'')} · seit ${esc(new Date(p.created_at).toLocaleDateString('de-DE'))}</p>
+      ${p.role==='pending'?(()=>{const pre=D('role_assign').filter(x=>!x.userId&&x.fn!=='master'&&x.name.trim().toLowerCase()===(p.name||'').trim().toLowerCase()); return pre.length?`<div class="fn-chips"><span class="sub">Vorgemerkt – wird bei Freigabe übernommen:</span>${pre.map(x=>`<span class="fn-chip on">${esc(FN_NAME[x.fn]||x.fn)}</span>`).join('')}</div>`:'';})():''}
       ${p.role!=='pending'?`<div class="fn-chips">${p.role==='admin'?'<span class="fn-chip master">👑 App-Master</span>':''}${Object.entries(FN_NAME).map(([k,n])=>master
         ? `<button class="fn-chip ${f.includes(k)?'on':''}" data-act="fn-toggle" data-id="${esc(p.id)}" data-key="${k}" aria-pressed="${f.includes(k)}">${f.includes(k)?'✓ ':''}${n}</button>`
         : (f.includes(k)?`<span class="fn-chip on">${n}</span>`:'')).join('')}${!master&&!f.length&&p.role!=='admin'?'<span class="sub">Mitglied</span>':''}</div>`:''}
@@ -1357,13 +1359,38 @@ function renderTodo(){
   return loadingOr(['todo_lists','todos'], html);
 }
 
+/* ---------- Zuständigkeiten: Rollen + Reservierungs-Verantwortliche ---------- */
+const ASSIGN_FNS=[['master','👑 App-Master','darf alles, auch Rollen vergeben – nur für bereits freigeschaltete Mitglieder'],['kommandant','Kommandant','alles von Gruppenführer und Gerätewart + Organigramm & Mitglieder'],['gruppenfuehrer','Gruppenführer','Dienstpläne, Neues, Veranstaltungen, Übungsdoku, Führung, Aufgaben'],['geraetewart','Gerätewart','Mängel, Fahrzeuge & Material, Kleiderkammer & Lager'],['kassier','Kassier','private Ausgaben sehen und erstatten']];
+const RES_AREAS=()=>[...CATS.map(c=>[c.k,c.n]),['eis','Crushed-Eis']];
+function memberDatalist(){ return `<datalist id="dl-members">${people().map(p=>`<option value="${esc(p.name||'')}">`).join('')}</datalist>`; }
+function renderAssign(){
+  const master=isMaster(), gear=canGear();
+  let html=`<div class="panel"><div class="panel-head"><div><h2>Zuständigkeiten</h2><p class="sub">Pro Bereich beliebig viele Namen eintragen. Bei bereits registrierten Kameraden wirkt es sofort, bei allen anderen automatisch, sobald sie sich mit genau diesem Namen registrieren und freigegeben werden.</p></div></div></div>${memberDatalist()}`;
+  // Rollen
+  html+=`<h4 class="group-label">Rollen in der App ${master?'':'<span class="sub">(ändern nur App-Master)</span>'}</h4><div class="assign-grid">`+
+    ASSIGN_FNS.map(([k,n,d])=>{
+      const rows=D('role_assign').filter(a=>a.fn===k).sort((a,b)=>a.name.localeCompare(b.name,'de'));
+      return `<div class="assign-card"><h3>${esc(n)}</h3><p class="sub">${esc(d)}</p>
+        <div class="assign-names">${rows.length?rows.map(a=>`<span class="aname ${a.userId?'':'wait'}" title="${a.userId?'registriert – Rechte aktiv':'noch nicht registriert – wird bei Freigabe übernommen'}">${a.userId?'✓':'⏳'} ${esc(a.name)}${master?`<button data-act="assign-del" data-id="${esc(a.id)}" aria-label="${esc(a.name)} entfernen">×</button>`:''}</span>`).join(''):'<span class="sub">noch niemand</span>'}</div>
+        ${master?`<form class="assign-add" data-form="assign" data-id="${k}"><input id="as-${k}" list="dl-members" maxlength="60" placeholder="Vor- und Nachname" aria-label="Name für ${esc(n)}" autocomplete="off"><button class="btn primary small" type="submit">+ Hinzufügen</button></form>${errP('assign-'+k)}`:''}
+      </div>`;}).join('')+`</div>`;
+  // Reservierungen
+  html+=`<h4 class="group-label">Verantwortliche für Reservierungen ${gear?'':'<span class="sub">(ändern Gerätewart/Kommandant)</span>'}</h4><p class="sub" style="margin:-4px 0 10px">Bekommen bei jeder Reservierung eine Push-Nachricht (wenn sie die App haben). Mit Handynummer erscheint zusätzlich der WhatsApp-Knopf.</p><div class="assign-grid">`+
+    RES_AREAS().map(([k,n])=>{
+      const rows=D('res_contacts').filter(c=>c.key===k);
+      return `<div class="assign-card"><h3>${esc(n)}</h3>
+        <div class="assign-names">${rows.length?rows.map(c=>`<span class="aname ${c.user_id?'':'wait'}">${c.user_id?'🔔':'👤'} ${esc(c.user_id?nameOf(c.user_id):c.name)}${c.phone?' · 📱':''}${gear?`<button data-act="rc-del" data-id="${esc(c.id)}" aria-label="entfernen">×</button>`:''}</span>`).join(''):'<span class="sub">noch niemand</span>'}</div>
+        ${gear?`<form class="assign-add two" data-form="rc-add" data-id="${k}"><input id="rc-n-${k}" list="dl-members" maxlength="60" placeholder="Name" aria-label="Name" autocomplete="off"><input id="rc-p-${k}" type="tel" maxlength="30" placeholder="WhatsApp-Nr. (optional)" aria-label="Handynummer"><button class="btn primary small" type="submit">+ Hinzufügen</button></form>${errP('rc-'+k)}`:''}
+      </div>`;}).join('')+`</div>`;
+  return loadingOr(['role_assign','res_contacts','profiles'], html);
+}
 /* ---------- Gesamt-Render ---------- */
 function render(){
   if(!isMember()) return;
   const v=S.view;
   $('#view-home').hidden = v!=='home';
   $('#view-doc').hidden = v!=='doc';
-  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','who','members','me','quiz','clothing','todo','defects','push','lead','expenses'].includes(v);
+  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','who','members','me','quiz','clothing','todo','assign','defects','push','lead','expenses'].includes(v);
   const waiting=D('profiles').filter(p=>p.role==='pending').length;
   $('#me-name').textContent=S.profile.name||'';
   $('#me-role').textContent=roleLabel(S.profile);
@@ -1376,7 +1403,7 @@ function render(){
   } else if(v!=='doc'){
     const page=$('#view-page'); const snap=snapshotForm(page);
     if(S.skipRestore){ snap.vals={}; snap.focus=null; }
-    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg('areas') : v==='who'?renderOrg('people') : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : v==='expenses'?renderExpenses() : v==='me'?renderMe() : v==='quiz'?renderQuiz() : v==='clothing'?renderClothing() : v==='todo'?renderTodo() : renderDuty(v));
+    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg('areas') : v==='who'?renderOrg('people') : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : v==='expenses'?renderExpenses() : v==='me'?renderMe() : v==='quiz'?renderQuiz() : v==='clothing'?renderClothing() : v==='todo'?renderTodo() : v==='assign'?renderAssign() : renderDuty(v));
     restoreForm(page,snap); S.skipRestore=false;
   }
   renderDocs();
@@ -1413,7 +1440,8 @@ document.addEventListener('click', async e=>{
   else if(act==='reserve'){ S.formFor=id; S.errs={}; render(); document.getElementById('rf-why-'+id)?.focus(); }
   else if(act==='contact-edit'){ S.contactEdit=S.contactEdit===id?null:id; S.errs={}; S.skipRestore=true; render(); }
   else if(act==='contact-cancel'){ S.contactEdit=null; render(); }
-  else if(act==='contact-clear'){ const ok=await run('res_contacts', sb.from('res_contacts').delete().eq('key',id), 'Verantwortliche Person entfernt'); if(ok){ S.contactEdit=null; render(); } }
+  else if(act==='rc-del'){ await run('res_contacts', sb.from('res_contacts').delete().eq('id',id), 'Entfernt'); }
+  else if(act==='assign-del'){ const {error}=await sb.rpc('assign_remove',{aid:id}); if(error) toast(error.message.replace(/^.*?:\s*/,'')); else { toast('Entfernt'); await Promise.all([load('role_assign'),load('profiles')]); route(); } }
   else if(act==='res-done-close'){ S.lastRes=null; render(); }
   else if(act==='toggle-past'){ S.showPast[b.dataset.key]=!S.showPast[b.dataset.key]; render(); }
   else if(act==='ask'){ S.confirm=b.dataset.key; render(); }
@@ -1563,12 +1591,20 @@ document.addEventListener('submit', async e=>{
         text:`Hallo, ich habe ${it.name} reserviert: ${fmtRange(from,to)} Uhr – ${purpose}. Gruß ${nameOf(S.me)} (über Florian HQ)`};
       render(); }
   }
-  else if(kind==='contact'){
-    const user_id=val('ct-user')||null, phone=val('ct-phone');
-    if(phone && !waNumber(phone)) return fail('contact','Die Nummer sieht unvollständig aus.');
-    if(!user_id && !phone) return fail('contact','Bitte eine Person oder eine Nummer angeben – oder „Entfernen“.');
-    const ok=await run('res_contacts', sb.from('res_contacts').upsert({key:fid,user_id,phone,updated_at:new Date().toISOString()}), 'Verantwortliche Person gespeichert');
-    if(ok){ S.contactEdit=null; S.errs.contact=null; render(); }
+  else if(kind==='assign'){
+    const nm=val('as-'+fid); if(nm.length<2) return fail('assign-'+fid,'Bitte Vor- und Nachnamen eintragen.');
+    const {error}=await sb.rpc('assign_add',{f:fid,nm});
+    if(error) return fail('assign-'+fid, error.message.replace(/^.*?:\s*/,''));
+    S.errs['assign-'+fid]=null; toast(nm+' eingetragen'); await Promise.all([load('role_assign'),load('profiles')]);
+    const e=document.getElementById('as-'+fid); if(e) e.value=''; route();
+  }
+  else if(kind==='rc-add'){
+    const nm=val('rc-n-'+fid), phone=val('rc-p-'+fid);
+    if(!nm&&!phone) return fail('rc-'+fid,'Bitte einen Namen oder eine Nummer eintragen.');
+    if(phone && !waNumber(phone)) return fail('rc-'+fid,'Die Nummer sieht unvollständig aus.');
+    const p=people().find(x=>(x.name||'').trim().toLowerCase()===nm.trim().toLowerCase());
+    const ok=await ins('res_contacts',{key:fid,user_id:p?p.id:null,name:p?'':nm,phone},(nm||'Nummer')+' hinzugefügt');
+    if(ok){ S.errs['rc-'+fid]=null; ['rc-n-','rc-p-'].forEach(k=>{const e=document.getElementById(k+fid); if(e) e.value='';}); }
   }
   else if(kind==='ice'){
     const date=val('ice-date'), time=val('ice-time'), bags=parseInt(val('ice-bags'),10), purpose=val('ice-why');
