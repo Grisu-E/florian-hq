@@ -597,7 +597,7 @@ function orgTree(r){
   const hue=orgHueMap(), kids=orgChildren(r.id);
   return `<div class="ot-tree ${kids.length>1?'':'solo'}">
     ${otNode(r,'root',null)}
-    ${kids.length?`<ul class="ot-h">${kids.map(k=>`<li>${otNode(k,'l1',hue[k.id])}${otVert(k.id,hue[k.id],1)}${orgAddBtn(k)}</li>`).join('')}</ul>`:''}
+    ${kids.length?`<ul class="ot-h">${kids.map(k=>`<li class="hue${hue[k.id]??'r'}">${otNode(k,'l1',hue[k.id])}${otVert(k.id,hue[k.id],1)}${orgAddBtn(k)}</li>`).join('')}</ul>`:''}
   </div>`;
 }
 function renderOrg(){
