@@ -189,7 +189,7 @@ function renderTiles(){
   const clOpen=D('clothing_requests').filter(x=>x.status==='offen');
   $('#tiles-me').innerHTML =
     tile('me','Meine Seite', myOpenDuties?`${myOpenDuties} Dienste ohne Rückmeldung`:'Dienste, Fristen, Kalender',{attr:'data-goto="me"',alert:myOpenDuties>0}) +
-    tile('quiz','Wissenstest & Leistungsabzeichen', `${D('quiz_questions').length} Übungsfragen`,{attr:'data-goto="quiz"'}) +
+    tile('quiz','Wissenstest & Leistungs\u00ADabzeichen', `${D('quiz_questions').length} Übungsfragen`,{attr:'data-goto="quiz"'}) +
     tile('clothing','Kleiderkammer', mgr()?(clOpen.length?`${clOpen.length} offene Anfragen`:'Nichts offen'):'Größen & Bedarf melden',{attr:'data-goto="clothing"',alert:mgr()&&clOpen.length>0});
 }
 function catTile(c,n){
