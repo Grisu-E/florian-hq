@@ -14,6 +14,9 @@ const ICONS = {
   'duty-jugend':'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></svg>',
   events:'<svg viewBox="0 0 24 24"><path d="M4 21V4"/><path d="M4 4h13l-2.5 4L17 12H4"/><path d="M9 21h6M12 15v6"/></svg>',
   expenses:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M15 15h3"/><path d="M7 3h10"/></svg>',
+  me:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg>',
+  quiz:'<svg viewBox="0 0 24 24"><path d="M12 3l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.3 6.8 19l1-5.8L3.6 9.1l5.8-.8z"/></svg>',
+  clothing:'<svg viewBox="0 0 24 24"><path d="M8 3l4 3 4-3 5 4-3 4-2-1.5V21H8V9.5L6 11 3 7z"/></svg>',
   who:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.2 5 2.6 5 5.8"/></svg>',
   org:'<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></svg>',
   lead:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M4 4l2 2M20 4l-2 2"/></svg>',
@@ -28,10 +31,10 @@ const CATS = [
 ];
 const DUTY = {'duty-aktive':{g:'aktive',n:'Dienstplan Aktive'}, 'duty-jugend':{g:'jugend',n:'Dienstplan Jugend'}};
 const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'Bearbeiter'};
-const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','who','doc','members','defects','push','lead','expenses'];
+const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','who','doc','members','me','quiz','clothing','defects','push','lead','expenses'];
 const catName = k => k==='eis'?'Crushed-Eis':((CATS.find(c=>c.k===k)||{}).n || k);
 
-const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance','expenses','res_contacts'];
+const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance','expenses','res_contacts','absences','clothing_sizes','clothing_requests','quiz_questions','quiz_results','cal_tokens'];
 const S = {
   view:'home', openCat:null, data:{}, loaded:{},
   me:null, profile:null,
@@ -179,6 +182,12 @@ function renderTiles(){
       tile('members','Mitglieder', waiting?`${waiting} warten auf Freigabe`:`${D('profiles').filter(p=>p.role!=='pending').length} Mitglieder`,{attr:'data-goto="members"',alert:waiting>0});
   }
   $('#tiles-org').innerHTML = org;
+  const myOpenDuties=D('duties').filter(d=>d.date>=t&&!D('duty_rsvp').some(r=>r.dutyId===d.id&&r.userId===S.me)&&d.date<=addDays(t,14)).length;
+  const clOpen=D('clothing_requests').filter(x=>x.status==='offen');
+  $('#tiles-me').innerHTML =
+    tile('me','Meine Seite', myOpenDuties?`${myOpenDuties} Dienste ohne Rückmeldung`:'Dienste, Fristen, Kalender',{attr:'data-goto="me"',alert:myOpenDuties>0}) +
+    tile('quiz','Wissenstest & Leistungsabzeichen', `${D('quiz_questions').length} Übungsfragen`,{attr:'data-goto="quiz"'}) +
+    tile('clothing','Kleiderkammer', mgr()?(clOpen.length?`${clOpen.length} offene Anfragen`:'Nichts offen'):'Größen & Bedarf melden',{attr:'data-goto="clothing"',alert:mgr()&&clOpen.length>0});
 }
 function catTile(c,n){
   const items=D('items').filter(i=>i.cat===c.k).length;
@@ -358,7 +367,7 @@ function rsvpBlock(d, past){
       <span class="chip done">${cnt('yes')} kommen</span><span class="chip open">${cnt('maybe')} vielleicht</span><span class="chip busy">${cnt('no')} nicht</span>
       <span class="rsvp-more">${open?'Namen ausblenden':'Wer kommt?'}</span>
     </button>
-    ${open?`<div class="rsvp-names"><p><b>Kommen:</b> ${names('yes')}</p><p><b>Vielleicht:</b> ${names('maybe')}</p><p><b>Kommen nicht:</b> ${names('no')}</p></div>`:''}
+    ${open?`<div class="rsvp-names"><p><b>Kommen:</b> ${names('yes')}</p><p><b>Vielleicht:</b> ${names('maybe')}</p><p><b>Kommen nicht:</b> ${names('no')}</p>${mgr()&&absOn(d.date).length?`<p><b>Abgemeldet:</b> ${[...new Set(absOn(d.date).map(a=>a.userId))].map(u=>esc(nameOf(u))).join(', ')}</p>`:''}</div>`:''}
   </div>`;
 }
 async function setRsvp(dutyId,status){
@@ -373,7 +382,7 @@ function renderDuty(viewKey){
   const upcoming=all.filter(d=>d.date>=t), past=all.filter(d=>d.date<t).reverse();
   let html=`<div class="panel"><div class="panel-head">
     <div><h2>${esc(n)}</h2><p class="sub">${g==='jugend'?'Übungsabende und Termine der Jugendfeuerwehr.':'Übungsdienste und Termine der aktiven Mannschaft.'}</p>${lockNote()}</div>
-    ${mgr()?`<div class="actions"><button class="btn primary" data-act="open-form" data-form="${fk}">+ Dienst eintragen</button></div>`:''}</div>`;
+    <div class="actions"><button class="btn ghost" data-goto="me" title="Kalender-Abo auf Meine Seite">📅 In meinen Kalender</button>${mgr()?`<button class="btn primary" data-act="open-form" data-form="${fk}">+ Dienst eintragen</button>`:''}</div></div>`;
   if(S.openForm===fk && mgr()){
     html+=`<form class="inline" data-form="duty" data-group="${g}">
       <label for="${fk}-date">Datum<input type="date" id="${fk}-date" required></label>
@@ -662,7 +671,7 @@ function renderDefects(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)'],['meine_fristen','Meine eigenen Fristen'],['expenses','Private Ausgaben'],['reservations','Reservierungen, für die ich verantwortlich bin']];
+const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (nur Bearbeiter)'],['fristen','Fristen-Erinnerung (nur Bearbeiter)'],['meine_fristen','Meine eigenen Fristen'],['expenses','Private Ausgaben'],['reservations','Reservierungen, für die ich verantwortlich bin'],['kleider','Kleiderkammer-Anfragen (nur Bearbeiter)']];
 const pushSupported=()=>('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 const isStandalone=()=>matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
@@ -713,7 +722,7 @@ function renderPush(){
       <div style="padding:0 20px 20px"><button class="btn primary" data-act="push-on">🔔 Benachrichtigungen einschalten</button></div>`;
   } else {
     body = `<div class="row"><div class="info"><h3>Benachrichtigungen sind an</h3><p class="note">Wähle, worüber du informiert werden willst. Gilt nur für dieses Gerät.</p></div><div class="actions"><button class="btn danger small" data-act="push-off">Alle ausschalten</button></div></div>
-      ${PUSH_CATS.filter(([k])=>(k!=='defects'&&k!=='fristen')||mgr()).map(([k,n])=>{const on=(row.prefs||{})[k]!==false;return `<div class="row"><div class="info"><h3 style="font-size:16px">${esc(n)}</h3></div><div class="actions"><button class="switch" role="switch" aria-checked="${on}" data-act="push-pref" data-key="${k}" aria-label="${esc(n)}"><span></span></button></div></div>`;}).join('')}`;
+      ${PUSH_CATS.filter(([k])=>(k!=='defects'&&k!=='fristen'&&k!=='kleider')||mgr()).map(([k,n])=>{const on=(row.prefs||{})[k]!==false;return `<div class="row"><div class="info"><h3 style="font-size:16px">${esc(n)}</h3></div><div class="actions"><button class="switch" role="switch" aria-checked="${on}" data-act="push-pref" data-key="${k}" aria-label="${esc(n)}"><span></span></button></div></div>`;}).join('')}`;
   }
   return `<div class="panel"><div class="panel-head"><div><h2>Benachrichtigungen</h2><p class="sub">Push-Meldungen aufs Handy oder den Computer.</p></div></div>${body}</div>`;
 }
@@ -730,14 +739,14 @@ function typeOpts(k,sel){ return qTypes(k).map(t=>`<option value="${esc(t.id)}" 
 
 function renderLead(){
   if(!mgr()) return `<div class="panel"><div class="empty"><strong>Nur für Bearbeiter.</strong></div></div>`;
-  const tabs=[['catalog','Fristen'],['attend','Übungsbeteiligung']];
+  const tabs=[['catalog','Fristen'],['attend','Übungsbeteiligung'],['avail','Verfügbarkeit']];
   if(!tabs.some(([k])=>k===S.leadTab)) S.leadTab='catalog';
   const fr=D('member_quals').filter(q=>D('qual_types').find(t=>t.id===q.typeId&&t.kind==='frist'));
   const red=fr.filter(q=>fristState(q).k===0).length, yel=fr.filter(q=>fristState(q).k===1).length;
   let html=`<div class="panel"><div class="panel-head"><div><h2>Führung</h2><p class="sub">Nur für Bearbeiter sichtbar. Fristen und Übungsbeteiligung der Mannschaft.</p></div>
     <div class="actions">${red?`<span class="chip busy">${red} abgelaufen</span>`:''}${yel?`<span class="chip open">${yel} bald fällig</span>`:''}</div></div>
     <div class="org-tools"><div class="filters">${tabs.map(([k,n])=>`<button class="filter" data-act="lead-tab" data-key="${k}" aria-pressed="${S.leadTab===k}">${n}</button>`).join('')}</div></div></div>`;
-  html += S.leadTab==='attend'?leadAttend() : leadCatalog();
+  html += S.leadTab==='attend'?leadAttend() : S.leadTab==='avail'?leadAvail() : leadCatalog();
   return loadingOr(['qual_types','member_quals','duty_attendance','profiles'], html);
 }
 // Frühere Fristen-Gesamtliste (ersetzt durch den aufklappbaren Katalog)
@@ -1000,13 +1009,218 @@ function renderDocs(){
   }).join('')}</div>`;
 }
 
+/* =====================================================================
+   v6: Meine Seite · Abwesenheiten · Kalender-Abo · Kleiderkammer · Wissenstest
+   ===================================================================== */
+const ABS = {urlaub:'Urlaub', schicht:'Schicht / Arbeit', beruflich:'Beruflich unterwegs', krank:'Krank', sonstiges:'Sonstiges'};
+const myName = () => (S.profile&&S.profile.name)||'';
+const absOn = (date,uid) => D('absences').filter(a=>a.starts<=date && a.ends>=date && (!uid||a.userId===uid));
+const fmtSpan = (a,b) => a===b?fmtDay(a):`${fmtDay(a)} – ${fmtDay(b)}`;
+
+/* ---------- Kalender-Abo ---------- */
+function myCalToken(){ const r=D('cal_tokens').find(x=>x.userId===S.me); return r&&r.token; }
+async function ensureCalToken(){
+  if(myCalToken()) return myCalToken();
+  const {error}=await sb.from('cal_tokens').insert({user_id:S.me});
+  if(error && !/duplicate/i.test(error.message)){ toast(errText(error)); return null; }
+  await load('cal_tokens'); return myCalToken();
+}
+function calUrl(g,scheme='https'){
+  const tok=myCalToken(); if(!tok) return '';
+  const base=CFG.supabaseUrl.replace(/^https?:\/\//,'')+'/functions/v1/ical';
+  return `${scheme}://${base}?t=${tok}&g=${g}`;
+}
+function calBlock(){
+  const tok=myCalToken();
+  if(!tok) return `<div class="me-card"><h3>📅 Dienstplan im Handy-Kalender</h3><p class="note">Einmal abonnieren – alle Dienste und Veranstaltungen erscheinen automatisch in deinem Kalender und bleiben aktuell.</p><button class="btn primary" data-act="cal-create">Kalender-Link erstellen</button></div>`;
+  const opt=(g,n)=>`<div class="cal-opt"><b>${n}</b><div class="actions"><a class="btn primary small" href="${esc(calUrl(g,'webcal'))}">📅 Abonnieren</a><button class="btn ghost small" data-act="copy" data-v="${esc(calUrl(g))}">Link kopieren</button></div></div>`;
+  return `<div class="me-card"><h3>📅 Dienstplan im Handy-Kalender</h3>
+    <p class="note">„Abonnieren“ antippen – iPhone und Mac fragen dann, ob der Kalender hinzugefügt werden soll. Bei <b>Google Kalender</b>: „Link kopieren“ und am Computer unter <i>Weitere Kalender → Per URL</i> einfügen. Der Kalender aktualisiert sich selbst.</p>
+    ${opt('aktive','Aktive + Veranstaltungen')}${opt('jugend','Jugend + Veranstaltungen')}${opt('alle','Alles (Aktive, Jugend, Veranstaltungen)')}
+    <p class="sub" style="margin:8px 0 0">Der Link ist persönlich – bitte nicht weitergeben.</p></div>`;
+}
+
+/* ---------- Abwesenheiten ---------- */
+function absForm(){
+  const t=today();
+  return `<form class="inline" data-form="absence">
+    <label for="ab-from">Von<input type="date" id="ab-from" required value="${t}"></label>
+    <label for="ab-to">Bis<input type="date" id="ab-to" required value="${t}"></label>
+    <label for="ab-why">Grund<select id="ab-why">${Object.entries(ABS).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select></label>
+    <label for="ab-note">Notiz<input id="ab-note" maxlength="140" placeholder="optional, z. B. nur tagsüber"></label>
+    <div class="form-actions"><button class="btn primary" type="submit">Abwesenheit eintragen</button></div>
+    ${errP('absence')}</form>`;
+}
+function absRow(a,withName){
+  const t=today(); const now=a.starts<=t&&a.ends>=t;
+  return `<div class="row ${a.ends<t?'past':''}"><div class="info">
+      <div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center"><h3 style="font-size:16px">${withName?esc(nameOf(a.userId))+' · ':''}${esc(fmtSpan(a.starts,a.ends))}</h3><span class="chip ${now?'busy':'open'}">${now?'jetzt abwesend':esc(ABS[a.reason]||a.reason)}</span></div>
+      <p class="note">${esc(ABS[a.reason]||a.reason)}${a.note?' · '+esc(a.note):''}</p></div>
+    <div class="actions">${(a.userId===S.me||mgr())?delBtn('absences',a.id,'Entfernen'):''}</div></div>`;
+}
+function leadAvail(){
+  const t=today(); const in14=addDays(t,14);
+  const cur=D('absences').filter(a=>a.ends>=t).sort((a,b)=>a.starts.localeCompare(b.starts));
+  const todayAbs=absOn(t);
+  const days=[...Array(14)].map((_,i)=>addDays(t,i));
+  const ppl=people();
+  let html=`<div class="panel"><div class="panel-head"><div><h3>Heute verfügbar</h3><p class="sub">${ppl.length-new Set(todayAbs.map(a=>a.userId)).size} von ${ppl.length} Mitgliedern · Abwesenheiten tragen die Kameraden auf „Meine Seite“ selbst ein.</p></div></div>
+    <div class="avail-strip">${days.map(d=>{const n=new Set(absOn(d).map(a=>a.userId)).size; const duty=D('duties').some(x=>x.date===d);
+      return `<div class="av-day ${n?'has':''}" title="${esc(fmtDayLong(d))}: ${n} abwesend"><span class="wd">${esc(new Date(d+'T00:00').toLocaleDateString('de-DE',{weekday:'short'}).replace('.',''))}</span><span class="d">${new Date(d+'T00:00').getDate()}</span><span class="n">${n?'−'+n:'✓'}</span>${duty?'<span class="dutydot" title="Dienst"></span>':''}</div>`;}).join('')}</div>`;
+  html+= cur.length?cur.map(a=>absRow(a,true)).join(''):`<div class="empty"><strong>Niemand hat sich abgemeldet.</strong>Alle sind in den nächsten Wochen verfügbar.</div>`;
+  return html+'</div>';
+}
+function addDays(d,n){ const x=new Date(d+'T00:00'); x.setDate(x.getDate()+n); return `${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`; }
+
+/* ---------- Meine Seite ---------- */
+function renderMe(){
+  const t=today(), n=nowISO();
+  const duties=D('duties').filter(d=>d.date>=t).sort((a,b)=>(a.date+(a.time||'')).localeCompare(b.date+(b.time||''))).slice(0,6);
+  const myQ=D('member_quals').filter(q=>q.userId===S.me).map(q=>({q,t:D('qual_types').find(x=>x.id===q.typeId)})).filter(x=>x.t&&x.t.kind==='frist');
+  const tasks=(orgPersons().find(([p])=>p.toLowerCase()===myName().toLowerCase())||[null,[]])[1];
+  const myRes=D('reservations').filter(r=>r.by===S.me&&r.to>n).sort((a,b)=>a.from.localeCompare(b.from));
+  const myEx=D('expenses').filter(x=>x.userId===S.me&&x.status==='offen');
+  const myCl=D('clothing_requests').filter(x=>x.userId===S.me&&x.status!=='ausgegeben'&&x.status!=='abgelehnt');
+  const myAbs=D('absences').filter(a=>a.userId===S.me&&a.ends>=t).sort((a,b)=>a.starts.localeCompare(b.starts));
+  const best=c=>{const r=D('quiz_results').filter(x=>x.userId===S.me&&x.cat===c); return r.length?Math.max(...r.map(x=>Math.round(100*x.score/x.total))):null;};
+  const absToday=absOn(t,S.me).length>0;
+  let html=`<div class="panel me-head"><div class="panel-head"><div style="display:flex;gap:14px;align-items:center"><span class="av big">${esc(initials(myName()||'?'))}</span><div><h2>Hallo ${esc((myName().split(' ')[0])||'')}!</h2><p class="sub">${esc(ROLE_NAME[S.profile.role]||'')}${S.profile.treasurer?' · Kassier':''}${absToday?' · <b>heute abgemeldet</b>':''}</p></div></div>
+    <div class="actions"><button class="btn ghost" data-goto="push">🔔 Benachrichtigungen</button></div></div></div>
+  <div class="me-grid">`;
+  // Dienste
+  html+=`<div class="me-card span2"><h3>Meine nächsten Dienste</h3>${duties.length?duties.map(d=>{const my=D('duty_rsvp').find(r=>r.dutyId===d.id&&r.userId===S.me); const ab=absOn(d.date,S.me).length;
+      return `<div class="me-duty">${dateBox(d.date)}<div class="info"><b>${esc(d.topic)}</b><span class="sub">${esc(d.group==='jugend'?'Jugend':'Aktive')} · ${esc(d.time||'')} Uhr${d.place?' · '+esc(d.place):''}${ab?' · <span class="chip busy">abgemeldet</span>':''}</span>
+        <div class="rsvp-btns sm">${Object.entries(RSVP).map(([k,v])=>`<button class="rsvp-btn ${k}" data-act="rsvp" data-id="${esc(d.id)}" data-status="${k}" aria-pressed="${my&&my.status===k?'true':'false'}">${v.i} ${v.n}</button>`).join('')}</div></div></div>`;}).join(''):'<p class="note">Keine kommenden Dienste.</p>'}</div>`;
+  // Abwesenheit
+  html+=`<div class="me-card span2"><h3>Abwesenheit melden</h3><p class="note">Urlaub, Schicht oder krank? Nur du und die Führung sehen das.</p>${absForm()}${myAbs.length?`<div class="me-list">${myAbs.map(a=>absRow(a,false)).join('')}</div>`:''}</div>`;
+  // Fristen
+  html+=`<div class="me-card"><h3>Meine Fristen</h3>${myQ.length?myQ.map(({q,t})=>{const s=fristState(q);return `<div class="me-line"><span><span class="dot-st ${s.c}"></span>${esc(t.name)}</span><span class="sub">${q.expires?'bis '+esc(fmtDate(q.expires)):''} · ${esc(s.n)}</span></div>`;}).join(''):'<p class="note">Keine Fristen hinterlegt.</p>'}</div>`;
+  // Aufgaben
+  html+=`<div class="me-card"><h3>Meine Aufgaben</h3>${tasks.length?`<div class="ptasks">${tasks.map(x=>`<button class="tchip hue${x.hue??'r'}" data-act="org-open" data-id="${esc((x.area||x.n).id)}">${esc(x.n.role)}</button>`).join('')}</div>`:'<p class="note">Im Organigramm ist dir (noch) keine Aufgabe zugeordnet.</p>'}</div>`;
+  // Offenes
+  html+=`<div class="me-card"><h3>Offen bei mir</h3>
+    <div class="me-line"><span>Reservierungen</span><span class="sub">${myRes.length?esc(myRes.map(r=>r.itemName).slice(0,3).join(', ')):'keine'}</span></div>
+    <div class="me-line link" data-goto="expenses"><span>Auslagen offen</span><span class="sub">${myEx.length?myEx.length+' · '+eur(myEx.reduce((s,x)=>s+(+x.amount||0),0)):'keine'} ›</span></div>
+    <div class="me-line link" data-goto="clothing"><span>Kleiderkammer</span><span class="sub">${myCl.length?myCl.length+' Anfrage(n)':'nichts offen'} ›</span></div>
+    <div class="me-line link" data-goto="quiz"><span>Wissenstest-Training</span><span class="sub">${best('wissenstest')!=null?'Bestwert '+best('wissenstest')+' %':'noch nicht geübt'} ›</span></div></div>`;
+  html+=calBlock();
+  return loadingOr(['duties','absences'], html+'</div>');
+}
+
+/* ---------- Kleiderkammer ---------- */
+const CLOTH_SIZES=[['jacke','Einsatzjacke'],['hose','Einsatzhose'],['stiefel','Stiefel (Schuhgröße)'],['handschuhe','Handschuhe'],['helm','Helm (Kopfumfang)'],['shirt','T-Shirt / Polo'],['pullover','Pullover / Softshell']];
+const CLOTH_ITEMS=['Einsatzjacke','Einsatzhose','Stiefel','Handschuhe','Helm','Flammschutzhaube','T-Shirt','Poloshirt','Pullover / Softshell','Dienstkleidung / Uniform','Mütze / Cap','Sonstiges'];
+const CLOTH_MAP={'Einsatzjacke':'jacke','Einsatzhose':'hose','Stiefel':'stiefel','Handschuhe':'handschuhe','Helm':'helm','T-Shirt':'shirt','Poloshirt':'shirt','Pullover / Softshell':'pullover'};
+const CST={offen:{n:'offen',c:'open'},bestellt:{n:'bestellt',c:'ice'},ausgegeben:{n:'ausgegeben',c:'done'},abgelehnt:{n:'abgelehnt',c:'busy'}};
+const mySizes=()=>((D('clothing_sizes').find(x=>x.userId===S.me)||{}).sizes)||{};
+function renderClothing(){
+  const sz=mySizes(); const mine=D('clothing_requests').filter(x=>x.userId===S.me).sort((a,b)=>(b.createdAt||'').localeCompare(a.createdAt||''));
+  let html=`<div class="panel"><div class="panel-head"><div><h2>Kleiderkammer</h2><p class="sub">Trag deine Größen einmal ein und melde, was du brauchst. Die Bearbeiter sehen alles gesammelt als Bestellliste.</p></div></div>
+    <div class="me-grid" style="padding:16px 20px 20px">
+    <div class="me-card"><h3>Meine Größen</h3><form class="inline sizes" data-form="sizes">${CLOTH_SIZES.map(([k,n])=>`<label for="sz-${k}">${n}<input id="sz-${k}" maxlength="12" value="${esc(sz[k]||'')}" placeholder="–"></label>`).join('')}
+      <div class="form-actions"><button class="btn primary" type="submit">Größen speichern</button></div></form></div>
+    <div class="me-card"><h3>Ich brauche …</h3><form class="inline" data-form="cloth-req">
+      <label for="cr-item">Was<select id="cr-item">${CLOTH_ITEMS.map(i=>`<option>${esc(i)}</option>`).join('')}</select></label>
+      <label for="cr-size">Größe<input id="cr-size" maxlength="20" value="${esc(sz.jacke||'')}" placeholder="z. B. 52 oder L"></label>
+      <label for="cr-qty">Anzahl<input id="cr-qty" type="number" min="1" max="20" value="1"></label>
+      <label for="cr-note">Hinweis<input id="cr-note" maxlength="140" placeholder="z. B. alte Jacke gerissen"></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Bedarf melden</button></div>${errP('cloth')}</form></div>
+    </div>`;
+  if(mine.length) html+=`<div class="day-head"><span class="when">Meine Anfragen</span></div>`+mine.map(x=>clothRow(x,false)).join('');
+  if(mgr()){
+    const open=D('clothing_requests').filter(x=>x.status==='offen'||x.status==='bestellt');
+    const sum={}; open.filter(x=>x.status==='offen').forEach(x=>{const k=x.item+(x.size?' · Gr. '+x.size:''); sum[k]=(sum[k]||0)+(+x.qty||1);});
+    html+=`<div class="day-head"><span class="when">Bestellliste (offen)</span><span class="count">nur Bearbeiter</span></div>`+
+      (Object.keys(sum).length?`<div class="order-list">${Object.entries(sum).sort().map(([k,q])=>`<span class="order-item"><b>${q}×</b> ${esc(k)}</span>`).join('')}</div>`:`<div class="empty" style="padding:16px 20px">Nichts zu bestellen.</div>`)+
+      `<div class="day-head"><span class="when">Alle offenen Anfragen (${open.length})</span></div>`+(open.length?open.map(x=>clothRow(x,true)).join(''):'')+
+      `<div class="day-head"><span class="when">Größen der Mannschaft</span><button class="btn ghost small" data-act="toggle-past" data-key="sizes">${S.showPast.sizes?'Ausblenden':'Anzeigen'}</button></div>`+
+      (S.showPast.sizes?`<div class="qtable-wrap"><table class="qtable"><thead><tr><th>Name</th>${CLOTH_SIZES.map(([,n])=>`<th>${esc(n.split(' ')[0])}</th>`).join('')}</tr></thead><tbody>${people().map(p=>{const s=((D('clothing_sizes').find(x=>x.userId===p.id)||{}).sizes)||{};return `<tr><th>${esc(p.name||'')}</th>${CLOTH_SIZES.map(([k])=>`<td>${esc(s[k]||'–')}</td>`).join('')}</tr>`;}).join('')}</tbody></table></div>`:'');
+  }
+  return loadingOr(['clothing_requests','clothing_sizes'], html+'</div>');
+}
+function clothRow(x,admin){
+  const st=CST[x.status]||CST.offen;
+  return `<div class="row"><div class="info"><div style="display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center"><h3 style="font-size:16px">${+x.qty||1}× ${esc(x.item)}${x.size?' · Gr. '+esc(x.size):''}</h3><span class="chip ${st.c}">${st.n}</span></div>
+    <p class="note">${admin?esc(nameOf(x.userId))+' · ':''}${esc(fmtDay(String(x.createdAt||'').slice(0,10)))}${x.note?' · '+esc(x.note):''}</p></div>
+    <div class="actions">${admin?`${x.status==='offen'?`<button class="btn small" data-act="cloth-st" data-id="${esc(x.id)}" data-status="bestellt">Bestellt</button>`:''}<button class="btn small primary" data-act="cloth-st" data-id="${esc(x.id)}" data-status="ausgegeben">Ausgegeben</button><button class="btn ghost small" data-act="cloth-st" data-id="${esc(x.id)}" data-status="abgelehnt">Ablehnen</button>`:''}${(x.userId===S.me&&x.status==='offen')||mgr()?delBtn('clothing_requests',x.id,'Löschen'):''}</div></div>`;
+}
+
+/* ---------- Wissenstest & Leistungsabzeichen ---------- */
+const QCAT={wissenstest:'Wissenstest',leistungsabzeichen:'Leistungsabzeichen'};
+S.quiz=null;
+function shuffle(a){ a=[...a]; for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function startQuiz(cat){
+  const qs=shuffle(D('quiz_questions').filter(q=>q.cat===cat)).slice(0,10);
+  if(!qs.length){ toast('Für diesen Bereich gibt es noch keine Fragen.'); return; }
+  S.quiz={cat,ids:qs.map(q=>q.id),i:0,picked:null,score:0,order:qs.map(q=>shuffle(q.options.map((_,k)=>k)))};
+}
+function renderQuiz(){
+  let html=`<div class="panel"><div class="panel-head"><div><h2>Wissenstest & Leistungsabzeichen</h2><p class="sub">Üben auf dem Handy – 10 zufällige Fragen pro Runde.</p></div>
+    ${mgr()?`<div class="actions"><button class="btn ${S.quizAdmin?'':'ghost'}" data-act="quiz-admin">${S.quizAdmin?'Fertig':'✎ Fragen verwalten'}</button></div>`:''}</div>`;
+  if(S.quizAdmin&&mgr()) return loadingOr(['quiz_questions'], html+quizAdmin()+'</div>');
+  const Q=S.quiz;
+  if(Q && Q.i<Q.ids.length){
+    const q=D('quiz_questions').find(x=>x.id===Q.ids[Q.i]); if(!q){ S.quiz=null; return renderQuiz(); }
+    const ord=Q.order[Q.i], done=Q.picked!=null;
+    html+=`<div class="quiz"><div class="quiz-top"><span class="chip ice">${esc(QCAT[Q.cat])}</span><span class="count">Frage ${Q.i+1} von ${Q.ids.length} · ${Q.score} richtig</span></div>
+      <div class="quiz-bar"><span style="width:${Math.round(100*Q.i/Q.ids.length)}%"></span></div>
+      <h3 class="quiz-q">${esc(q.question)}</h3>
+      <div class="quiz-opts">${ord.map(k=>{const cls=!done?'':(k===q.correct?'right':(k===Q.picked?'wrong':'dim'));return `<button class="quiz-opt ${cls}" data-act="quiz-pick" data-id="${k}" ${done?'disabled':''}>${esc(q.options[k])}</button>`;}).join('')}</div>
+      ${done?`<div class="quiz-exp ${Q.picked===q.correct?'ok':'no'}"><b>${Q.picked===q.correct?'Richtig! 🎉':'Leider falsch.'}</b> ${esc(q.explanation||'')}</div>
+        <div class="form-actions"><button class="btn primary" data-act="quiz-next">${Q.i+1<Q.ids.length?'Nächste Frage →':'Auswertung'}</button></div>`:''}
+      <button class="linkbtn" data-act="quiz-stop" style="margin-top:14px">Runde abbrechen</button></div>`;
+    return html+'</div>';
+  }
+  if(Q && Q.i>=Q.ids.length){
+    const pct=Math.round(100*Q.score/Q.ids.length);
+    html+=`<div class="quiz quiz-end"><div class="quiz-score ${pct>=80?'ok':pct>=50?'mid':'no'}">${pct} %</div><h3>${Q.score} von ${Q.ids.length} richtig</h3>
+      <p class="note">${pct===100?'Perfekt – du bist bereit! 💪':pct>=80?'Sehr gut, fast alles sitzt.':pct>=50?'Solide – noch eine Runde?':'Dranbleiben, Übung macht den Meister!'}</p>
+      <div class="form-actions" style="justify-content:center"><button class="btn primary" data-act="quiz-start" data-id="${Q.cat}">Nochmal üben</button><button class="btn ghost" data-act="quiz-stop">Zur Auswahl</button></div></div>`;
+    return html+'</div>';
+  }
+  const cnt=c=>D('quiz_questions').filter(q=>q.cat===c).length;
+  const mine=c=>D('quiz_results').filter(r=>r.userId===S.me&&r.cat===c);
+  html+=`<div class="quiz-pick">${Object.entries(QCAT).map(([c,n])=>{const r=mine(c); const best=r.length?Math.max(...r.map(x=>Math.round(100*x.score/x.total))):null;
+    return `<button class="quiz-card" data-act="quiz-start" data-id="${c}"><span class="qc-ico">${c==='wissenstest'?'🧠':'🏅'}</span><span class="qc-name">${n}</span><span class="sub">${cnt(c)} Fragen${best!=null?` · dein Bestwert ${best} %`:''}</span><span class="btn primary small">Los geht’s</span></button>`;}).join('')}</div>
+    <p class="sub" style="padding:0 20px 18px">Fragen ohne Gewähr – die Jugendwarte und Bearbeiter können Fragen ergänzen und korrigieren.</p>`;
+  if(mgr()){
+    const res=D('quiz_results'); const by={};
+    res.forEach(r=>{const k=r.userId+'|'+r.cat; const p=Math.round(100*r.score/r.total); if(!by[k]||p>by[k].p) by[k]={p,r,n:(by[k]?by[k].n:0)}; by[k].n=(by[k].n||0)+1;});
+    const rows=Object.values(by).sort((a,b)=>nameOf(a.r.userId).localeCompare(nameOf(b.r.userId),'de'));
+    html+=`<div class="day-head"><span class="when">Übungsstand der Mannschaft</span><span class="count">nur Bearbeiter</span></div>`+
+      (rows.length?rows.map(x=>`<div class="me-line" style="padding:10px 20px"><span>${esc(nameOf(x.r.userId))} · ${esc(QCAT[x.r.cat]||x.r.cat)}</span><span class="sub">Bestwert <b>${x.p} %</b> · ${x.n} Runde(n)</span></div>`).join(''):`<div class="empty" style="padding:16px 20px">Noch hat niemand geübt.</div>`);
+  }
+  return loadingOr(['quiz_questions'], html+'</div>');
+}
+function quizAdmin(){
+  const qs=[...D('quiz_questions')].sort((a,b)=>a.cat.localeCompare(b.cat)||(a.createdAt||'').localeCompare(b.createdAt||''));
+  return `<form class="inline" data-form="quiz-q" style="margin:14px 20px">
+      <label for="qq-cat">Bereich<select id="qq-cat">${Object.entries(QCAT).map(([k,n])=>`<option value="${k}">${n}</option>`).join('')}</select></label>
+      <label for="qq-q" class="span-all">Frage<input id="qq-q" required maxlength="200"></label>
+      ${[0,1,2,3].map(i=>`<label for="qq-o${i}">Antwort ${String.fromCharCode(65+i)}${i<2?'':' (optional)'}<input id="qq-o${i}" maxlength="120" ${i<2?'required':''}></label>`).join('')}
+      <label for="qq-ok">Richtig ist<select id="qq-ok">${[0,1,2,3].map(i=>`<option value="${i}">Antwort ${String.fromCharCode(65+i)}</option>`).join('')}</select></label>
+      <label for="qq-exp" class="span-all">Erklärung<input id="qq-exp" maxlength="240" placeholder="wird nach dem Antworten angezeigt"></label>
+      <div class="form-actions"><button class="btn primary" type="submit">Frage hinzufügen</button></div>${errP('quiz')}</form>
+    ${qs.map(q=>`<div class="row"><div class="info"><span class="chip ice">${esc(QCAT[q.cat])}</span><h3 style="font-size:15px;margin-top:6px">${esc(q.question)}</h3><p class="note">✓ ${esc(q.options[q.correct]||'')}</p></div><div class="actions">${delBtn('quiz_questions',q.id)}</div></div>`).join('')}`;
+}
+async function quizPick(k){
+  const Q=S.quiz; if(!Q||Q.picked!=null) return;
+  const q=D('quiz_questions').find(x=>x.id===Q.ids[Q.i]); Q.picked=k; if(q&&k===q.correct) Q.score++;
+  render();
+}
+async function quizNext(){
+  const Q=S.quiz; if(!Q) return; Q.i++; Q.picked=null;
+  if(Q.i>=Q.ids.length) await run('quiz_results', sb.from('quiz_results').insert({cat:Q.cat,score:Q.score,total:Q.ids.length}));
+  render(); window.scrollTo({top:0,behavior:'smooth'});
+}
+
 /* ---------- Gesamt-Render ---------- */
 function render(){
   if(!isMember()) return;
   const v=S.view;
   $('#view-home').hidden = v!=='home';
   $('#view-doc').hidden = v!=='doc';
-  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','who','members','defects','push','lead','expenses'].includes(v);
+  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','who','members','me','quiz','clothing','defects','push','lead','expenses'].includes(v);
   const waiting=D('profiles').filter(p=>p.role==='pending').length;
   $('#me-name').textContent=S.profile.name||'';
   $('#me-role').textContent=ROLE_NAME[S.profile.role]||'';
@@ -1019,7 +1233,7 @@ function render(){
   } else if(v!=='doc'){
     const page=$('#view-page'); const snap=snapshotForm(page);
     if(S.skipRestore){ snap.vals={}; snap.focus=null; }
-    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg('areas') : v==='who'?renderOrg('people') : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : v==='expenses'?renderExpenses() : renderDuty(v));
+    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg('areas') : v==='who'?renderOrg('people') : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : v==='expenses'?renderExpenses() : v==='me'?renderMe() : v==='quiz'?renderQuiz() : v==='clothing'?renderClothing() : renderDuty(v));
     restoreForm(page,snap); S.skipRestore=false;
   }
   renderDocs();
@@ -1037,7 +1251,7 @@ function go(view){
 }
 
 /* ---------- Klicks ---------- */
-const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',docs:'Liste gelöscht',news:'Beitrag gelöscht',duties:'Dienst gelöscht',events:'Veranstaltung gelöscht',shifts:'Arbeitsdienst gelöscht',ice:'Eis-Anmeldung storniert',org:'Funktion entfernt',defects:'Mangel gelöscht',member_quals:'Eintrag entfernt',expenses:'Ausgabe gelöscht',qual_types:'Aus dem Katalog entfernt'};
+const DEL_MSG={items:'Eintrag gelöscht',reservations:'Reservierung storniert',docs:'Liste gelöscht',news:'Beitrag gelöscht',duties:'Dienst gelöscht',events:'Veranstaltung gelöscht',shifts:'Arbeitsdienst gelöscht',ice:'Eis-Anmeldung storniert',org:'Funktion entfernt',defects:'Mangel gelöscht',member_quals:'Eintrag entfernt',expenses:'Ausgabe gelöscht',qual_types:'Aus dem Katalog entfernt',absences:'Abwesenheit entfernt',clothing_requests:'Anfrage gelöscht',quiz_questions:'Frage gelöscht'};
 
 document.addEventListener('click', async e=>{
   const gt=e.target.closest('[data-goto]'); if(gt){ go(gt.dataset.goto); return; }
@@ -1120,6 +1334,13 @@ document.addEventListener('click', async e=>{
   }
   else if(act==='push-on'){ await enablePush(); }
   else if(act==='push-off'){ await disablePush(); }
+  else if(act==='cal-create'){ await ensureCalToken(); render(); }
+  else if(act==='cloth-st'){ await upd('clothing_requests',id,{status:b.dataset.status,done_by:S.me},'Status: '+(CST[b.dataset.status]||{}).n); }
+  else if(act==='quiz-start'){ startQuiz(id); render(); window.scrollTo({top:0}); }
+  else if(act==='quiz-pick'){ await quizPick(+id); }
+  else if(act==='quiz-next'){ await quizNext(); }
+  else if(act==='quiz-stop'){ S.quiz=null; render(); }
+  else if(act==='quiz-admin'){ S.quizAdmin=!S.quizAdmin; S.quiz=null; render(); }
   else if(act==='push-pref'){ await setPushPref(b.dataset.key, b.getAttribute('aria-checked')!=='true'); }
   else if(act==='edit-org'){ S.editOrg=id; S.orgParent=null; S.errs={}; S.skipRestore=true; render(); const f=document.getElementById('org-role'); if(f){ f.focus({preventScroll:true}); f.closest('form').scrollIntoView({block:'center'}); } }
   else if(act==='org-add-under'){ S.editOrg='new'; S.orgParent=id; S.errs={}; S.skipRestore=true; render(); const f=document.getElementById('org-role'); if(f){ f.focus({preventScroll:true}); f.closest('form').scrollIntoView({block:'center'}); } }
@@ -1152,6 +1373,7 @@ async function setRole(id,role){
 }
 $('#lightbox').addEventListener('click',()=>{$('#lightbox').hidden=true});
 document.addEventListener('keydown',e=>{ if(e.key==='Escape') $('#lightbox').hidden=true; });
+document.addEventListener('change',e=>{ if(e.target.id==='cr-item'){ const k=CLOTH_MAP[e.target.value]; const f=document.getElementById('cr-size'); if(f) f.value=k?(mySizes()[k]||''):''; } });
 document.addEventListener('input',e=>{ if(e.target.id==='org-q'){ S.orgQ=e.target.value; render(); } });
 window.addEventListener('hashchange',()=>{ const v=location.hash.slice(1); if(VIEWS.includes(v) && v!==S.view && isMember()) go(v); });
 
@@ -1260,6 +1482,32 @@ document.addEventListener('submit', async e=>{
     const rows=people().map(p=>({duty_id:fid,user_id:p.id,present:!!(document.getElementById('att-'+p.id)||{}).checked}));
     const ok=await run('duty_attendance', sb.from('duty_attendance').upsert(rows,{onConflict:'duty_id,user_id'}), rows.filter(r=>r.present).length+' anwesend gespeichert');
     if(ok){ S.attDuty=null; render(); }
+  }
+  else if(kind==='absence'){
+    const starts=val('ab-from'), ends=val('ab-to'), reason=val('ab-why'), note=val('ab-note');
+    if(!starts||!ends) return fail('absence','Bitte Von und Bis angeben.');
+    if(ends<starts) return fail('absence','„Bis“ darf nicht vor „Von“ liegen.');
+    const ok=await ins('absences',{starts,ends,reason,note},'Abwesenheit eingetragen');
+    if(ok){ S.errs.absence=null; const n=document.getElementById('ab-note'); if(n) n.value=''; render(); }
+  }
+  else if(kind==='sizes'){
+    const sizes={}; CLOTH_SIZES.forEach(([k])=>{ const v=val('sz-'+k); if(v) sizes[k]=v; });
+    await run('clothing_sizes', sb.from('clothing_sizes').upsert({user_id:S.me,sizes,updated_at:new Date().toISOString()}), 'Größen gespeichert');
+  }
+  else if(kind==='cloth-req'){
+    const item=val('cr-item'), size=val('cr-size'), qty=parseInt(val('cr-qty'),10)||1, note=val('cr-note');
+    if(item==='Sonstiges'&&!note) return fail('cloth','Bitte unter „Hinweis“ schreiben, was du brauchst.');
+    const ok=await ins('clothing_requests',{item,size,qty,note},'Bedarf gemeldet');
+    if(ok){ S.errs.cloth=null; render(); }
+  }
+  else if(kind==='quiz-q'){
+    const opts=[0,1,2,3].map(i=>val('qq-o'+i)); const okIdx=+val('qq-ok');
+    const options=opts.filter(Boolean); const question=val('qq-q');
+    if(!question||options.length<2) return fail('quiz','Bitte Frage und mindestens zwei Antworten eintragen.');
+    if(!opts[okIdx]) return fail('quiz','Die als richtig markierte Antwort ist leer.');
+    const correct=options.indexOf(opts[okIdx]);
+    const ok=await ins('quiz_questions',{cat:val('qq-cat'),question,options,correct,explanation:val('qq-exp')},'Frage hinzugefügt');
+    if(ok){ S.errs.quiz=null; S.skipRestore=true; render(); }
   }
   else if(kind==='expense'){
     const spent_on=val('ex-date'), purpose=val('ex-purpose');
