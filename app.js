@@ -14,6 +14,7 @@ const ICONS = {
   'duty-jugend':'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="1.5"/><path d="M3 10h18M8 3v4M16 3v4"/><path d="m9 15 2 2 4-4"/></svg>',
   events:'<svg viewBox="0 0 24 24"><path d="M4 21V4"/><path d="M4 4h13l-2.5 4L17 12H4"/><path d="M9 21h6M12 15v6"/></svg>',
   expenses:'<svg viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2"/><path d="M3 10h18"/><path d="M15 15h3"/><path d="M7 3h10"/></svg>',
+  who:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.5"/><path d="M16 14.2c2.8.2 5 2.6 5 5.8"/></svg>',
   org:'<svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v4M6 16v-4h12v4"/></svg>',
   lead:'<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M4 4l2 2M20 4l-2 2"/></svg>',
   members:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><circle cx="17" cy="9" r="2.6"/><path d="M15.5 14.2c3 .2 5.5 2.6 5.5 5.8"/></svg>',
@@ -27,7 +28,7 @@ const CATS = [
 ];
 const DUTY = {'duty-aktive':{g:'aktive',n:'Dienstplan Aktive'}, 'duty-jugend':{g:'jugend',n:'Dienstplan Jugend'}};
 const ROLE_NAME = {pending:'wartet', member:'Mitglied', admin:'Bearbeiter'};
-const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','doc','members','defects','push','lead','expenses'];
+const VIEWS = ['home','news','duty-aktive','duty-jugend','events','org','who','doc','members','defects','push','lead','expenses'];
 const catName = k => k==='eis'?'Crushed-Eis':((CATS.find(c=>c.k===k)||{}).n || k);
 
 const TABLES = ['profiles','items','reservations','docs','news','duties','events','shifts','signups','ice','org','duty_rsvp','defects','push_subs','qual_types','member_quals','duty_attendance','expenses','res_contacts'];
@@ -166,6 +167,7 @@ function renderTiles(){
   $('#tiles-res').innerHTML = CATS.map(c=>catTile(c,n)).join('') +
     tile('eis','Crushed-Eis', `${iceToday} Säcke heute · ${iceUp.length} Anmeldungen`,{attr:'data-cat="eis"',pressed:S.openCat==='eis'});
   let org = tile('org','Organigramm', D('org').length?`${D('org').length} Funktionen`:'Noch nicht hinterlegt',{attr:'data-goto="org"'}) +
+    tile('who','Wer macht was?', D('org').length?`${orgPersons().length} Personen`:'Noch nicht hinterlegt',{attr:'data-goto="who"'}) +
     tile('doc','Übungsdoku', `${openDocs} offen · ${D('docs').length-openDocs} eingepflegt`,{attr:'data-goto="doc"',alert:mgr()&&openDocs>0}) +
     (()=>{ const ex=D('expenses').filter(x=>x.status==='offen'); const sum=ex.reduce((a,x)=>a+(+x.amount||0),0);
       return tile('expenses','Private Ausgaben', ex.length?`${ex.length} offen · ${eur(sum)}`:(isTreasurer()?'Nichts zu erstatten':'Auslage einreichen'),{attr:'data-goto="expenses"',alert:isTreasurer()&&ex.length>0}); })();
@@ -600,15 +602,14 @@ function orgTree(r){
     ${kids.length?`<ul class="ot-h">${kids.map(k=>`<li class="hue${hue[k.id]??'r'}">${otNode(k,'l1',hue[k.id])}${otVert(k.id,hue[k.id],1)}${orgAddBtn(k)}</li>`).join('')}</ul>`:''}
   </div>`;
 }
-function renderOrg(){
-  const all=D('org'); const q=S.orgQ.trim().toLowerCase(); const tab=S.orgTab||'areas';
+function renderOrg(tab){
+  const all=D('org'); const q=S.orgQ.trim().toLowerCase();
   let html=`<div class="panel"><div class="panel-head">
-    <div><h2>Organigramm</h2><p class="sub">Wer ist wofür zuständig? Bereich antippen oder nach Namen suchen.</p></div>
+    <div><h2>${tab==='people'?'Wer macht was?':'Organigramm'}</h2><p class="sub">${tab==='people'?'Alle Kameraden mit ihren Aufgaben. Aufgabe antippen zeigt sie im Organigramm.':'Wer ist wofür zuständig? Namen antippen zeigt alle Aufgaben der Person.'}</p></div>
     ${mgr()?`<div class="actions">${S.orgEdit?`<button class="btn primary" data-act="edit-org" data-id="new">+ Funktion</button>`:''}<button class="btn ${S.orgEdit?'':'ghost'}" data-act="org-edit-mode" aria-pressed="${!!S.orgEdit}">${S.orgEdit?'Fertig':'✎ Bearbeiten'}</button></div>`:''}</div>`;
   if(S.editOrg && mgr()) html+=orgForm();
   if(!all.length) return loadingOr(['org'], html+`<div class="empty"><strong>Noch kein Organigramm hinterlegt.</strong>${mgr()?'Über „✎ Bearbeiten“ → „+ Funktion“ anlegen.':'Sobald die Bearbeiter es anlegen, steht es hier.'}</div></div>`);
   html+=`<div class="org-tools">
-    <div class="seg org-seg"><button data-act="org-tab" data-id="areas" aria-pressed="${tab==='areas'}">Bereiche</button><button data-act="org-tab" data-id="people" aria-pressed="${tab==='people'}">Wer macht was?</button></div>
     <input id="org-q" type="search" placeholder="${tab==='people'?'Name suchen':'Suchen: Aufgabe oder Name'}" value="${esc(S.orgQ)}" aria-label="Organigramm durchsuchen">
   </div>`;
   if(tab==='people') html+=renderOrgPeople(q);
@@ -1005,7 +1006,7 @@ function render(){
   const v=S.view;
   $('#view-home').hidden = v!=='home';
   $('#view-doc').hidden = v!=='doc';
-  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','members','defects','push','lead','expenses'].includes(v);
+  $('#view-page').hidden = !['news','duty-aktive','duty-jugend','events','org','who','members','defects','push','lead','expenses'].includes(v);
   const waiting=D('profiles').filter(p=>p.role==='pending').length;
   $('#me-name').textContent=S.profile.name||'';
   $('#me-role').textContent=ROLE_NAME[S.profile.role]||'';
@@ -1018,7 +1019,7 @@ function render(){
   } else if(v!=='doc'){
     const page=$('#view-page'); const snap=snapshotForm(page);
     if(S.skipRestore){ snap.vals={}; snap.focus=null; }
-    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg() : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : v==='expenses'?renderExpenses() : renderDuty(v));
+    page.innerHTML = `<div class="backbar"><button class="btn ghost" data-goto="home">← Übersicht</button></div>` + (v==='news'?renderNews() : v==='events'?renderEvents() : v==='org'?renderOrg('areas') : v==='who'?renderOrg('people') : v==='members'?renderMembers() : v==='defects'?renderDefects() : v==='push'?renderPush() : v==='lead'?renderLead() : v==='expenses'?renderExpenses() : renderDuty(v));
     restoreForm(page,snap); S.skipRestore=false;
   }
   renderDocs();
@@ -1028,6 +1029,7 @@ function render(){
 }
 function go(view){
   if((view==='members'||view==='lead') && !mgr()) view='home';
+  if(view!==S.view) S.orgQ='';
   S.view=view; S.openForm=null; S.editOrg=null; S.confirm=null; S.errs={};
   try{ localStorage.setItem('fhq-view',view); }catch(_){}
   if(location.hash!=='#'+view) history.replaceState(null,'','#'+view);
@@ -1123,10 +1125,10 @@ document.addEventListener('click', async e=>{
   else if(act==='org-add-under'){ S.editOrg='new'; S.orgParent=id; S.errs={}; S.skipRestore=true; render(); const f=document.getElementById('org-role'); if(f){ f.focus({preventScroll:true}); f.closest('form').scrollIntoView({block:'center'}); } }
   else if(act==='org-edit-mode'){ S.orgEdit=!S.orgEdit; S.editOrg=null; render(); }
   else if(act==='org-toggle'){ if(S.orgAll){ S.orgAll=false; S.orgOpen=new Set(orgAreas().map(a=>a.id)); } S.orgOpen.has(id)?S.orgOpen.delete(id):S.orgOpen.add(id); render(); }
-  else if(act==='org-open'){ S.orgTab='areas'; S.orgQ=''; S.orgOpen.add(id); render(); requestAnimationFrame(()=>document.getElementById('org-'+id)?.scrollIntoView({behavior:'smooth',block:'start'})); }
+  else if(act==='org-open'){ S.orgQ=''; go('org'); requestAnimationFrame(()=>document.getElementById('org-'+id)?.scrollIntoView({behavior:'smooth',block:'start'})); }
   else if(act==='org-all'){ S.orgAll=!S.orgAll; if(!S.orgAll) S.orgOpen.clear(); render(); }
   else if(act==='org-tab'){ S.orgTab=id; S.orgQ=''; render(); }
-  else if(act==='org-person'){ S.orgTab='people'; S.orgQ=b.dataset.v; render(); }
+  else if(act==='org-person'){ go('who'); S.orgQ=b.dataset.v; render(); }
   else if(act==='copy'){
     const v=b.dataset.v;
     try{ await navigator.clipboard.writeText(v); toast('Kopiert: '+v); }
