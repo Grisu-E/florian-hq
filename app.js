@@ -970,7 +970,7 @@ function renderMembers(){
     <div class="actions">
       ${p.role==='pending'
         ? `<button class="btn primary small" data-act="set-role" data-id="${esc(p.id)}" data-role="member">Freigeben</button>`
-        : `${master?`<button class="btn small ${p.role==='admin'?'primary':''}" data-act="set-role" data-id="${esc(p.id)}" data-role="${p.role==='admin'?'member':'admin'}" title="App-Master darf alles, auch Rollen vergeben">${p.role==='admin'?'Master entziehen':'Zum Master machen'}</button>`:''}
+        : `${master&&p.id!==S.me?`<button class="btn small ${p.role==='admin'?'primary':''}" data-act="set-role" data-id="${esc(p.id)}" data-role="${p.role==='admin'?'member':'admin'}" title="App-Master darf alles, auch Rollen vergeben">${p.role==='admin'?'Master entziehen':'Zum Master machen'}</button>`:''}
            ${(p.role!=='admin'||master)&&p.id!==S.me?`<button class="btn ghost small" data-act="set-role" data-id="${esc(p.id)}" data-role="pending">Sperren</button>`:''}`}
       ${p.id!==S.me&&(p.role!=='admin'||master)?delBtn('member',p.id,'Entfernen'):''}
     </div>
