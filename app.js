@@ -35,7 +35,7 @@ const S = {
   view:'home', openCat:null, data:{}, loaded:{},
   me:null, profile:null,
   formFor:null, openForm:null, editOrg:null, orgQ:'', skipRestore:false,
-  errs:{}, confirm:null, contactEdit:null, lastRes:null, docFilter:'offen', busy:false, showPast:{}, urls:{}, urlPending:new Set()
+  errs:{}, confirm:null, contactEdit:null, lastRes:null, orgOpen:new Set(), orgAll:false, orgTab:'areas', docFilter:'offen', busy:false, showPast:{}, urls:{}, urlPending:new Set()
 };
 TABLES.forEach(t=>{ S.data[t]=[]; S.loaded[t]=false; });
 
@@ -512,7 +512,7 @@ function orgForm(){
     <div class="form-actions"><button class="btn primary" type="submit">${ed?'Speichern':'Hinzufügen'}</button><button class="btn ghost" type="button" data-act="close-form">Abbrechen</button>${ed?delBtn('org',ed.id,'Funktion löschen'):''}</div>
     ${errP('org')}</form>`;
 }
-/* Übersichtliche Darstellung: oberste Ebene als Band, darunter je Bereich eine Karte mit kompakter Liste */
+/* ---------- Organigramm: Schaubild + Bereiche zum Aufklappen + Ansicht „Wer macht was?“ ---------- */
 const orgEditBtn = (n,label='✎') => mgr()&&S.orgEdit?`<button class="org-ed" data-act="edit-org" data-id="${esc(n.id)}" aria-label="${esc(n.role)} bearbeiten">${label}</button>`:'';
 const orgAddBtn = n => mgr()&&S.orgEdit?`<button class="org-add" data-act="org-add-under" data-id="${esc(n.id)}">+ Unterpunkt</button>`:'';
 function orgContacts(n){
@@ -520,42 +520,91 @@ function orgContacts(n){
   const mail=n.email?`<a class="org-c" href="mailto:${esc(n.email)}" aria-label="${esc(n.name||n.role)} mailen">✉️</a>`:'';
   return tel+mail;
 }
+const orgPeople = s => String(s||'').split(/\s*(?:\/|,|\s\+\s|\bund\b)\s*/).map(x=>x.trim()).filter(Boolean);
+const isPerson = t => /^[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.'-]+(\s+[A-ZÄÖÜ][A-Za-zÄÖÜäöüß.'-]+)+$/.test(t);
+const initials = t => { const w=t.split(/\s+/); return ((w[0]||'')[0]+(w.length>1?(w[w.length-1]||'')[0]:'')).toUpperCase(); };
+function nameChips(s,{small=false}={}){
+  if(!s) return '<span class="free">unbesetzt</span>';
+  return orgPeople(s).map(t=>isPerson(t)
+    ? `<button class="pchip${small?' sm':''}" data-act="org-person" data-v="${esc(t)}" title="Alle Aufgaben von ${esc(t)}"><span class="av">${esc(initials(t))}</span>${esc(t)}</button>`
+    : `<span class="pchip grp${small?' sm':''}">${esc(t)}</span>`).join('');
+}
+/* Bereich (Kind einer obersten Ebene) und Farbe je Knoten */
+function orgAreas(){ return orgChildren(null).flatMap(r=>orgChildren(r.id)); }
+function orgHueMap(){ const m={}; orgAreas().forEach((a,i)=>{ orgDesc(a.id).forEach(id=>m[id]=i%7); }); return m; }
 function orgRows(pid,depth){
   return orgChildren(pid).map(n=>`<li class="org-li d${Math.min(depth,3)}">
-      <div class="org-row"><span class="fn">${esc(n.role)}${n.area?`<small>${esc(n.area)}</small>`:''}</span><span class="nm">${n.name?esc(n.name):'<span class="free">–</span>'}${orgContacts(n)}${orgEditBtn(n)}</span></div>
+      <div class="org-row"><span class="fn">${esc(n.role)}${n.area?`<small>${esc(n.area)}</small>`:''}</span><span class="nm">${nameChips(n.name,{small:true})}${orgContacts(n)}${orgEditBtn(n)}</span></div>
     </li>${depth<8?orgRows(n.id,depth+1):''}`).join('');
 }
-function orgAreaCard(n){
-  const rows=orgRows(n.id,1);
-  return `<article class="org-box" id="org-${esc(n.id)}">
-    <header><div class="org-box-t"><h3>${esc(n.role)}</h3>${orgEditBtn(n)}</div>
-      <div class="org-lead">${n.name?esc(n.name):'<span class="free">unbesetzt</span>'}${orgContacts(n)}</div>
-      ${n.area?`<p class="org-area-note">${esc(n.area)}</p>`:''}</header>
-    ${rows?`<ul class="org-ul">${rows}</ul>`:''}${orgAddBtn(n)}
-  </article>`;
+function orgBox(n,hue){
+  const open=S.orgAll||S.orgOpen.has(n.id), cnt=orgDesc(n.id).size-1;
+  return `<div class="obox hue${hue} ${open?'open':''}" id="org-${esc(n.id)}">
+    <div class="obox-h">
+      <button class="obox-t" data-act="org-toggle" data-id="${esc(n.id)}" aria-expanded="${open}">
+        <span class="obadge">${esc((n.role||'?')[0])}</span>
+        <span class="obox-tx"><span class="obox-name">${esc(n.role)}</span><span class="obox-sub">${cnt?`${cnt} Aufgaben`:'keine Unterpunkte'}</span></span>
+        <span class="chev" aria-hidden="true">▾</span>
+      </button>${orgEditBtn(n)}
+    </div>
+    <div class="obox-lead"><span class="lbl">Leitung</span>${nameChips(n.name)}${orgContacts(n)}</div>
+    ${n.area?`<p class="org-area-note">${esc(n.area)}</p>`:''}
+    ${open&&cnt?`<ul class="org-ul">${orgRows(n.id,1)}</ul>`:''}${open?orgAddBtn(n):''}
+  </div>`;
+}
+function orgChart(){
+  const hue=orgHueMap();
+  return `<div class="ochart">${orgChildren(null).map(r=>{
+    const kids=orgChildren(r.id);
+    return `<div class="otree ${kids.length>2?'big':'small'}">
+      <div class="onode root" ><span class="o-role">${esc(r.role)}</span><span class="o-name">${esc(r.name||'–')}</span></div>
+      ${kids.length?`<div class="okids" style="--n:${kids.length}">${kids.map(k=>`<button class="onode hue${hue[k.id]}" data-act="org-open" data-id="${esc(k.id)}"><span class="o-role">${esc(k.role)}</span><span class="o-name">${esc(orgPeople(k.name).join(' · ')||'–')}</span><span class="o-cnt">${orgDesc(k.id).size-1||''}</span></button>`).join('')}</div>`:''}
+    </div>`; }).join('')}</div>`;
+}
+function orgPersons(){
+  const hue=orgHueMap(), areaOf={}; orgAreas().forEach(a=>orgDesc(a.id).forEach(id=>areaOf[id]=a));
+  const map=new Map();
+  D('org').forEach(n=>orgPeople(n.name).filter(isPerson).forEach(p=>{
+    if(!map.has(p)) map.set(p,[]); map.get(p).push({n,hue:hue[n.id],area:areaOf[n.id]});
+  }));
+  return [...map.entries()].sort((a,b)=>a[0].localeCompare(b[0],'de'));
+}
+function renderOrgPeople(q){
+  const list=orgPersons().filter(([p,t])=>!q||p.toLowerCase().includes(q)||t.some(x=>x.n.role.toLowerCase().includes(q)));
+  if(!list.length) return `<div class="empty"><strong>Niemand gefunden.</strong>Versuch es mit einem anderen Namen.</div>`;
+  return `<div class="pgrid">${list.map(([p,tasks])=>`<div class="pcard">
+      <div class="pcard-h"><span class="av big">${esc(initials(p))}</span><div><div class="pname">${esc(p)}</div><div class="obox-sub">${tasks.length} ${tasks.length===1?'Aufgabe':'Aufgaben'}</div></div></div>
+      <div class="ptasks">${tasks.map(t=>`<button class="tchip hue${t.hue??'r'}" data-act="org-open" data-id="${esc((t.area||t.n).id)}" title="${esc(orgPath(t.n))}">${esc(t.n.role)}</button>`).join('')}</div>
+    </div>`).join('')}</div>`;
 }
 function renderOrg(){
-  const all=D('org'); const q=S.orgQ.trim().toLowerCase();
+  const all=D('org'); const q=S.orgQ.trim().toLowerCase(); const tab=S.orgTab||'areas';
   let html=`<div class="panel"><div class="panel-head">
-    <div><h2>Organigramm</h2><p class="sub">Wer ist wofür zuständig? Suchen oder Bereich anschauen.</p></div>
+    <div><h2>Organigramm</h2><p class="sub">Wer ist wofür zuständig? Bereich antippen oder nach Namen suchen.</p></div>
     ${mgr()?`<div class="actions">${S.orgEdit?`<button class="btn primary" data-act="edit-org" data-id="new">+ Funktion</button>`:''}<button class="btn ${S.orgEdit?'':'ghost'}" data-act="org-edit-mode" aria-pressed="${!!S.orgEdit}">${S.orgEdit?'Fertig':'✎ Bearbeiten'}</button></div>`:''}</div>`;
   if(S.editOrg && mgr()) html+=orgForm();
-  if(all.length){
-    const roots=orgChildren(null);
-    html+=`<div class="org-tools"><input id="org-q" type="search" placeholder="Suchen: Funktion oder Name" value="${esc(S.orgQ)}" aria-label="Organigramm durchsuchen"><span class="count">${all.length} Funktionen</span></div>`;
-    if(!q) html+=`<nav class="org-jump">${roots.flatMap(r=>orgChildren(r.id).length?orgChildren(r.id):[r]).map(n=>`<button class="filter" data-act="org-jump" data-id="${esc(n.id)}">${esc(n.role)}</button>`).join('')}</nav>`;
-  }
-  if(!all.length) html+=`<div class="empty"><strong>Noch kein Organigramm hinterlegt.</strong>${mgr()?'Über „✎ Bearbeiten“ → „+ Funktion“ anlegen.':'Sobald die Bearbeiter es anlegen, steht es hier.'}</div>`;
+  if(!all.length) return loadingOr(['org'], html+`<div class="empty"><strong>Noch kein Organigramm hinterlegt.</strong>${mgr()?'Über „✎ Bearbeiten“ → „+ Funktion“ anlegen.':'Sobald die Bearbeiter es anlegen, steht es hier.'}</div></div>`);
+  html+=`<div class="org-tools">
+    <div class="seg org-seg"><button data-act="org-tab" data-id="areas" aria-pressed="${tab==='areas'}">Bereiche</button><button data-act="org-tab" data-id="people" aria-pressed="${tab==='people'}">Wer macht was?</button></div>
+    <input id="org-q" type="search" placeholder="${tab==='people'?'Name suchen':'Suchen: Aufgabe oder Name'}" value="${esc(S.orgQ)}" aria-label="Organigramm durchsuchen">
+  </div>`;
+  if(tab==='people') html+=renderOrgPeople(q);
   else if(q){
+    const hue=orgHueMap();
     const hits=all.filter(n=>[n.role,n.name,n.area].some(x=>(x||'').toLowerCase().includes(q)));
-    html+= hits.length?`<ul class="org-ul org-hits">${hits.map(n=>`<li class="org-li"><div class="org-row"><span class="fn">${esc(n.role)}<small>${esc(orgPath(n))}</small></span><span class="nm">${n.name?esc(n.name):'<span class="free">–</span>'}${orgContacts(n)}${orgEditBtn(n)}</span></div></li>`).join('')}</ul>`:`<div class="empty"><strong>Nichts gefunden.</strong>Versuch es mit einem anderen Stichwort.</div>`;
-  } else html+=orgChildren(null).map(r=>{
-    const kids=orgChildren(r.id);
-    return `<section class="org-sec" id="org-${esc(r.id)}">
-      <div class="org-top"><div><div class="org-role">${esc(r.role)}</div><div class="org-name">${r.name?esc(r.name):'– unbesetzt –'}${orgContacts(r)}</div>${r.area?`<p class="org-area-note">${esc(r.area)}</p>`:''}</div><div class="actions">${orgEditBtn(r)}${orgAddBtn(r)}</div></div>
-      ${kids.length?`<div class="org-grid">${kids.map(orgAreaCard).join('')}</div>`:''}
-    </section>`;
-  }).join('');
+    html+= hits.length?`<ul class="org-ul org-hits">${hits.map(n=>`<li class="org-li"><div class="org-row"><span class="fn"><span class="dot hue${hue[n.id]??'r'}"></span>${esc(n.role)}<small>${esc(orgPath(n))}</small></span><span class="nm">${nameChips(n.name,{small:true})}${orgContacts(n)}${orgEditBtn(n)}</span></div></li>`).join('')}</ul>`:`<div class="empty"><strong>Nichts gefunden.</strong>Versuch es mit einem anderen Stichwort.</div>`;
+  } else {
+    const hue=orgHueMap();
+    html+=orgChart();
+    html+=`<div class="org-bar"><span class="count">${all.length} Funktionen · ${orgPersons().length} Personen</span><button class="linkbtn" data-act="org-all">${S.orgAll?'Alle zuklappen':'Alle aufklappen'}</button></div>`;
+    html+=orgChildren(null).map(r=>{
+      const kids=orgChildren(r.id);
+      return `<section class="org-sec" id="org-${esc(r.id)}">
+        <div class="org-sec-h"><div><span class="o-role">${esc(r.role)}</span><div class="org-sec-n">${nameChips(r.name)}${orgContacts(r)}</div>${r.area?`<p class="org-area-note">${esc(r.area)}</p>`:''}</div><div class="actions">${orgEditBtn(r)}${orgAddBtn(r)}</div></div>
+        ${kids.length?`<div class="org-grid">${kids.map(k=>orgBox(k,hue[k.id])).join('')}</div>`:''}
+      </section>`;
+    }).join('');
+  }
   return loadingOr(['org'], html+'</div>');
 }
 
@@ -1058,7 +1107,11 @@ document.addEventListener('click', async e=>{
   else if(act==='edit-org'){ S.editOrg=id; S.orgParent=null; S.errs={}; S.skipRestore=true; render(); const f=document.getElementById('org-role'); if(f){ f.focus({preventScroll:true}); f.closest('form').scrollIntoView({block:'center'}); } }
   else if(act==='org-add-under'){ S.editOrg='new'; S.orgParent=id; S.errs={}; S.skipRestore=true; render(); const f=document.getElementById('org-role'); if(f){ f.focus({preventScroll:true}); f.closest('form').scrollIntoView({block:'center'}); } }
   else if(act==='org-edit-mode'){ S.orgEdit=!S.orgEdit; S.editOrg=null; render(); }
-  else if(act==='org-jump'){ document.getElementById('org-'+id)?.scrollIntoView({behavior:'smooth',block:'start'}); }
+  else if(act==='org-toggle'){ if(S.orgAll){ S.orgAll=false; S.orgOpen=new Set(orgAreas().map(a=>a.id)); } S.orgOpen.has(id)?S.orgOpen.delete(id):S.orgOpen.add(id); render(); }
+  else if(act==='org-open'){ S.orgTab='areas'; S.orgQ=''; S.orgOpen.add(id); render(); requestAnimationFrame(()=>document.getElementById('org-'+id)?.scrollIntoView({behavior:'smooth',block:'start'})); }
+  else if(act==='org-all'){ S.orgAll=!S.orgAll; if(!S.orgAll) S.orgOpen.clear(); render(); }
+  else if(act==='org-tab'){ S.orgTab=id; S.orgQ=''; render(); }
+  else if(act==='org-person'){ S.orgTab='people'; S.orgQ=b.dataset.v; render(); }
   else if(act==='copy'){
     const v=b.dataset.v;
     try{ await navigator.clipboard.writeText(v); toast('Kopiert: '+v); }
