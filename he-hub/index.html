@@ -1,0 +1,1198 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="H&amp;E Hub">
+<title>H&amp;E Hub</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<style>
+/* Layout: App-Shell mit Markenkopf (H&E), Kachel-Dashboard → Detailansichten per #hash; weiche Flächen, große Radien, Icon-Chips je Bereich */
+:root{
+  --bg:#F3F4F7; --surface:#FFFFFF; --sunken:#EBEDF2; --ink:#14161C; --muted:#646B7A; --line:#E2E5EB;
+  --accent:#2E5BFF; --accent-ink:#FFFFFF; --accent-soft:#E6ECFF;
+  --c-car:#2E5BFF; --c-car-soft:#E6ECFF; --c-cal:#0E9F8E; --c-cal-soft:#DDF4F1; --c-bill:#E86A2C; --c-bill-soft:#FDEBDF; --c-bin:#5B6B2E; --c-bin-soft:#ECF0DD; --c-bday:#D63F7A; --c-bday-soft:#FCE3EE; --c-fix:#6A4CC7; --c-fix-soft:#EEE9FB;
+  --ok:#14874F; --ok-soft:#DCF3E7; --warn:#B26A00; --warn-soft:#FCEED6; --crit:#D02B36; --crit-soft:#FCE1E3;
+  --shadow:0 1px 2px rgba(20,22,28,.04),0 8px 24px rgba(20,22,28,.06);
+  --shadow-hi:0 2px 4px rgba(20,22,28,.06),0 18px 40px rgba(20,22,28,.10);
+  --plate:#FFFFFF; --plate-ink:#111111; --plate-eu:#1E47C8;
+  --f-display:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-body:"Manrope",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:16px; --r-lg:22px;
+  --logo-a:#5B82FF; --logo-b:#2E5BFF; --logo-c:#1631A8; --logo-amp:#FFD27A; --logo-glow:rgba(46,91,255,.35);
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1015; --surface:#171A21; --sunken:#1F232C; --ink:#EEF0F4; --muted:#9AA1B0; --line:#262B35;
+  --accent:#7C9BFF; --accent-ink:#0B1020; --accent-soft:#1D2540;
+  --c-car:#7C9BFF; --c-car-soft:#1D2540; --c-cal:#3FD3BF; --c-cal-soft:#123331; --c-bill:#FF9A63; --c-bill-soft:#3A2418; --c-bin:#B9CC7A; --c-bin-soft:#262C17; --c-bday:#FF7FB0; --c-bday-soft:#3A1828; --c-fix:#AE98FF; --c-fix-soft:#261E40;
+  --ok:#4CD38C; --ok-soft:#13301F; --warn:#F2B24F; --warn-soft:#352812; --crit:#FF6B75; --crit-soft:#3A181C;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); --shadow-hi:0 2px 4px rgba(0,0,0,.35),0 18px 40px rgba(0,0,0,.4);
+  --plate:#F1F1EE; --plate-ink:#111111; --plate-eu:#2450D0; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1015; --surface:#171A21; --sunken:#1F232C; --ink:#EEF0F4; --muted:#9AA1B0; --line:#262B35;
+  --accent:#7C9BFF; --accent-ink:#0B1020; --accent-soft:#1D2540;
+  --c-car:#7C9BFF; --c-car-soft:#1D2540; --c-cal:#3FD3BF; --c-cal-soft:#123331; --c-bill:#FF9A63; --c-bill-soft:#3A2418; --c-bin:#B9CC7A; --c-bin-soft:#262C17; --c-bday:#FF7FB0; --c-bday-soft:#3A1828; --c-fix:#AE98FF; --c-fix-soft:#261E40;
+  --ok:#4CD38C; --ok-soft:#13301F; --warn:#F2B24F; --warn-soft:#352812; --crit:#FF6B75; --crit-soft:#3A181C;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.25); --shadow-hi:0 2px 4px rgba(0,0,0,.35),0 18px 40px rgba(0,0,0,.4);
+  --plate:#F1F1EE; --plate-ink:#111111; --plate-eu:#2450D0; color-scheme:dark}
+*{box-sizing:border-box}
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 56px}
+.wrap{max-width:1100px;margin:0 auto;display:grid;gap:24px}
+h1,h2,h3{font-family:var(--f-display);font-weight:800;letter-spacing:-.02em;margin:0;text-wrap:balance}
+h1{font-size:1.5rem;line-height:1.1}
+h2{font-size:1.35rem}
+h3{font-size:1.1rem;font-weight:700}
+.page-title{font-size:clamp(1.6rem,4vw,2.2rem);letter-spacing:-.03em}
+.eyebrow{text-transform:uppercase;letter-spacing:.1em;font-size:.72rem;color:var(--muted);font-weight:700}
+.num{font-family:var(--f-mono);font-variant-numeric:tabular-nums;letter-spacing:-.01em}
+.muted{color:var(--muted)}
+svg.i{width:20px;height:20px;flex:none;stroke:currentColor;fill:none;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round}
+button,.btn{font:inherit;font-weight:700;font-size:.9rem;border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:999px;padding:9px 16px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;min-height:42px;transition:background .15s,border-color .15s,transform .1s}
+button:hover,.btn:hover{border-color:var(--muted)}
+button:active,.btn:active{transform:scale(.97)}
+.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.primary:hover{border-color:var(--ink);opacity:.9}
+.ghost{background:transparent;border-color:transparent;color:var(--muted)}
+.ghost:hover{background:var(--sunken);border-color:transparent;color:var(--ink)}
+.danger{color:var(--crit)}
+button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible,.tile:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+button:disabled{opacity:.5;cursor:default}
+
+header.top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:52px;height:52px;border-radius:16px;flex:none;display:grid;place-items:center;background:#000;border:1px solid rgba(255,255,255,.12);box-shadow:0 6px 16px rgba(0,0,0,.18)}
+.logo .mono{color:#fff;font-weight:800;font-size:1.15rem;letter-spacing:-.02em;line-height:1}
+.logo .amp{font-weight:600;margin:0 .04em}
+.wordmark{display:flex;align-items:baseline;font-weight:800;letter-spacing:-.02em;font-size:1.6rem;line-height:1}
+.wordmark .amp{font-weight:600;margin:0 .06em}
+.wordmark .hub{font-weight:400;color:var(--muted);margin-left:.28em;letter-spacing:-.01em}
+.status{font-size:.8rem;color:var(--muted);display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:6px 12px}
+.status::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.banner{border:1px solid var(--warn);background:var(--warn-soft);color:var(--ink);border-radius:var(--r);padding:12px 16px;font-size:.9rem}
+.hello{display:grid;gap:4px}
+
+/* Kacheln */
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:22px;display:flex;flex-direction:column;gap:18px;cursor:pointer;min-width:0;text-align:left;color:inherit;text-decoration:none;box-shadow:var(--shadow);transition:box-shadow .2s,transform .2s}
+.tile:hover{box-shadow:var(--shadow-hi);transform:translateY(-3px)}
+.tile-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tile-title{display:flex;align-items:center;gap:12px}
+.chip{width:42px;height:42px;border-radius:13px;display:grid;place-items:center}
+.chip.car{background:var(--c-car-soft);color:var(--c-car)}
+.chip.cal{background:var(--c-cal-soft);color:var(--c-cal)}
+.chip.bill{background:var(--c-bill-soft);color:var(--c-bill)}
+.chip.bin{background:var(--c-bin-soft);color:var(--c-bin)}
+.chip.bday{background:var(--c-bday-soft);color:var(--c-bday)}
+.chip.ablage{background:var(--sunken);color:var(--ink)}
+.chip.fix{background:var(--c-fix-soft);color:var(--c-fix)}
+.date-block.fix{background:var(--c-fix-soft);color:var(--c-fix)}
+.ampel{display:inline-flex;gap:3px;padding:3px 5px;background:#14161C;border-radius:999px;flex:none}
+.ampel i{width:9px;height:9px;border-radius:50%;background:#3A3E48;display:block}
+.ampel i.on.r{background:#FF3B3B;box-shadow:0 0 6px #FF3B3B}
+.ampel i.on.y{background:#FFC83D;box-shadow:0 0 6px #FFC83D}
+.ampel i.on.g{background:#2FD27A;box-shadow:0 0 6px #2FD27A}
+.ampel-row{border-left:5px solid var(--line)}
+.ampel-row.ok{border-left-color:var(--ok)}
+.ampel-row.warn{border-left-color:var(--warn)}
+.ampel-row.crit{border-left-color:var(--crit)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.82rem;color:var(--muted);align-items:center}
+.legend span{display:inline-flex;gap:6px;align-items:center}
+.share-badge{min-height:28px;padding:3px 10px;font-size:.72rem;gap:5px;border-radius:999px;background:var(--sunken);border:none;color:var(--muted);margin-left:auto}
+.share-badge svg.i{width:14px;height:14px}
+.share-badge.partner{background:var(--c-fix-soft);color:var(--c-fix)}
+.share-badge.alle{background:var(--ok-soft);color:var(--ok)}
+.share-badge:hover{border:none;color:var(--ink)}
+.tile-title{flex:1;min-width:0}
+.share-list{display:grid;gap:8px}
+.share-row{display:grid;grid-template-columns:1fr minmax(0,260px);gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:var(--sunken)}
+.share-row .t{font-weight:700}
+.share-row select{background:var(--surface)}
+@media (max-width:520px){.share-row{grid-template-columns:1fr}}
+.notices{display:grid;gap:8px}
+#app{display:grid;gap:20px}
+.notice{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;text-decoration:none;color:var(--ink);border:1px solid transparent;font-size:.92rem}
+.notice.info{background:var(--accent-soft);border-color:var(--accent)}
+.notice.info svg.i{color:var(--accent)}
+.notice.warn{background:var(--warn-soft);border-color:var(--warn)}
+.notice.crit{background:var(--crit-soft);border-color:var(--crit)}
+.notice.warn svg.i{color:var(--warn)}
+.notice.crit svg.i{color:var(--crit)}
+.auth-card{max-width:440px;margin:6vh auto 0;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:28px;display:grid;gap:16px;box-shadow:var(--shadow)}
+.member{display:grid;gap:10px;padding:14px;border-radius:14px;background:var(--sunken)}
+.member-head{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.member .tiles-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.member .tiles-grid label{display:grid;gap:4px;font-size:.78rem;font-weight:700;color:var(--muted)}
+.member select,.member input{background:var(--surface)}
+.konto-group{display:grid;gap:10px}
+.konto-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;padding:0 4px}
+.konto-head h3{display:flex;align-items:center;gap:8px}
+.amount{font-family:var(--f-mono);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.bin-dot{width:14px;height:14px;border-radius:50%;flex:none;border:1px solid rgba(0,0,0,.15)}
+.bin-badge{width:44px;height:44px;border-radius:14px;display:grid;place-items:center;flex:none}
+.bin-badge svg.i{width:22px;height:22px}
+.next-hl{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;background:var(--sunken)}
+.next-hl.soon{background:var(--warn-soft);color:var(--warn)}
+.next-hl b{color:var(--ink)}
+.dates{display:flex;gap:6px;flex-wrap:wrap}
+.date-chip{font-size:.78rem;font-weight:700;background:var(--sunken);border-radius:8px;padding:3px 8px;color:var(--muted)}
+.date-block.bday{background:var(--c-bday-soft);color:var(--c-bday)}
+.seg{display:inline-flex;gap:4px;padding:4px;background:var(--sunken);border-radius:999px;justify-self:start;flex-wrap:wrap}
+.seg button{border:none;background:transparent;color:var(--muted);min-height:38px}
+.seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+.seg button:hover{border:none;color:var(--ink)}
+label.check{display:flex;align-items:center;gap:8px;font-size:.88rem;font-weight:600;color:var(--muted)}
+label.check input{width:auto}
+.count{font-size:.78rem;font-weight:700;color:var(--muted);background:var(--sunken);border-radius:999px;padding:4px 10px;white-space:nowrap}
+.tile-foot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.big{font-family:var(--f-mono);font-size:2.4rem;font-weight:600;line-height:1;letter-spacing:-.04em}
+.mini-list{display:grid;gap:4px;margin:0;padding:0;list-style:none}
+.mini-list li{display:flex;justify-content:space-between;gap:10px;align-items:center;min-width:0;padding:8px 10px;border-radius:10px;background:var(--sunken)}
+.mini-list .t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;font-weight:600}
+.empty{color:var(--muted);font-size:.92rem;background:var(--sunken);border-radius:var(--r);padding:18px;text-align:center}
+.tile .empty{text-align:left}
+
+/* Kennzeichen */
+.plate{display:inline-flex;align-items:stretch;background:var(--plate);color:var(--plate-ink);border:2px solid #1b1b1b;border-radius:6px;font-family:var(--f-display);font-weight:700;font-size:1.05rem;letter-spacing:.08em;line-height:1;white-space:nowrap;overflow:hidden}
+.plate .eu{background:var(--plate-eu);color:#fff;font-size:.55rem;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;padding:3px 4px;letter-spacing:0}
+.plate .eu::before{content:"";width:9px;height:9px;border-radius:50%;border:1.5px dotted #F2D23C;margin-bottom:2px}
+.plate .txt{padding:6px 10px 5px}
+
+/* Pills */
+.pill{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:700;border-radius:999px;padding:4px 10px;white-space:nowrap}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.crit{background:var(--crit-soft);color:var(--crit)}
+.pill.neutral{background:var(--sunken);color:var(--muted)}
+.pill.neutral::before{display:none}
+
+/* Detailansicht */
+.view-head{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.back{padding-left:10px}
+.list{display:grid;gap:10px}
+.row{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:grid;grid-template-columns:auto 1fr auto;gap:16px;align-items:center;min-width:0;box-shadow:var(--shadow)}
+.row .main{min-width:0;display:grid;gap:6px}
+.row .main .t{font-weight:700;overflow-wrap:anywhere}
+.row .acts{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end}
+.row.past{opacity:.55;box-shadow:none}
+@media (max-width:560px){.row{grid-template-columns:auto 1fr}.row .acts{grid-column:1/-1;justify-content:flex-start}}
+.date-block{width:56px;text-align:center;border-radius:14px;background:var(--c-cal-soft);color:var(--c-cal);padding:8px 0;line-height:1}
+.date-block .d{font-size:1.5rem;font-weight:800;letter-spacing:-.03em}
+.date-block .m{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;font-weight:700;margin-top:3px}
+.thumb{width:52px;height:52px;border-radius:12px;background:var(--sunken);border:1px solid var(--line);display:grid;place-items:center;color:var(--muted);font-size:.65rem;cursor:pointer;padding:0;min-height:0;overflow:hidden;text-align:center}
+.thumb img{width:100%;height:100%;object-fit:cover}
+
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.sums{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.sum{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px 16px;display:grid;gap:4px;min-width:0}
+.sum .k{font-size:.8rem;color:var(--muted);font-weight:600}
+.sum .v{font-size:1.15rem;font-weight:600}
+.sum.total{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.sum.total .k{color:var(--bg);opacity:.7}
+.sum.total .v{font-size:1.5rem}
+.table-wrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+table{width:100%;border-collapse:collapse;font-size:.9rem;min-width:600px}
+th,td{padding:12px 14px;text-align:left;border-bottom:1px solid var(--line);vertical-align:middle}
+th{text-transform:uppercase;letter-spacing:.08em;font-size:.7rem;color:var(--muted);font-weight:700;background:var(--sunken)}
+td.r,th.r{text-align:right}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:var(--sunken)}
+tfoot td{font-weight:800;border-top:1px solid var(--line);border-bottom:none}
+select.year{width:auto;border-radius:999px;padding:8px 14px;font-weight:700}
+
+/* Dialog */
+.overlay{position:fixed;inset:0;background:rgba(8,10,14,.5);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);display:grid;place-items:center;z-index:50;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));animation:fade .15s ease-out}
+.sheet{background:var(--surface);color:var(--ink);border-radius:var(--r-lg);width:min(520px,100%);max-height:100%;overflow:auto;padding:24px;display:grid;gap:16px;border:1px solid var(--line);box-shadow:var(--shadow-hi);animation:rise .2s ease-out}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{transform:translateY(12px);opacity:0}}
+.sheet-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.fields{display:grid;gap:14px;grid-template-columns:1fr 1fr}
+.fields .full{grid-column:1/-1}
+@media (max-width:460px){.fields{grid-template-columns:1fr}}
+label.f{display:grid;gap:6px;font-size:.8rem;font-weight:700;color:var(--muted);min-width:0}
+input,select,textarea{font:inherit;font-weight:500;color:var(--ink);background:var(--sunken);border:1px solid transparent;border-radius:12px;padding:11px 12px;width:100%;min-width:0;transition:border-color .15s,background .15s}
+input:focus,select:focus,textarea:focus{background:var(--surface);border-color:var(--accent);outline:none}
+textarea{resize:vertical;min-height:64px}
+.sheet-foot{display:flex;justify-content:flex-end;gap:8px;flex-wrap:wrap}
+.photo-zone{display:grid;gap:12px}
+.drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:22px;border:2px dashed var(--line);border-radius:var(--r);background:var(--sunken);color:var(--muted);font-weight:700;cursor:pointer;text-align:center;transition:border-color .15s,color .15s}
+.drop:hover{border-color:var(--c-bill);color:var(--c-bill)}
+.drop svg.i{width:28px;height:28px;color:var(--c-bill)}
+.photo-preview{max-height:220px;border-radius:12px;border:1px solid var(--line);justify-self:start}
+.scan-status{font-size:.86rem;padding:10px 14px;border-radius:12px;background:var(--sunken);color:var(--muted)}
+.scan-status.ok{background:var(--ok-soft);color:var(--ok)}
+.scan-status.warn{background:var(--warn-soft);color:var(--warn)}
+.big-img{max-width:100%;max-height:80vh;border-radius:12px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(24px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:12px 18px;border-radius:999px;font-weight:700;z-index:60;font-size:.88rem;box-shadow:var(--shadow-hi)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}.tile:hover{transform:none}}
+</style>
+
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <div class="logo" aria-hidden="true"><span class="mono">H<span class="amp">&amp;</span>E</span></div>
+      <div class="hello"><h1 class="wordmark" aria-label="H und E Hub">H<span class="amp">&amp;</span>E<span class="hub">Hub</span></h1><div class="eyebrow" id="today"></div></div>
+    </div>
+    <div class="toolbar"><button id="logoutBtn" class="ghost" data-act="logout" hidden>Abmelden</button><button id="shareBtn" data-act="share" hidden><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5M16 5.2a3 3 0 0 1 0 5.6M18 14.3c1.6.6 2.7 2.2 3 4.7"/></svg>Personen &amp; Freigaben</button><div class="status" id="storeStatus">Daten werden geladen …</div></div>
+  </header>
+  <div id="banner" class="banner" hidden></div>
+  <main id="app"></main>
+</div>
+<div id="modalRoot"></div>
+<div id="toastRoot"></div>
+
+<script>
+(() => {
+const KATS = [
+  "Werbungskosten (Beruf)",
+  "Handwerkerleistungen §35a",
+  "Haushaltsnahe Dienstleistungen §35a",
+  "Sonderausgaben",
+  "Außergewöhnliche Belastungen",
+  "Fahrzeug",
+  "Sonstiges"
+];
+const KATS_BIZ = ["Material & Waren","Werkzeug & Maschinen","Fahrzeugkosten","Büro & Software","Werbung & Marketing","Reisekosten","Versicherungen & Gebühren","Sonstiges"];
+const BEREICHE = ["H&E Tools"];
+const KATS_ABLAGE = ["Elektronik","Haushaltsgeräte","Möbel","Fahrzeug","Werkzeug","Handwerker & Haus","Versicherung & Verträge","Kleidung","Sonstiges"];
+const ABLAGE = "Wichtige Rechnungen";
+const BER_LABEL = { "Privat":"Privat (Steuer)", "H&E Tools":"H&E Tools (Firma)", [ABLAGE]:"Wichtige Rechnungen (Ablage)" };
+const katsFor = b => b === "H&E Tools" ? KATS_BIZ : b === ABLAGE ? KATS_ABLAGE : KATS;
+const MONATE = ["Jan","Feb","Mär","Apr","Mai","Jun","Jul","Aug","Sep","Okt","Nov","Dez"];
+const PLAKETTE = [["#E896B6","Rosa"],["#4CA65A","Grün"],["#F08A2A","Orange"],["#2F7FD1","Blau"],["#F2C94C","Gelb"],["#8B5E3C","Braun"]]; // ab 2025
+const ICON = {
+  car:'<svg class="i" viewBox="0 0 24 24"><path d="M5 17h14M3 13l2-5.5A2 2 0 0 1 6.9 6h10.2a2 2 0 0 1 1.9 1.5L21 13v4a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1v-1H6v1a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><circle cx="7.5" cy="13.5" r="1"/><circle cx="16.5" cy="13.5" r="1"/></svg>',
+  cal:'<svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>',
+  bill:'<svg class="i" viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/></svg>',
+  cam:'<svg class="i" viewBox="0 0 24 24"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.5"/></svg>',
+  plus:'<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
+  back:'<svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
+  bin:'<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1zM6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M10 11v6M14 11v6"/></svg>',
+  cake:'<svg class="i" viewBox="0 0 24 24"><path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 16c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 5 0M12 12V8M12 5.5c.8-.6 1-1.4 0-2.5-1 1.1-.8 1.9 0 2.5z"/></svg>',
+  fix:'<svg class="i" viewBox="0 0 24 24"><path d="M3 10l9-6 9 6M5 10v9h14v-9M10 19v-5h4v5"/></svg>',
+  bank:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10h18M7 15h4"/></svg>',
+  tool:'<svg class="i" viewBox="0 0 24 24"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.1L4 16.7 7.3 20l5.3-5.3a4 4 0 0 0 5.1-5.4l-2.5 2.5-2.4-.6-.6-2.4z"/></svg>',
+  folder:'<svg class="i" viewBox="0 0 24 24"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 11v5M9.5 13.5h5"/></svg>',
+  lock:'<svg class="i" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
+  people:'<svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5M16 5.2a3 3 0 0 1 0 5.6M18 14.3c1.6.6 2.7 2.2 3 4.7"/></svg>',
+  bell:'<svg class="i" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15zM10 20a2 2 0 0 0 4 0"/></svg>',
+  dl:'<svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>'
+};
+const eur = new Intl.NumberFormat("de-DE",{style:"currency",currency:"EUR"});
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const today = () => { const d = new Date(); d.setHours(0,0,0,0); return d; };
+const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const parseDate = s => { const [y,m,d] = String(s||"").split("-").map(Number); return y && m && d ? new Date(y, m-1, d) : null; };
+const fmtDate = s => { const d = parseDate(s); return d ? d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"}) : "–"; };
+const parseAmount = v => { if (typeof v === "number") return v; const n = parseFloat(String(v||"").replace(/\s|€/g,"").replace(/\.(?=\d{3}(\D|$))/g,"").replace(",",".")); return isFinite(n) ? n : NaN; };
+
+$("#today").textContent = new Date().toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
+
+/* ---------- Supabase: Anmeldung, Speicher, Freigaben ---------- */
+const SB_URL = "https://kdqtfbhwjqymfbaunkwg.supabase.co";
+const SB_KEY = "sb_publishable_bEARbfjx56Xq7oUg9GQESA_BILmK_Jm";
+const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+const S = { items: [], mode: "db", ready: false, auth: "loading", email: "" };
+let uid = null, member = null, members = [];
+const TILES = [["fahrzeuge","Fahrzeuge"],["termine","Termine"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["muell","Müllplan"],["geburtstage","Geburtstage"]];
+const LEVEL = { none: "Kein Zugriff", view: "Ansehen", edit: "Bearbeiten" };
+const me = { owner: false };
+const tileOf = it => ({ fahrzeug:"fahrzeuge", termin:"termine", fix:"fixkosten", muell:"muell", geburtstag:"geburtstage" })[it.kind] || (it.kind === "beleg" ? (it.bereich === "H&E Tools" ? "belege" : "ablage") : "fahrzeuge");
+const lvl = t => me.owner ? "edit" : ((member?.tiles || {})[t] || "none");
+const visible = t => lvl(t) !== "none";
+const canWrite = t => lvl(t) === "edit";
+const rowToItem = r => ({ ...r.data, id: r.id, kind: r.kind, _tile: r.tile, von: r.updated_by, erstellt: Date.parse(r.created_at), geaendert: Date.parse(r.updated_at) });
+
+async function loadItems(){
+  const { data, error } = await sb.from("he_items").select("*").order("created_at");
+  if (error) { toast("Daten konnten nicht geladen werden."); return; }
+  S.items = data.map(rowToItem); render();
+}
+let reloadT = null;
+const reloadSoon = () => { clearTimeout(reloadT); reloadT = setTimeout(loadItems, 300); };
+async function loadMembers(){
+  if (!me.owner) return;
+  const { data } = await sb.from("he_members").select("*").order("created_at");
+  members = data || [];
+}
+async function loadMe(){
+  const { data } = await sb.from("he_members").select("*").eq("user_id", uid).maybeSingle();
+  return data;
+}
+let channel = null;
+async function afterLogin(session){
+  uid = session.user.id; S.email = session.user.email || "";
+  let m = await loadMe();
+  if (!m) { await sb.from("he_members").insert({ user_id: uid, name: session.user.user_metadata?.name || "" }); m = await loadMe(); }
+  member = m;
+  $("#logoutBtn").hidden = false;
+  if (!m || m.status !== "approved") { S.auth = m?.status === "blocked" ? "blocked" : "pending"; $("#storeStatus").textContent = S.email; render(); return; }
+  me.owner = m.role === "admin"; S.auth = "ok";
+  await Promise.all([loadItems(), loadMembers()]);
+  S.ready = true;
+  $("#storeStatus").textContent = (m.name || S.email) + (me.owner ? " · Admin" : "");
+  $("#shareBtn").hidden = !me.owner;
+  if (!channel) channel = sb.channel("he-items").on("postgres_changes", { event: "*", schema: "public", table: "he_items" }, reloadSoon).subscribe();
+  render();
+}
+async function refreshAll(){
+  if (!uid) return;
+  const m = await loadMe(); if (!m) return;
+  const was = member?.status; member = m;
+  if (m.status === "approved" && was !== "approved") { const { data } = await sb.auth.getSession(); if (data.session) return afterLogin(data.session); }
+  me.owner = m.role === "admin";
+  if (m.status === "approved") { await Promise.all([loadItems(), loadMembers()]); render(); }
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") refreshAll(); });
+async function initStore(){
+  sb.auth.onAuthStateChange((ev, session) => {
+    if (ev === "SIGNED_IN" && session && session.user.id !== uid) afterLogin(session);
+    if (ev === "SIGNED_OUT") location.reload();
+  });
+  const { data } = await sb.auth.getSession();
+  if (data.session) afterLogin(data.session); else { S.auth = "signedout"; $("#storeStatus").textContent = "Nicht angemeldet"; render(); }
+}
+async function saveItem(obj){
+  const { id, _tile, von, erstellt, geaendert, ...data } = obj;
+  const row = { tile: tileOf(obj), kind: obj.kind, data };
+  const res = id ? await sb.from("he_items").update(row).eq("id", id) : await sb.from("he_items").insert(row);
+  if (res.error) throw res.error;
+  await loadItems();
+}
+async function deleteItem(id){
+  const it = S.items.find(i => i.id === id);
+  const { error } = await sb.from("he_items").delete().eq("id", id);
+  if (error) throw error;
+  if (it?.assetId) sb.storage.from("he-belege").remove([it.assetId]).catch(() => {});
+  await loadItems();
+}
+/* Fotos im privaten Speicher */
+const assets = { upload: async (blob, tile) => {
+  const path = `${tile}/${crypto.randomUUID()}.jpg`;
+  const { error } = await sb.storage.from("he-belege").upload(path, blob, { contentType: "image/jpeg" });
+  if (error) throw error; return { id: path };
+} };
+const photoCache = {}, photoPending = new Set();
+const BLANK = "data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==";
+function blobUrl(id){
+  if (photoCache[id]) return photoCache[id];
+  if (!photoPending.has(id)) { photoPending.add(id); sb.storage.from("he-belege").createSignedUrl(id, 3600).then(({ data }) => { if (data?.signedUrl) { photoCache[id] = data.signedUrl; render(); const big = document.querySelector(`img[data-big="${CSS.escape(id)}"]`); if (big) big.src = data.signedUrl; } }); }
+  return BLANK;
+}
+/* Belege lesen über Supabase-Funktion */
+const blobToB64 = blob => new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(",")[1]); r.onerror = rej; r.readAsDataURL(blob); });
+const sample = {
+  limits: async () => ({ images: true }),
+  json: async (prompt, { images, signal } = {}) => {
+    const image = await blobToB64(images);
+    const tile = tileOf({ kind: "beleg", bereich: $("#bl-bereich")?.value });
+    const { data, error } = await sb.functions.invoke("he-beleg-lesen", { body: { image, mediaType: "image/jpeg", tile, prompt } });
+    if (signal?.aborted) throw { code: "cancelled" };
+    if (error) { let code = "failed"; try { code = (await error.context.json()).error || code; } catch {} throw { code }; }
+    return data.result;
+  }
+};
+const downloads = { save: async ({ filename, data }) => {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([data], { type: "text/csv;charset=utf-8" }));
+  a.download = filename; document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+} };
+const ofKind = k => S.items.filter(i => i.kind === k);
+
+/* ---------- TÜV ---------- */
+function tuevInfo(ym){
+  if (!ym) return { cls:"neutral", label:"Kein TÜV-Termin", months: Infinity };
+  const [y,m] = ym.split("-").map(Number);
+  const t = today();
+  const months = (y - t.getFullYear())*12 + (m - (t.getMonth()+1));
+  if (months < 0) return { cls:"crit", label:`Überfällig seit ${MONATE[m-1]} ${y}`, months };
+  if (months === 0) return { cls:"crit", label:"Diesen Monat fällig", months };
+  if (months <= 2) return { cls:"warn", label:`Fällig in ${months} Monat${months>1?"en":""}`, months };
+  return { cls:"ok", label:`Gültig bis ${MONATE[m-1]} ${y}`, months };
+}
+function plakette(ym, size=56){
+  if (!ym) return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" aria-hidden="true"><circle cx="50" cy="50" r="46" fill="var(--sunken)" stroke="var(--line)" stroke-width="3"/><text x="50" y="58" text-anchor="middle" font-family="Manrope,Arial" font-weight="800" font-size="22" fill="var(--muted)">TÜV</text></svg>`;
+  const [y,m] = ym.split("-").map(Number);
+  const [col, name] = PLAKETTE[(((y-2025)%6)+6)%6];
+  const dark = ["#F2C94C","#E896B6","#F08A2A"].includes(col);
+  const ink = dark ? "#1a1a1a" : "#ffffff";
+  let ticks = "";
+  for (let i = 1; i <= 12; i++) {
+    const ang = ((i - m) * 30 - 90) * Math.PI/180;
+    const r1 = 40, r2 = i === m ? 30 : 35;
+    ticks += `<line x1="${50+r1*Math.cos(ang)}" y1="${50+r1*Math.sin(ang)}" x2="${50+r2*Math.cos(ang)}" y2="${50+r2*Math.sin(ang)}" stroke="${ink}" stroke-width="${i===m?4:2}" stroke-linecap="round"/>`;
+  }
+  return `<svg width="${size}" height="${size}" viewBox="0 0 100 100" role="img" aria-label="TÜV-Plakette ${name}, ${MONATE[m-1]} ${y}"><circle cx="50" cy="50" r="47" fill="${col}" stroke="rgba(0,0,0,.25)" stroke-width="2"/>${ticks}<text x="50" y="62" text-anchor="middle" font-family="Manrope,Arial" font-weight="800" font-size="30" fill="${ink}">${String(y).slice(2)}</text><text x="50" y="25" text-anchor="middle" font-family="Manrope,Arial" font-weight="800" font-size="11" fill="${ink}">${m}</text></svg>`;
+}
+const plate = kz => `<span class="plate"><span class="eu">D</span><span class="txt">${esc((kz||"—").toUpperCase())}</span></span>`;
+
+/* ---------- Termine ---------- */
+function dayLabel(s){
+  const d = parseDate(s); if (!d) return "";
+  const diff = Math.round((d - today())/86400000);
+  if (diff === 0) return "heute"; if (diff === 1) return "morgen"; if (diff === -1) return "gestern";
+  if (diff > 1) return `in ${diff} Tagen`; return `vor ${-diff} Tagen`;
+}
+/* ---------- Müll ---------- */
+const MUELL = {
+  "Gartenabfall":["#3E8E41","#fff"], "Problemstoffe":["#C0392B","#fff"], "Christbaum":["#1E6B3A","#fff"], "Altmetall":["#7D8590","#fff"],
+  "Restmüll":["#3C3F45","#fff"], "Biomüll":["#7A5230","#fff"], "Papier":["#2F6FD1","#fff"],
+  "Gelber Sack":["#F2C94C","#1a1a1a"], "Glas":["#2E8B57","#fff"], "Sperrmüll":["#E07B39","#fff"], "Sonstiges":["#8A8F99","#fff"]
+};
+const RHYTHMUS = { "0":"einmalig", "7":"jede Woche", "14":"alle 2 Wochen", "28":"alle 4 Wochen" };
+function muellDates(m, count=3){
+  const start = parseDate(m.datum); if (!start) return [];
+  const step = Number(m.rhythmus)||0, t = today(), out = [];
+  if (!step) return start >= t ? [start] : [];
+  const d = new Date(start);
+  if (d < t) { const n = Math.ceil(Math.round((t - d)/86400000) / step); d.setDate(d.getDate() + n*step); }
+  for (let i = 0; i < count; i++) { const x = new Date(d); x.setDate(x.getDate() + i*step); out.push(x); }
+  return out;
+}
+/* Offizieller Abfuhrkalender Bodenseekreis – Tettnang, Bezirk III (Restliches Umland), Stand 2026 */
+const AWA = { quelle: "Abfuhrkalender Bodenseekreis · Tettnang Bezirk III", bis: "2026-12-31",
+  events: [["20260102","Bioabfall 2-wöchentlich"],["20260109","Restmüll 2-wöchentlich"],["20260110","Christbaumsammlung (S. Gemeindeblatt)"],["20260113","Gelber Sack"],["20260113","Christbaumsammlung (S. Gemeindeblatt)"],["20260115","Bioabfall 2-wöchentlich"],["20260119","Papier 4-wöchentlich"],["20260122","Restmüll 4-wöchentlich"],["20260122","Restmüll 2-wöchentlich"],["20260127","Gelber Sack"],["20260129","Bioabfall 2-wöchentlich"],["20260205","Restmüll 2-wöchentlich"],["20260210","Gelber Sack"],["20260212","Bioabfall 2-wöchentlich"],["20260216","Papier 4-wöchentlich"],["20260219","Restmüll 4-wöchentlich"],["20260219","Restmüll 2-wöchentlich"],["20260224","Gelber Sack"],["20260226","Bioabfall 2-wöchentlich"],["20260305","Restmüll 2-wöchentlich"],["20260307","Altmetallsammlung Vereine (Obereisenbach, Tannau (außer Krumbach))"],["20260310","Gelber Sack"],["20260312","Bioabfall 2-wöchentlich"],["20260316","Papier 4-wöchentlich"],["20260319","Restmüll 4-wöchentlich"],["20260319","Restmüll 2-wöchentlich"],["20260321","Problemstoffsammlung (Parkplatz Stadthalle 10:15 - 11:50 Uhr)"],["20260324","Gelber Sack"],["20260326","Bioabfall 2-wöchentlich"],["20260328","Altmetallsammlung Vereine (s. Gemeindeblatt)"],["20260330","Gartenabfall"],["20260401","Restmüll 2-wöchentlich"],["20260408","Gelber Sack"],["20260410","Bioabfall 2-wöchentlich"],["20260413","Papier 4-wöchentlich"],["20260416","Restmüll 4-wöchentlich"],["20260416","Restmüll 2-wöchentlich"],["20260421","Gelber Sack"],["20260423","Bioabfall 2-wöchentlich"],["20260430","Restmüll 2-wöchentlich"],["20260505","Gelber Sack"],["20260507","Bioabfall 2-wöchentlich"],["20260511","Papier 4-wöchentlich"],["20260515","Restmüll 4-wöchentlich"],["20260515","Restmüll 2-wöchentlich"],["20260519","Gelber Sack"],["20260521","Bioabfall 2-wöchentlich"],["20260529","Restmüll 2-wöchentlich"],["20260602","Gelber Sack"],["20260605","Bioabfall 2-wöchentlich"],["20260608","Papier 4-wöchentlich"],["20260611","Restmüll 4-wöchentlich"],["20260611","Restmüll 2-wöchentlich"],["20260616","Gelber Sack"],["20260618","Bioabfall 2-wöchentlich"],["20260625","Restmüll 2-wöchentlich"],["20260630","Gelber Sack"],["20260702","Bioabfall 2-wöchentlich"],["20260706","Papier 4-wöchentlich"],["20260709","Restmüll 4-wöchentlich"],["20260709","Restmüll 2-wöchentlich"],["20260714","Gelber Sack"],["20260716","Bioabfall 2-wöchentlich"],["20260723","Restmüll 2-wöchentlich"],["20260728","Gelber Sack"],["20260730","Bioabfall 2-wöchentlich"],["20260803","Papier 4-wöchentlich"],["20260806","Restmüll 4-wöchentlich"],["20260806","Restmüll 2-wöchentlich"],["20260811","Gelber Sack"],["20260813","Bioabfall 2-wöchentlich"],["20260820","Restmüll 2-wöchentlich"],["20260825","Gelber Sack"],["20260827","Bioabfall 2-wöchentlich"],["20260831","Papier 4-wöchentlich"],["20260903","Restmüll 4-wöchentlich"],["20260903","Restmüll 2-wöchentlich"],["20260908","Gelber Sack"],["20260910","Bioabfall 2-wöchentlich"],["20260917","Restmüll 2-wöchentlich"],["20260922","Gelber Sack"],["20260924","Bioabfall 2-wöchentlich"],["20260928","Papier 4-wöchentlich"],["20261001","Restmüll 4-wöchentlich"],["20261001","Restmüll 2-wöchentlich"],["20261001","Gartenabfall"],["20261006","Gelber Sack"],["20261008","Bioabfall 2-wöchentlich"],["20261015","Restmüll 2-wöchentlich"],["20261020","Gelber Sack"],["20261022","Bioabfall 2-wöchentlich"],["20261024","Problemstoffsammlung (Parkplatz Stadthalle 10:15 - 11:50 Uhr)"],["20261024","Altmetallsammlung Vereine (s. Gemeindeblatt)"],["20261026","Papier 4-wöchentlich"],["20261029","Restmüll 4-wöchentlich"],["20261029","Restmüll 2-wöchentlich"],["20261031","Altmetallsammlung Vereine (Obereisenbach, Tannau (außer Krumbach))"],["20261103","Gelber Sack"],["20261105","Bioabfall 2-wöchentlich"],["20261112","Restmüll 2-wöchentlich"],["20261117","Gelber Sack"],["20261119","Bioabfall 2-wöchentlich"],["20261123","Papier 4-wöchentlich"],["20261126","Restmüll 4-wöchentlich"],["20261126","Restmüll 2-wöchentlich"],["20261130","Gartenabfall"],["20261201","Gelber Sack"],["20261203","Bioabfall 2-wöchentlich"],["20261210","Restmüll 2-wöchentlich"],["20261215","Gelber Sack"],["20261217","Bioabfall 2-wöchentlich"],["20261219","Papier 4-wöchentlich"],["20261223","Restmüll 4-wöchentlich"],["20261223","Restmüll 2-wöchentlich"],["20261229","Gelber Sack"],["20261231","Bioabfall 2-wöchentlich"]] };
+function awaTyp(sum){
+  if (/^Restmüll 2/.test(sum)) return { key:"Restmüll 2-wöchentlich", art:"Restmüll", label:"Restmüll" };
+  if (/^Restmüll 4/.test(sum)) return { key:"Restmüll 4-wöchentlich", art:"Restmüll", label:"Restmüll (4-wöchentl.)" };
+  if (/^Bioabfall/.test(sum)) return { key:"Bioabfall", art:"Biomüll", label:"Biomüll" };
+  if (/^Papier/.test(sum)) return { key:"Papier", art:"Papier", label:"Papier" };
+  if (/^Gelber Sack/.test(sum)) return { key:"Gelber Sack", art:"Gelber Sack", label:"Gelber Sack" };
+  if (/^Gartenabfall/.test(sum)) return { key:"Gartenabfall", art:"Gartenabfall", label:"Gartenabfall" };
+  if (/^Problemstoff/.test(sum)) return { key:"Problemstoffsammlung", art:"Problemstoffe", label:"Problemstoffsammlung" };
+  if (/^Christbaum/.test(sum)) return { key:"Christbaumsammlung", art:"Christbaum", label:"Christbaumsammlung" };
+  if (/^Altmetall/.test(sum)) return { key:"Altmetallsammlung Vereine", art:"Altmetall", label:"Altmetallsammlung" };
+  return { key:"Sonstiges", art:"Sonstiges", label:sum };
+}
+const AWA_EV = AWA.events.map(([ds, sum]) => { const t = awaTyp(sum); const hint = (sum.match(/\((.*)\)$/)||[])[1] || ""; return { d: new Date(+ds.slice(0,4), +ds.slice(4,6)-1, +ds.slice(6,8)), m: { art: t.art, label: t.label, key: t.key, hint, official: true } }; });
+const AWA_NUTZEN = ["Restmüll 2-wöchentlich", "Gelber Sack", "Papier"];
+for (let i = AWA_EV.length - 1; i >= 0; i--) if (!AWA_NUTZEN.includes(AWA_EV[i].m.key)) AWA_EV.splice(i, 1);
+const AWA_TYPES = AWA_NUTZEN;
+const MT_KEY = "hehub-muell-aus";
+let muellAus = (() => { try { return JSON.parse(localStorage.getItem(MT_KEY) || "[]"); } catch { return []; } })();
+const saveMuellAus = () => { try { localStorage.setItem(MT_KEY, JSON.stringify(muellAus)); } catch {} };
+const awaUpcoming = () => { const t = today(); return AWA_EV.filter(e => e.d >= t && !muellAus.includes(e.m.key)); };
+const muellNext = () => [...awaUpcoming(), ...ofKind("muell").flatMap(m => muellDates(m, 4).map(d => ({ m: { ...m, label: m.art }, d })))].sort((a,b) => a.d - b.d);
+const binBadge = (art, size="") => { const [bg, fg] = MUELL[art] || MUELL.Sonstiges; return `<span class="bin-badge" style="background:${bg};color:${fg}${size}">${ICON.bin}</span>`; };
+const dayLabelD = d => dayLabel(iso(d));
+
+/* ---------- Fixkosten ---------- */
+const FIX_TYP = ["Miete","Pauschalmiete","Nebenkosten","Versicherung","Strom & Gas","Internet & Handy","Kredit","Abo","Sonstiges"];
+const FIX_RH = { "1":"monatlich", "3":"vierteljährlich", "6":"halbjährlich", "12":"jährlich" };
+function addMonths(base, k){ const day = base.getDate(); const d = new Date(base.getFullYear(), base.getMonth()+k, 1); d.setDate(Math.min(day, new Date(d.getFullYear(), d.getMonth()+1, 0).getDate())); return d; }
+function fixNext(f){
+  const start = parseDate(f.datum); if (!start) return null;
+  const step = Number(f.rhythmus)||1, t = today(); let k = 0, d = start;
+  while (d < t && k < 1200) { k += step; d = addMonths(start, k); }
+  return d;
+}
+const fixMonat = f => (Number(f.betrag)||0) / (Number(f.rhythmus)||1);
+const fixSorted = () => ofKind("fix").map(f => ({ f, d: fixNext(f) })).filter(x => x.d).sort((a,b) => a.d - b.d);
+const dueDays = d => Math.round((d - today())/86400000);
+const isMiete = f => f.typ === "Miete" || f.typ === "Pauschalmiete";
+/* Ampel: rot ≤ 7 Tage, gelb ≤ 30 Tage, grün mehr als 30 Tage */
+function ampel(d){
+  const n = dueDays(d);
+  const cls = n <= 7 ? "crit" : n <= 30 ? "warn" : "ok";
+  const txt = n === 0 ? "heute fällig" : n === 1 ? "morgen fällig" : n <= 30 ? `in ${n} Tagen` : `am ${d.toLocaleDateString("de-DE",{day:"2-digit",month:"2-digit",year:"numeric"})}`;
+  return { cls, n, txt };
+}
+const ampelLight = (cls, title) => `<span class="ampel" role="img" aria-label="${esc(title)}"><i class="${cls==="crit"?"on r":""}"></i><i class="${cls==="warn"?"on y":""}"></i><i class="${cls==="ok"?"on g":""}"></i></span>`;
+
+/* ---------- Geburtstage ---------- */
+function bdayNext(g){
+  const b = parseDate(g.datum); if (!b) return null;
+  const t = today(); let d = new Date(t.getFullYear(), b.getMonth(), b.getDate());
+  if (d < t) d = new Date(t.getFullYear()+1, b.getMonth(), b.getDate());
+  const days = Math.round((d - t)/86400000);
+  const alter = g.jahrUnbekannt ? null : d.getFullYear() - b.getFullYear();
+  return { d, days, alter };
+}
+const bdaySorted = () => ofKind("geburtstag").map(g => ({ g, n: bdayNext(g) })).filter(x => x.n).sort((a,b) => a.n.days - b.n.days);
+const daysText = n => n === 0 ? "heute" : n === 1 ? "morgen" : `in ${n} Tagen`;
+
+const sortedTermine = () => ofKind("termin").slice().sort((a,b) => (a.datum+(a.zeit||"")).localeCompare(b.datum+(b.zeit||"")));
+const upcoming = () => sortedTermine().filter(t => (parseDate(t.datum)||0) >= today());
+
+/* ---------- Belege ---------- */
+let belegJahr = new Date().getFullYear();
+let belegBereich = "H&E Tools";
+const bereichOf = b => b.bereich === "H&E Tools" ? "H&E Tools" : "Wichtige Rechnungen"; // frühere „Privat“-Belege landen in der Ablage
+const belegeJahr = (y, ber = belegBereich) => ofKind("beleg").filter(b => String(b.datum||"").startsWith(String(y)) && (ber === "*" || bereichOf(b) === ber)).sort((a,b) => String(b.datum).localeCompare(String(a.datum)));
+const sum = arr => arr.reduce((s,b) => s + (Number(b.betrag)||0), 0);
+
+/* ---------- Ansichten ---------- */
+function route(){ const h = location.hash.slice(1); return ["fahrzeuge","termine","belege","muell","geburtstage","fixkosten","ablage"].includes(h) ? h : ""; }
+window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); });
+
+function render(){
+  const app = $("#app");
+  if (S.auth === "signedout") { app.innerHTML = loginHtml(); return; }
+  if (S.auth === "pending" || S.auth === "blocked") { app.innerHTML = `<div class="auth-card"><h2>${S.auth === "blocked" ? "Kein Zugriff" : "Fast geschafft"}</h2><p class="muted" style="margin:0">${S.auth === "blocked" ? "Dein Zugang wurde gesperrt." : "Du bist angemeldet als <b>" + esc(S.email) + "</b>. Sobald der Admin dich freigibt, siehst du hier die Kacheln, die für dich bestimmt sind."}</p><div class="toolbar"><button class="primary" data-act="reload">Erneut prüfen</button><button class="ghost" data-act="logout">Abmelden</button></div></div>`; return; }
+  if (!S.ready) { app.innerHTML = `<div class="empty">H&amp;E Hub wird geladen …</div>`; return; }
+  let r = route(); if (r && !visible(r)) r = "";
+  app.innerHTML = r === "fahrzeuge" ? viewFahrzeuge() : r === "termine" ? viewTermine() : r === "belege" ? viewBelege() : r === "muell" ? viewMuell() : r === "geburtstage" ? viewGeburtstage() : r === "fixkosten" ? viewFix() : r === "ablage" ? viewAblage() : viewHome();
+}
+
+function loginHtml(){
+  return `<form id="loginFrm" class="auth-card">
+    <h2>Anmelden</h2>
+    <p class="muted" style="margin:0">Gib deine E-Mail-Adresse ein. Du bekommst einen Link, mit dem du dich ohne Passwort anmeldest.</p>
+    <label class="f">E-Mail<input id="lg-mail" name="email" type="email" autocomplete="email" required placeholder="name@beispiel.de"></label>
+    <label class="f">Dein Name (beim ersten Mal)<input id="lg-name" name="name" autocomplete="given-name" placeholder="z. B. Eva"></label>
+    <button class="primary" type="submit" id="lg-btn">Login-Link senden</button>
+    <div id="lg-msg" class="scan-status" hidden></div>
+  </form>`;
+}
+async function sendLink(form){
+  const fd = new FormData(form), btn = $("#lg-btn"), msg = $("#lg-msg");
+  btn.disabled = true; btn.textContent = "Wird gesendet …";
+  const { error } = await sb.auth.signInWithOtp({ email: String(fd.get("email")).trim(), options: { emailRedirectTo: location.origin + location.pathname, data: { app: "hehub", name: String(fd.get("name") || "").trim() } } });
+  btn.disabled = false; btn.textContent = "Login-Link senden"; msg.hidden = false;
+  if (error) { msg.className = "scan-status warn"; msg.textContent = "Der Link konnte nicht gesendet werden. Bitte gleich noch einmal versuchen."; }
+  else { msg.className = "scan-status ok"; msg.textContent = "Link verschickt. Öffne die E-Mail und tippe auf den Link – am besten auf diesem Gerät."; }
+}
+
+function viewHome(){
+  const fz = ofKind("fahrzeug").slice().sort((a,b) => tuevInfo(a.tuev).months - tuevInfo(b.tuev).months);
+  const next = fz[0];
+  const up = upcoming().slice(0,3);
+  const y = new Date().getFullYear(), bj = belegeJahr(y, "*"), bjH = belegeJahr(y, "H&E Tools");
+  const kritisch = fz.filter(f => ["crit","warn"].includes(tuevInfo(f.tuev).cls)).length;
+  const T = {};
+  T.fahrzeuge = `<a class="tile" href="#fahrzeuge">
+      <div class="tile-head"><div class="tile-title"><span class="chip car">${ICON.car}</span><h2>Fahrzeuge</h2></div><span class="count">${fz.length} im Bestand</span></div>
+      ${next ? `<div style="display:flex;gap:14px;align-items:center">${plakette(next.tuev,64)}<div style="display:grid;gap:6px;min-width:0">${plate(next.kennzeichen)}<span class="muted" style="overflow-wrap:anywhere">${esc(next.name)}</span></div></div>
+        <div><span class="pill ${tuevInfo(next.tuev).cls}">Nächster TÜV · ${esc(tuevInfo(next.tuev).label)}</span></div>`
+        : `<div class="empty">Noch kein Fahrzeug. Lege dein erstes mit Kennzeichen und TÜV-Monat an.</div>`}
+      <div class="tile-foot"><span class="muted">${kritisch ? `${kritisch} TÜV-Termin${kritisch>1?"e":""} bald fällig` : fz.length ? "Alle Plaketten aktuell" : ""}</span><span class="btn primary" data-act="new-fahrzeug">${ICON.plus}Fahrzeug</span></div>
+    </a>`;
+  T.termine = `<a class="tile" href="#termine">
+      <div class="tile-head"><div class="tile-title"><span class="chip cal">${ICON.cal}</span><h2>Termine</h2></div><span class="count">${upcoming().length} anstehend</span></div>
+      ${up.length ? `<ul class="mini-list">${up.map(t => `<li><span class="t"><b>${esc(t.titel)}</b></span><span class="muted num" style="font-size:.85rem;white-space:nowrap">${fmtDate(t.datum).slice(0,6)}${t.zeit?" "+esc(t.zeit):""} · ${dayLabel(t.datum)}</span></li>`).join("")}</ul>`
+        : `<div class="empty">Keine anstehenden Termine.</div>`}
+      <div class="tile-foot"><span></span><span class="btn primary" data-act="new-termin">${ICON.plus}Termin</span></div>
+    </a>`;
+  T.belege = `<a class="tile" href="#belege">
+      <div class="tile-head"><div class="tile-title"><span class="chip bill">${ICON.bill}</span><h2>Rechnungen</h2></div><span class="count">H&amp;E Tools</span></div>
+      <div style="display:grid;gap:4px"><span class="big num">${eur.format(sum(bjH))}</span><span class="muted">H&amp;E Tools · ${bjH.length} Beleg${bjH.length===1?"":"e"} ${y}</span></div>
+      <div class="tile-foot"><span class="muted">Foto machen, Betrag wird ausgelesen</span><span class="btn primary" data-act="new-beleg">${ICON.cam}Fotografieren</span></div>
+    </a>`;
+  T.ablage = tileAblage(); T.fixkosten = tileFix(); T.muell = tileMuell(); T.geburtstage = tileGeburtstage();
+  const shown = TILES.map(([k]) => k).filter(visible);
+  const tiles = shown.map(k => {
+    let h = T[k];
+    if (me.owner) { const n = members.filter(m => m.status === "approved" && m.role !== "admin" && (m.tiles?.[k] || "none") !== "none").length; h = h.replace("</h2></div>", `</h2></div><button class="share-badge ${n ? "alle" : "privat"}" data-act="share" aria-label="Freigaben verwalten">${n ? ICON.people : ICON.lock}${n ? n + (n === 1 ? " Person" : " Personen") : "Privat"}</button>`); }
+    if (!canWrite(k)) h = h.replace(/<span class="btn[^"]*" data-act="new-[^"]*">[\s\S]*?<\/span>/g, "");
+    return h;
+  }).join("");
+  return `${neuigkeitenHtml()}${hinweiseHtml()}${shown.length ? `<div class="tiles">${tiles}</div>` : `<div class="empty">Für dich wurden noch keine Kacheln freigegeben.</div>`}`;
+}
+
+/* ---------- Hinweise / Benachrichtigungen ---------- */
+function hinweise(){
+  const out = [];
+  if (visible("muell")) {
+    const t = today(), m = new Date(t); m.setDate(m.getDate() + 1);
+    const nx = muellNext();
+    const heute = nx.filter(x => +x.d === +t).map(x => x.m.label || x.m.art);
+    const morgen = nx.filter(x => +x.d === +m).map(x => x.m.label || x.m.art);
+    if (heute.length) out.push({ cls: "warn", icon: ICON.bin, href: "#muell", text: `<b>Heute Abfuhr:</b> ${esc([...new Set(heute)].join(" + "))} – bis 6 Uhr bereitstellen` });
+    if (morgen.length) out.push({ cls: "crit", icon: ICON.bin, href: "#muell", text: `<b>Morgen Abfuhr:</b> ${esc([...new Set(morgen)].join(" + "))} – heute Abend rausstellen` });
+  }
+  if (me.owner) { const p = members.filter(m => m.status === "pending").length; if (p) out.push({ cls: "warn", icon: ICON.people, href: "#", act: "share", text: `<b>${p} ${p === 1 ? "Person wartet" : "Personen warten"} auf Freigabe</b> – jetzt Kacheln freigeben` }); }
+  if (visible("fahrzeuge")) {
+    for (const f of ofKind("fahrzeug")) {
+      const i = tuevInfo(f.tuev);
+      if (i.cls === "crit" || i.cls === "warn") out.push({ cls: i.cls, icon: ICON.car, href: "#fahrzeuge", text: `<b>TÜV ${esc((f.kennzeichen||"").toUpperCase())}</b>${f.name?" ("+esc(f.name)+")":""}: ${esc(i.label)}` });
+    }
+  }
+  return out;
+}
+/* Neuigkeiten pro Person: neu freigegebene Kacheln und Änderungen anderer seit dem letzten Besuch */
+const SEEN_KEY = "hehub-gesehen";
+let seen = (() => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "null"); } catch { return null; } })();
+const firstVisitTs = Date.now();
+const names = {}; let namesPending = false;
+async function loadNames(ids){
+  const need = ids.filter(i => i && !(i in names)); if (!need.length || namesPending) return;
+  namesPending = true;
+  try { const { data } = await sb.rpc("he_names"); (data || []).forEach(r => names[r.user_id] = r.name || ""); } catch {}
+  need.forEach(i => { if (!(i in names)) names[i] = ""; });
+  namesPending = false; render();
+}
+const itemTitle = it => it.kind === "fahrzeug" ? (it.kennzeichen || it.name) : it.kind === "termin" ? it.titel : it.kind === "beleg" ? (it.haendler || "Rechnung") : it.kind === "fix" ? it.name : it.kind === "muell" ? it.art : it.kind === "geburtstag" ? it.name : "Eintrag";
+function neuigkeiten(){
+  if (S.mode !== "db") return { tiles: [], changes: [] };
+  const vis = TILES.map(([k]) => k).filter(visible);
+  const since = seen?.ts ?? firstVisitTs;
+  const tiles = me.owner ? [] : vis.filter(k => !(seen?.tiles || []).includes(k));
+  const changes = S.items.filter(i => visible(tileOf(i)) && i.von && i.von !== uid && (i.geaendert || 0) > since).sort((a,b) => b.geaendert - a.geaendert);
+  return { tiles, changes };
+}
+function markSeen(){
+  seen = { ts: Date.now(), tiles: TILES.map(([k]) => k).filter(visible) };
+  try { localStorage.setItem(SEEN_KEY, JSON.stringify(seen)); } catch {}
+  render();
+}
+function neuigkeitenHtml(){
+  const { tiles, changes } = neuigkeiten();
+  if (!tiles.length && !changes.length) return "";
+  loadNames([...new Set(changes.map(c => c.von))]);
+  const label = Object.fromEntries(TILES);
+  const rows = [
+    ...tiles.map(k => `<a class="notice info" href="#${k}">${ICON.people}<span><b>Für dich freigegeben:</b> ${esc(label[k])}</span></a>`),
+    ...changes.slice(0, 6).map(c => { const who = names[c.von] || "Jemand"; const neu = (c.erstellt || 0) > (seen?.ts ?? firstVisitTs); return `<a class="notice info" href="#${tileOf(c)}">${ICON.bell}<span><b>${esc(who)}</b> hat „${esc(itemTitle(c))}“ in ${esc(label[tileOf(c)])} ${neu ? "hinzugefügt" : "geändert"}</span></a>`; })
+  ];
+  if (changes.length > 6) rows.push(`<span class="muted" style="font-size:.85rem;padding-left:4px">+ ${changes.length - 6} weitere Änderungen</span>`);
+  return `<section class="notices" aria-label="Neuigkeiten"><div class="eyebrow" style="display:flex;align-items:center;gap:8px;justify-content:space-between"><span style="display:inline-flex;gap:8px;align-items:center">${ICON.people}Neu für dich</span><button class="ghost" style="min-height:30px;padding:4px 10px;font-size:.78rem" data-act="seen">Als gelesen markieren</button></div>${rows.join("")}</section>`;
+}
+
+function hinweiseHtml(){
+  const h = hinweise(); if (!h.length) return "";
+  return `<section class="notices" aria-label="Benachrichtigungen"><div class="eyebrow" style="display:flex;align-items:center;gap:8px">${ICON.bell}Benachrichtigungen</div>${h.map(n => `<a class="notice ${n.cls}" href="${n.href}" ${n.act ? `data-act="${n.act}"` : ""}>${n.icon}<span>${n.text}</span></a>`).join("")}</section>`;
+}
+
+async function openShare(){
+  await loadMembers();
+  const others = members.filter(m => m.user_id !== uid);
+  const self = members.find(m => m.user_id === uid);
+  openModal(`<form id="shareFrm" style="display:grid;gap:14px">${head("Personen &amp; Freigaben")}
+    <p class="muted" style="margin:0;font-size:.9rem">Wer die App öffnet und sich mit seiner E-Mail anmeldet, erscheint hier als <b>wartend</b>. Du gibst die Person frei und legst pro Kachel fest: kein Zugriff, nur ansehen oder bearbeiten.</p>
+    <p class="muted" style="margin:0;font-size:.85rem">App-Adresse zum Weitergeben: <b style="user-select:all">${esc(location.origin + location.pathname)}</b></p>
+    ${self ? `<label class="f">Dein Anzeigename<input id="selfName" name="selfName" value="${esc(self.name || "")}" placeholder="z. B. Tobi"></label>` : ""}
+    <div style="display:grid;gap:10px">${others.length ? others.map(m => `
+      <div class="member" data-uid="${m.user_id}">
+        <div class="member-head"><div style="display:grid;min-width:0"><b style="overflow-wrap:anywhere">${esc(m.name || m.email || "Unbekannt")}</b><span class="muted" style="font-size:.8rem;overflow-wrap:anywhere">${esc(m.email || "")}</span></div>
+          <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap"><select name="status-${m.user_id}" id="st-${m.user_id}" style="width:auto">${[["pending","Wartet"],["approved","Freigegeben"],["blocked","Gesperrt"]].map(([v,l]) => `<option value="${v}" ${v===m.status?"selected":""}>${l}</option>`).join("")}</select>
+          <button class="ghost danger" data-act="member-del" data-uid="${m.user_id}" style="min-height:36px">Entfernen</button></div></div>
+        ${m.role === "admin" ? `<span class="pill neutral">Admin – sieht alles</span>` : `<div class="tiles-grid">${TILES.map(([k,label]) => `<label>${esc(label)}<select name="t-${m.user_id}-${k}" id="t-${m.user_id}-${k}">${Object.entries(LEVEL).map(([v,l]) => `<option value="${v}" ${v===(m.tiles?.[k]||"none")?"selected":""}>${l}</option>`).join("")}</select></label>`).join("")}</div>`}
+      </div>`).join("") : `<div class="empty">Noch niemand außer dir. Schick deinem Partner die App-Adresse – nach der Anmeldung erscheint er hier.</div>`}</div>
+    <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" type="submit" id="shareSave">Speichern</button></div></form>`);
+}
+async function saveShare(form){
+  const fd = new FormData(form);
+  for (const m of members) {
+    if (m.user_id === uid) { const n = (fd.get("selfName") || "").trim(); if (n !== (m.name || "")) await sb.from("he_members").update({ name: n }).eq("user_id", uid); continue; }
+    const status = fd.get("status-" + m.user_id) || m.status;
+    const tiles = m.role === "admin" ? m.tiles : Object.fromEntries(TILES.map(([k]) => [k, fd.get(`t-${m.user_id}-${k}`) || "none"]).filter(([,v]) => v !== "none"));
+    if (status !== m.status || JSON.stringify(tiles) !== JSON.stringify(m.tiles || {})) {
+      const { error } = await sb.from("he_members").update({ status, tiles }).eq("user_id", m.user_id);
+      if (error) throw error;
+    }
+  }
+  await loadMembers();
+}
+
+function garantieInfo(b){
+  const g = parseDate(b.garantie); if (!g) return null;
+  const n = Math.round((g - today())/86400000);
+  return { n, cls: n < 0 ? "neutral" : n <= 60 ? "warn" : "ok", txt: n < 0 ? "Garantie abgelaufen" : `Garantie bis ${fmtDate(b.garantie)}` };
+}
+const ablageItems = () => ofKind("beleg").filter(b => bereichOf(b) === ABLAGE).sort((a,b) => String(b.datum).localeCompare(String(a.datum)));
+function tileAblage(){
+  const all = ablageItems();
+  const bald = all.map(b => ({ b, g: garantieInfo(b) })).filter(x => x.g && x.g.n >= 0 && x.g.n <= 60);
+  return `<a class="tile" href="#ablage">
+    <div class="tile-head"><div class="tile-title"><span class="chip ablage">${ICON.folder}</span><h2>Wichtige Rechnungen</h2></div><span class="count">${all.length} abgelegt</span></div>
+    ${all.length ? `<ul class="mini-list">${all.slice(0,3).map(b => `<li><span class="t">${esc(b.haendler||"–")}${b.beschreibung?` <span class="muted" style="font-weight:500">· ${esc(b.beschreibung)}</span>`:""}</span><span class="muted num" style="font-size:.82rem;white-space:nowrap">${eur.format(Number(b.betrag)||0)}</span></li>`).join("")}</ul>
+      ${bald.length ? `<span class="pill warn">${bald.length} Garantie${bald.length>1?"n laufen":" läuft"} bald ab</span>` : ""}`
+      : `<div class="empty">Kaufbelege, Garantien und wichtige Rechnungen sicher ablegen – unabhängig von der Steuer.</div>`}
+    <div class="tile-foot"><span class="muted">Nicht Teil der Steuer-Übersicht</span><span class="btn primary" data-act="new-ablage">${ICON.cam}Ablegen</span></div>
+  </a>`;
+}
+let ablageQ = "", ablageKat = "";
+function ablageRows(){
+  const q = ablageQ.trim().toLowerCase();
+  const list = ablageItems().filter(b => (!ablageKat || b.kategorie === ablageKat) && (!q || [b.haendler,b.beschreibung,b.kategorie].join(" ").toLowerCase().includes(q)));
+  if (!list.length) return `<div class="empty">${ablageItems().length ? "Keine Rechnung passt zur Suche." : "Noch nichts abgelegt. Fotografiere z. B. den Kaufbeleg vom Fernseher oder die Rechnung der Waschmaschine."}</div>`;
+  return list.map(b => { const g = garantieInfo(b); return `
+    <div class="row">${b.assetId ? `<button class="thumb" data-act="view-img" data-asset="${esc(b.assetId)}" aria-label="Foto ansehen"><img src="${blobUrl(b.assetId)}" alt="" loading="lazy"></button>` : `<span class="thumb" aria-hidden="true">kein Foto</span>`}
+      <div class="main"><span class="t">${esc(b.haendler||"–")}${b.beschreibung?` <span class="muted" style="font-weight:500">· ${esc(b.beschreibung)}</span>`:""}</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="muted num" style="font-size:.85rem">${fmtDate(b.datum)}</span><span class="pill neutral">${esc(b.kategorie||"Sonstiges")}</span>${g?`<span class="pill ${g.cls}">${g.txt}</span>`:""}</div></div>
+      <div class="acts" style="align-items:center"><span class="amount">${eur.format(Number(b.betrag)||0)}</span><button data-act="edit" data-id="${b.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${b.id}">Löschen</button></div>
+    </div>`; }).join("");
+}
+function viewAblage(){
+  const kats = [...new Set(ablageItems().map(b => b.kategorie).filter(Boolean))].sort();
+  return `<section style="display:grid;gap:16px">
+    <div class="view-head">${backBtn}<button class="primary" data-act="new-ablage">${ICON.cam}Rechnung ablegen</button></div>
+    <h2 class="page-title">Wichtige Rechnungen</h2>
+    <p class="muted" style="margin:0">Kaufbelege und Garantienachweise. Diese Rechnungen zählen nicht zur Steuer-Übersicht.</p>
+    <div class="toolbar"><input id="ablageQ" type="search" placeholder="Suchen: Händler, Gerät …" value="${esc(ablageQ)}" style="max-width:320px">
+      <select id="ablageKat" class="year"><option value="">Alle Kategorien</option>${kats.map(k => `<option ${k===ablageKat?"selected":""}>${esc(k)}</option>`).join("")}</select></div>
+    <div class="list" id="ablageList">${ablageRows()}</div>
+  </section>`;
+}
+
+function tileFix(){
+  const list = fixSorted(); const monat = ofKind("fix").reduce((s,f) => s + fixMonat(f), 0);
+  const miete = list.find(x => isMiete(x.f));
+  const next = list.filter(x => x !== miete).slice(0, miete ? 2 : 3);
+  const pillFor = d => { const a = ampel(d); return `<span style="display:inline-flex;align-items:center;gap:8px;white-space:nowrap"><span class="pill ${a.cls}" style="font-size:.78rem">${a.txt}</span>${ampelLight(a.cls, a.txt)}</span>`; };
+  return `<a class="tile" href="#fixkosten">
+    <div class="tile-head"><div class="tile-title"><span class="chip fix">${ICON.fix}</span><h2>Miete &amp; Versicherungen</h2></div></div>
+    ${list.length ? `<div style="display:grid;gap:4px"><span class="big num">${eur.format(monat)}</span><span class="muted">Fixkosten pro Monat (umgerechnet)</span></div>
+      <ul class="mini-list">
+        ${miete ? `<li style="background:var(--c-fix-soft)"><span class="t">${esc(miete.f.typ)} · ${eur.format(miete.f.betrag||0)} <span class="muted" style="font-weight:500">${esc(FIX_RH[String(miete.f.rhythmus||1)])}</span></span>${pillFor(miete.d)}</li>` : ""}
+        ${next.map(({f,d}) => `<li><span class="t">${esc(f.name)} <span class="muted" style="font-weight:500">· ${eur.format(f.betrag||0)}</span></span>${pillFor(d)}</li>`).join("")}
+      </ul>`
+      : `<div class="empty">Trage Miete, Versicherungen und andere feste Zahlungen ein – mit Betrag, Fälligkeit und Konto.</div>`}
+    <div class="tile-foot"><span></span><span class="btn primary" data-act="new-fix">${ICON.plus}Zahlung</span></div>
+  </a>`;
+}
+
+function viewFix(){
+  const list = fixSorted();
+  const all = ofKind("fix");
+  const monat = all.reduce((s,f) => s + fixMonat(f), 0);
+  const konten = [...new Set(all.map(f => f.konto || "Ohne Konto"))].sort();
+  const byTyp = FIX_TYP.map(t => [t, all.filter(f => f.typ === t).reduce((s,f) => s + fixMonat(f), 0)]).filter(([,v]) => v > 0);
+  const row = ({f,d}) => { const a = ampel(d); return `
+    <div class="row ampel-row ${a.cls}"><div class="date-block fix"><div class="d">${d.getDate()}</div><div class="m">${MONATE[d.getMonth()]}</div></div>
+      <div class="main"><span class="t">${esc(f.name)}</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${ampelLight(a.cls, a.txt)}<span class="pill ${a.cls}">fällig ${a.txt}</span><span class="pill neutral">${esc(f.typ||"Sonstiges")}</span><span class="muted" style="font-size:.88rem">${esc(FIX_RH[String(f.rhythmus||1)])}${f.anbieter?" · "+esc(f.anbieter):""}${f.vertragsnr?" · Nr. "+esc(f.vertragsnr):""}</span></div>
+        ${f.notiz?`<span class="muted" style="font-size:.9rem;overflow-wrap:anywhere">${esc(f.notiz)}</span>`:""}</div>
+      <div class="acts" style="align-items:center"><span class="amount">${eur.format(f.betrag||0)}</span><button data-act="edit" data-id="${f.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${f.id}">Löschen</button></div>
+    </div>`; };
+  return `<section style="display:grid;gap:18px">
+    <div class="view-head">${backBtn}<button class="primary" data-act="new-fix">${ICON.plus}Zahlung hinzufügen</button></div>
+    <h2 class="page-title">Miete &amp; Versicherungen</h2>
+    <div class="legend"><span>${ampelLight("ok","grün")}mehr als 30 Tage</span><span>${ampelLight("warn","gelb")}in 8–30 Tagen</span><span>${ampelLight("crit","rot")}in 7 Tagen oder weniger</span></div>
+    ${all.length ? `<div class="sums">
+        <div class="sum total"><span class="k">Fixkosten pro Monat</span><span class="v num">${eur.format(monat)}</span></div>
+        <div class="sum"><span class="k">Pro Jahr</span><span class="v num">${eur.format(monat*12)}</span></div>
+        ${byTyp.map(([k,v]) => `<div class="sum"><span class="k">${esc(k)} / Monat</span><span class="v num">${eur.format(v)}</span></div>`).join("")}
+      </div>
+      ${konten.map(k => { const items = list.filter(x => (x.f.konto || "Ohne Konto") === k); const m = items.reduce((s,x) => s + fixMonat(x.f), 0); return `
+        <div class="konto-group"><div class="konto-head"><h3>${ICON.bank}${esc(k)}</h3><span class="muted">${items.length} Zahlung${items.length===1?"":"en"} · <span class="amount">${eur.format(m)}</span> / Monat</span></div>
+        <div class="list">${items.map(row).join("")}</div></div>`; }).join("")}`
+      : `<div class="empty">Noch keine festen Zahlungen. Lege z. B. die Miete an: Betrag, nächste Fälligkeit, monatlich, vom Girokonto.</div>`}
+  </section>`;
+}
+
+function tileMuell(){
+  const nx = muellNext(); const first = nx[0];
+  const rest = nx.filter(x => !first || +x.d !== +first.d).slice(0,3);
+  const soon = first && Math.round((first.d - today())/86400000) <= 1;
+  return `<a class="tile" href="#muell">
+    <div class="tile-head"><div class="tile-title"><span class="chip bin">${ICON.bin}</span><h2>Müllplan</h2></div><span class="count">Tettnang III</span></div>
+    ${first ? `<div class="next-hl ${soon?"soon":""}">${binBadge(first.m.art)}<div style="display:grid;gap:2px;min-width:0"><b>${esc(first.m.label || first.m.art)}${nx.filter(x => x !== first && +x.d === +first.d).map(x => " + " + esc(x.m.label || x.m.art)).join("")}</b><span style="font-size:.88rem">${dayLabelD(first.d)} · ${first.d.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}${soon && dayLabelD(first.d)==="morgen" ? " – heute Abend rausstellen" : ""}</span></div></div>
+      ${rest.length ? `<ul class="mini-list">${rest.map(x => `<li><span class="t" style="display:flex;align-items:center;gap:8px"><span class="bin-dot" style="background:${(MUELL[x.m.art]||MUELL.Sonstiges)[0]}"></span>${esc(x.m.label || x.m.art)}</span><span class="muted num" style="font-size:.82rem;white-space:nowrap">${x.d.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}</span></li>`).join("")}</ul>` : ""}`
+      : `<div class="empty">Keine weiteren Termine im Kalender ${AWA.bis.slice(0,4)}. Der neue Abfuhrkalender des Bodenseekreises erscheint jeweils Ende des Jahres.</div>`}
+    <div class="tile-foot"><span></span><span class="btn" data-act="new-muell">${ICON.plus}Eigener Termin</span></div>
+  </a>`;
+}
+
+function tileGeburtstage(){
+  const list = bdaySorted().slice(0,3);
+  return `<a class="tile" href="#geburtstage">
+    <div class="tile-head"><div class="tile-title"><span class="chip bday">${ICON.cake}</span><h2>Geburtstage</h2></div><span class="count">${ofKind("geburtstag").length} gespeichert</span></div>
+    ${list.length ? `<ul class="mini-list">${list.map(({g,n}) => `<li><span class="t">${esc(g.name)}${n.alter!=null?` <span class="muted" style="font-weight:500">wird ${n.alter}</span>`:""}</span><span class="${n.days<=7?"pill warn":"muted num"}" style="font-size:.82rem;white-space:nowrap">${daysText(n.days)}</span></li>`).join("")}</ul>`
+      : `<div class="empty">Noch keine Geburtstage. Füge Familie und Freunde hinzu, mit Notiz für Geschenkideen.</div>`}
+    <div class="tile-foot"><span></span><span class="btn primary" data-act="new-geburtstag">${ICON.plus}Geburtstag</span></div>
+  </a>`;
+}
+
+function viewMuell(){
+  const ms = ofKind("muell").map(m => ({ m, ds: muellDates(m, 4) })).sort((a,b) => (a.ds[0]||Infinity) - (b.ds[0]||Infinity));
+  const days = []; for (const e of awaUpcoming()) { const k = +e.d; let g = days.find(x => x.k === k); if (!g) { g = { k, d: e.d, items: [] }; days.push(g); } g.items.push(e.m); }
+  return `<section style="display:grid;gap:16px">
+    <div class="view-head">${backBtn}<button data-act="new-muell">${ICON.plus}Eigener Termin</button></div>
+    <h2 class="page-title">Müllplan</h2>
+    <p class="muted" style="margin:0">${esc(AWA.quelle)} (Gitzensteig). Bereitstellung bis 6:00 Uhr am Abfuhrtag, frühestens am Vortag.</p>
+    <div class="dates" role="group" aria-label="Abfallarten anzeigen">${AWA_TYPES.map(k => { const on = !muellAus.includes(k); const t = AWA_EV.find(e => e.m.key === k).m; return `<button class="${on?"":"ghost"}" style="min-height:34px;padding:5px 12px;font-size:.8rem${on?"":";text-decoration:line-through"}" aria-pressed="${on}" data-act="muell-typ" data-k="${esc(k)}"><span class="bin-dot" style="background:${(MUELL[t.art]||MUELL.Sonstiges)[0]}"></span>${esc(k)}</button>`; }).join("")}</div>
+    ${days.length ? `<div class="list">${days.slice(0,12).map(g => { const n = Math.round((g.d - today())/86400000); return `
+      <div class="row ${n<=1?"ampel-row warn":""}" style="grid-template-columns:auto 1fr"><div class="date-block" style="background:var(--c-bin-soft);color:var(--c-bin)"><div class="d">${g.d.getDate()}</div><div class="m">${MONATE[g.d.getMonth()]}</div></div>
+        <div class="main"><span class="muted" style="font-size:.85rem;font-weight:600">${g.d.toLocaleDateString("de-DE",{weekday:"long"})} · ${dayLabelD(g.d)}${n===1?" – heute Abend rausstellen":""}</span>
+          <div class="dates">${g.items.map(m => `<span class="date-chip" style="display:inline-flex;align-items:center;gap:6px;color:var(--ink)"><span class="bin-dot" style="background:${(MUELL[m.art]||MUELL.Sonstiges)[0]}"></span>${esc(m.label)}${m.hint?` <span class="muted" style="font-weight:500">(${esc(m.hint)})</span>`:""}</span>`).join("")}</div></div>
+      </div>`; }).join("")}</div>
+      ${days.length > 12 ? `<p class="muted" style="margin:0;font-size:.85rem">+ ${days.length-12} weitere Termine bis ${fmtDate(AWA.bis)}</p>` : ""}`
+      : `<div class="empty">Keine weiteren Termine bis ${fmtDate(AWA.bis)}. Sobald der Abfuhrkalender ${+AWA.bis.slice(0,4)+1} erscheint, kann er hier ergänzt werden.</div>`}
+    <h3 style="margin-top:8px">Eigene Termine</h3>
+    ${ms.length ? `<div class="list">${ms.map(({m,ds}) => `
+      <div class="row">${binBadge(m.art)}
+        <div class="main"><span class="t">${esc(m.art)}</span>
+          <span class="muted" style="font-size:.88rem">${esc(RHYTHMUS[String(m.rhythmus||0)]||"")}${m.notiz?" · "+esc(m.notiz):""}</span>
+          ${ds.length ? `<div class="dates">${ds.map((d,i) => `<span class="date-chip" ${i===0?'style="background:var(--c-bin-soft);color:var(--c-bin)"':""}>${d.toLocaleDateString("de-DE",{weekday:"short",day:"2-digit",month:"2-digit"})}${i===0?" · "+dayLabelD(d):""}</span>`).join("")}</div>` : `<span class="pill neutral">Kein kommender Termin</span>`}
+        </div>
+        <div class="acts"><button data-act="edit" data-id="${m.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${m.id}">Löschen</button></div>
+      </div>`).join("")}</div>`
+      : `<div class="empty">Für zusätzliche Abholungen, z. B. Sperrmüll nach Anmeldung.</div>`}
+  </section>`;
+}
+
+function viewGeburtstage(){
+  const list = bdaySorted();
+  return `<section style="display:grid;gap:16px">
+    <div class="view-head">${backBtn}<button class="primary" data-act="new-geburtstag">${ICON.plus}Geburtstag hinzufügen</button></div>
+    <h2 class="page-title">Geburtstage</h2>
+    ${list.length ? `<div class="list">${list.map(({g,n}) => `
+      <div class="row"><div class="date-block bday"><div class="d">${n.d.getDate()}</div><div class="m">${MONATE[n.d.getMonth()]}</div></div>
+        <div class="main"><span class="t">${esc(g.name)}</span>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="pill ${n.days<=7?"warn":"neutral"}">${daysText(n.days)}</span>${n.alter!=null?`<span class="muted" style="font-size:.88rem">wird ${n.alter} · geboren ${fmtDate(g.datum)}</span>`:""}${g.beziehung?`<span class="muted" style="font-size:.88rem">${esc(g.beziehung)}</span>`:""}</div>
+          ${g.notiz?`<span class="muted" style="font-size:.9rem;overflow-wrap:anywhere">🎁 ${esc(g.notiz)}</span>`:""}</div>
+        <div class="acts"><button data-act="edit" data-id="${g.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${g.id}">Löschen</button></div>
+      </div>`).join("")}</div>`
+      : `<div class="empty">Noch keine Geburtstage gespeichert.</div>`}
+  </section>`;
+}
+
+const backBtn = `<a class="btn ghost back" href="#">${ICON.back}Übersicht</a>`;
+
+function viewFahrzeuge(){
+  const fz = ofKind("fahrzeug").slice().sort((a,b) => tuevInfo(a.tuev).months - tuevInfo(b.tuev).months);
+  return `<section style="display:grid;gap:16px">
+    <div class="view-head">${backBtn}<button class="primary" data-act="new-fahrzeug">${ICON.plus}Fahrzeug hinzufügen</button></div>
+    <h2 class="page-title">Fahrzeuge</h2>
+    ${fz.length ? `<div class="list">${fz.map(f => { const t = tuevInfo(f.tuev); return `
+      <div class="row">${plakette(f.tuev,56)}
+        <div class="main"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">${plate(f.kennzeichen)}<span class="t">${esc(f.name)}</span></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="pill ${t.cls}">${esc(t.label)}</span>${f.km?`<span class="muted num" style="font-size:.85rem">${Number(f.km).toLocaleString("de-DE")} km</span>`:""}</div>
+          ${f.notiz?`<div class="muted" style="font-size:.9rem;overflow-wrap:anywhere">${esc(f.notiz)}</div>`:""}</div>
+        <div class="acts"><button data-act="edit" data-id="${f.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${f.id}">Löschen</button></div>
+      </div>`; }).join("")}</div>`
+      : `<div class="empty">Noch keine Fahrzeuge. Füge eins hinzu – Kennzeichen, Bezeichnung und den Monat der nächsten Hauptuntersuchung.</div>`}
+  </section>`;
+}
+
+function viewTermine(){
+  const all = sortedTermine(); const t0 = today();
+  const fut = all.filter(t => (parseDate(t.datum)||0) >= t0), past = all.filter(t => (parseDate(t.datum)||0) < t0).reverse();
+  const row = (t, isPast) => { const d = parseDate(t.datum) || new Date(); return `
+    <div class="row ${isPast?"past":""}"><div class="date-block"><div class="d">${d.getDate()}</div><div class="m">${MONATE[d.getMonth()]}</div></div>
+      <div class="main"><span class="t">${esc(t.titel)}</span><span class="muted" style="font-size:.9rem">${fmtDate(t.datum)}${t.zeit?" · "+esc(t.zeit)+" Uhr":""} · ${dayLabel(t.datum)}${t.ort?" · "+esc(t.ort):""}</span>
+      ${t.notiz?`<span class="muted" style="font-size:.9rem;overflow-wrap:anywhere">${esc(t.notiz)}</span>`:""}</div>
+      <div class="acts"><button data-act="edit" data-id="${t.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${t.id}">Löschen</button></div></div>`; };
+  return `<section style="display:grid;gap:16px">
+    <div class="view-head">${backBtn}<button class="primary" data-act="new-termin">${ICON.plus}Termin hinzufügen</button></div>
+    <h2 class="page-title">Termine</h2>
+    ${fut.length ? `<div class="list">${fut.map(t => row(t,false)).join("")}</div>` : `<div class="empty">Keine anstehenden Termine.</div>`}
+    ${past.length ? `<details><summary class="eyebrow" style="cursor:pointer">Vergangene Termine (${past.length})</summary><div class="list" style="margin-top:10px">${past.map(t => row(t,true)).join("")}</div></details>` : ""}
+  </section>`;
+}
+
+function viewBelege(){
+  const years = new Set([new Date().getFullYear(), ...ofKind("beleg").map(b => Number(String(b.datum||"").slice(0,4))).filter(Boolean)]);
+  const ys = [...years].sort((a,b) => b-a);
+  const list = belegeJahr(belegJahr);
+  const biz = belegBereich === "H&E Tools";
+  const byKat = katsFor(belegBereich).map(k => [k, sum(list.filter(b => (b.kategorie||"Sonstiges") === k))]).filter(([,v]) => v > 0);
+  const mwst = list.reduce((s,b) => s + (Number(b.mwst)||0), 0);
+  return `<section style="display:grid;gap:16px">
+    <div class="view-head">${backBtn}<button class="primary" data-act="new-beleg">${ICON.cam}Rechnung fotografieren</button></div>
+    <div class="view-head"><h2 class="page-title">Rechnungen H&amp;E Tools</h2>
+      <div class="toolbar"><label class="f" for="jahrSel" style="grid-auto-flow:column;align-items:center;gap:8px">Jahr
+        <select id="jahrSel" class="year">${ys.map(y => `<option ${y===belegJahr?"selected":""}>${y}</option>`).join("")}</select></label>
+        <button data-act="export" ${list.length?"":"disabled"}>${ICON.dl}${downloads ? "Als CSV exportieren" : "Tabelle kopieren"}</button></div></div>
+    <div class="sums">
+      <div class="sum total"><span class="k">${esc(belegBereich)} · Summe ${belegJahr} (brutto)</span><span class="v num">${eur.format(sum(list))}</span></div>
+      ${biz ? `<div class="sum"><span class="k">davon MwSt (Vorsteuer)</span><span class="v num">${eur.format(mwst)}</span></div><div class="sum"><span class="k">Netto</span><span class="v num">${eur.format(sum(list)-mwst)}</span></div>` : ""}
+      ${byKat.map(([k,v]) => `<div class="sum"><span class="k">${esc(k)}</span><span class="v num">${eur.format(v)}</span></div>`).join("")}
+    </div>
+    ${list.length ? `<div class="table-wrap"><table>
+      <thead><tr><th>Beleg</th><th>Datum</th><th>Aussteller</th><th>Kategorie</th>${biz?'<th class="r">MwSt</th>':""}<th class="r">Brutto</th><th></th></tr></thead>
+      <tbody>${list.map(b => `<tr>
+        <td>${b.assetId ? `<button class="thumb" data-act="view-img" data-asset="${esc(b.assetId)}" aria-label="Beleg-Foto ansehen"><img src="${blobUrl(b.assetId)}" alt="" loading="lazy"></button>` : `<span class="thumb" aria-hidden="true">kein Foto</span>`}</td>
+        <td class="num">${fmtDate(b.datum)}</td>
+        <td><b>${esc(b.haendler||"–")}</b>${b.beschreibung?`<div class="muted" style="font-size:.85rem">${esc(b.beschreibung)}</div>`:""}</td>
+        <td><span class="pill neutral">${esc(b.kategorie||"Sonstiges")}</span></td>
+        ${biz?`<td class="r num muted">${b.mwst!=null&&b.mwst!==""?eur.format(Number(b.mwst)||0):"–"}</td>`:""}
+        <td class="r num">${eur.format(Number(b.betrag)||0)}</td>
+        <td class="r" style="white-space:nowrap"><button class="ghost" data-act="edit" data-id="${b.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${b.id}">Löschen</button></td>
+      </tr>`).join("")}</tbody>
+      <tfoot><tr><td colspan="4">Gesamt ${belegJahr}</td>${biz?`<td class="r num">${eur.format(mwst)}</td>`:""}<td class="r num">${eur.format(sum(list))}</td><td></td></tr></tfoot>
+    </table></div>` : `<div class="empty">Für ${esc(belegBereich)} ${belegJahr} sind noch keine Rechnungen erfasst. Fotografiere eine Rechnung – Betrag, Datum und Aussteller werden automatisch eingetragen.</div>`}
+  </section>`;
+}
+
+/* ---------- Dialoge ---------- */
+function openModal(html){ $("#modalRoot").innerHTML = `<div class="overlay" data-act="close-bg"><div class="sheet" role="dialog" aria-modal="true">${html}</div></div>`; const f = $("#modalRoot input, #modalRoot select"); f && f.focus(); }
+function closeModal(){ $("#modalRoot").innerHTML = ""; pending = null; }
+function toast(msg){ const r = $("#toastRoot"); r.innerHTML = `<div class="toast">${esc(msg)}</div>`; clearTimeout(toast.t); toast.t = setTimeout(() => r.innerHTML = "", 2600); }
+const head = t => `<div class="sheet-head"><h3>${t}</h3><button class="ghost" data-act="close" aria-label="Schließen">✕</button></div>`;
+const foot = (label="Speichern") => `<div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" type="submit" id="saveBtn">${label}</button></div>`;
+
+function formFahrzeug(f = {}){
+  openModal(`<form id="frm" data-kind="fahrzeug" data-id="${f.id||""}" style="display:grid;gap:14px">${head(f.id?"Fahrzeug bearbeiten":"Neues Fahrzeug")}
+    <div class="fields">
+      <label class="f">Kennzeichen<input id="fz-kz" name="kennzeichen" required placeholder="FN-AB 123" value="${esc(f.kennzeichen)}"></label>
+      <label class="f">Bezeichnung<input id="fz-name" name="name" required placeholder="z. B. VW Golf" value="${esc(f.name)}"></label>
+      <label class="f">TÜV fällig (Monat)<input id="fz-tuev" name="tuev" type="month" value="${esc(f.tuev)}"></label>
+      <label class="f">Kilometerstand<input id="fz-km" name="km" inputmode="numeric" value="${esc(f.km)}"></label>
+      <label class="f full">Notiz<textarea id="fz-notiz" name="notiz" placeholder="Reifen, Versicherung, Service …">${esc(f.notiz)}</textarea></label>
+    </div>${foot()}</form>`);
+}
+function formFix(f = {}){
+  const konten = [...new Set(ofKind("fix").map(x => x.konto).filter(Boolean))];
+  openModal(`<form id="frm" data-kind="fix" data-id="${f.id||""}" style="display:grid;gap:14px">${head(f.id?"Zahlung bearbeiten":"Neue feste Zahlung")}
+    <div class="fields">
+      <label class="f">Art<select id="fx-typ" name="typ">${FIX_TYP.map(t => `<option ${t===(f.typ||"Versicherung")?"selected":""}>${t}</option>`).join("")}</select></label>
+      <label class="f">Bezeichnung<input id="fx-name" name="name" required placeholder="z. B. Haftpflicht" value="${esc(f.name)}"></label>
+      <label class="f">Betrag (€)<input id="fx-betrag" name="betrag" inputmode="decimal" required placeholder="0,00" value="${f.betrag!=null?esc(String(f.betrag).replace(".",",")):""}"></label>
+      <label class="f">Zahlweise<select id="fx-rh" name="rhythmus">${Object.entries(FIX_RH).map(([v,l]) => `<option value="${v}" ${v===String(f.rhythmus ?? 1)?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label class="f">Nächste Fälligkeit<input id="fx-datum" name="datum" type="date" required value="${esc(f.datum||iso(today()))}"></label>
+      <label class="f">Von Konto<input id="fx-konto" name="konto" list="kontoList" placeholder="z. B. Giro Sparkasse" value="${esc(f.konto)}"><datalist id="kontoList">${konten.map(k => `<option value="${esc(k)}">`).join("")}</datalist></label>
+      <label class="f">Anbieter<input id="fx-anb" name="anbieter" placeholder="z. B. HUK, Vermieter" value="${esc(f.anbieter)}"></label>
+      <label class="f">Vertrags-/Policennummer<input id="fx-nr" name="vertragsnr" value="${esc(f.vertragsnr)}"></label>
+      <label class="f full">Notiz<textarea id="fx-notiz" name="notiz" placeholder="Kündigungsfrist, Ansprechpartner …">${esc(f.notiz)}</textarea></label>
+    </div>
+    <p class="muted" style="margin:0;font-size:.82rem">Beim Konto reicht ein Name wie „Giro Sparkasse“ – bitte keine IBAN eintragen.</p>
+    ${foot()}</form>`);
+}
+function formMuell(m = {}){
+  openModal(`<form id="frm" data-kind="muell" data-id="${m.id||""}" style="display:grid;gap:14px">${head(m.id?"Tonne bearbeiten":"Neue Tonne")}
+    <div class="fields">
+      <label class="f full">Art<select id="mu-art" name="art">${Object.keys(MUELL).map(a => `<option ${a===(m.art||"Restmüll")?"selected":""}>${a}</option>`).join("")}</select></label>
+      <label class="f">Nächste Abholung<input id="mu-datum" name="datum" type="date" required value="${esc(m.datum||iso(today()))}"></label>
+      <label class="f">Rhythmus<select id="mu-rh" name="rhythmus">${Object.entries(RHYTHMUS).map(([v,l]) => `<option value="${v}" ${v===String(m.rhythmus ?? 14)?"selected":""}>${l}</option>`).join("")}</select></label>
+      <label class="f full">Notiz<input id="mu-notiz" name="notiz" placeholder="z. B. Tonne steht hinterm Haus" value="${esc(m.notiz)}"></label>
+    </div>${foot()}</form>`);
+}
+function formGeburtstag(g = {}){
+  openModal(`<form id="frm" data-kind="geburtstag" data-id="${g.id||""}" style="display:grid;gap:14px">${head(g.id?"Geburtstag bearbeiten":"Neuer Geburtstag")}
+    <div class="fields">
+      <label class="f">Name<input id="gb-name" name="name" required value="${esc(g.name)}"></label>
+      <label class="f">Beziehung<input id="gb-bez" name="beziehung" placeholder="z. B. Mama, Freund" value="${esc(g.beziehung)}"></label>
+      <label class="f">Geburtsdatum<input id="gb-datum" name="datum" type="date" required value="${esc(g.datum)}"></label>
+      <label class="check" style="align-self:end;padding-bottom:10px"><input id="gb-ju" name="jahrUnbekannt" type="checkbox" ${g.jahrUnbekannt?"checked":""}> Jahr unbekannt</label>
+      <label class="f full">Geschenkideen / Notiz<textarea id="gb-notiz" name="notiz">${esc(g.notiz)}</textarea></label>
+    </div>${foot()}</form>`);
+}
+function formTermin(t = {}){
+  openModal(`<form id="frm" data-kind="termin" data-id="${t.id||""}" style="display:grid;gap:14px">${head(t.id?"Termin bearbeiten":"Neuer Termin")}
+    <div class="fields">
+      <label class="f full">Titel<input id="tm-titel" name="titel" required placeholder="z. B. Reifenwechsel" value="${esc(t.titel)}"></label>
+      <label class="f">Datum<input id="tm-datum" name="datum" type="date" required value="${esc(t.datum||iso(today()))}"></label>
+      <label class="f">Uhrzeit<input id="tm-zeit" name="zeit" type="time" value="${esc(t.zeit)}"></label>
+      <label class="f full">Ort<input id="tm-ort" name="ort" value="${esc(t.ort)}"></label>
+      <label class="f full">Notiz<textarea id="tm-notiz" name="notiz">${esc(t.notiz)}</textarea></label>
+    </div>${foot()}</form>`);
+}
+
+const katOptions = (ber, sel) => katsFor(ber).map(k => `<option ${k===(sel||"Sonstiges")?"selected":""}>${esc(k)}</option>`).join("");
+let pending = null; // { blob, previewUrl, ctl }
+async function formBeleg(b = {}, defBer){
+  const ber0 = b.id ? bereichOf(b) : (defBer || belegBereich);
+  const canScan = sample ? !!(await sample.limits().catch(() => null))?.images : false;
+  openModal(`<form id="frm" data-kind="beleg" data-id="${b.id||""}" style="display:grid;gap:14px">${head(b.id?"Rechnung bearbeiten":ber0===ABLAGE?"Wichtige Rechnung ablegen":"Rechnung erfassen")}
+    ${b.id ? "" : `<div class="photo-zone">
+      <label class="drop" for="bl-foto">${ICON.cam}Foto aufnehmen oder wählen</label>
+      <input id="bl-foto" type="file" accept="image/*" capture="environment" hidden>
+      <img id="bl-prev" class="photo-preview" alt="Vorschau der Rechnung" hidden>
+      <div id="bl-status" class="scan-status">${canScan ? "Nach dem Foto werden Betrag, Datum und Aussteller automatisch ausgelesen. Du kannst alles vor dem Speichern prüfen." : "Automatisches Auslesen ist in dieser Ansicht nicht verfügbar. Das Foto wird trotzdem gespeichert – trage den Betrag bitte selbst ein."}</div>
+    </div>`}
+    <div class="fields">
+      <label class="f full">Zuordnung<select id="bl-bereich" name="bereich">${[...BEREICHE, ABLAGE].map(x => `<option value="${esc(x)}" ${x===ber0?"selected":""}>${esc(BER_LABEL[x])}</option>`).join("")}</select></label>
+      <label class="f">Betrag (€, brutto)<input id="bl-betrag" name="betrag" inputmode="decimal" required placeholder="0,00" value="${b.betrag!=null?esc(String(b.betrag).replace(".",",")):""}"></label>
+      <label class="f">Rechnungsdatum<input id="bl-datum" name="datum" type="date" required value="${esc(b.datum||iso(today()))}"></label>
+      <label class="f full">Aussteller<input id="bl-haendler" name="haendler" placeholder="Firma / Geschäft" value="${esc(b.haendler)}"></label>
+      <label class="f">Kategorie<select id="bl-kat" name="kategorie">${katOptions(ber0, b.kategorie)}</select></label>
+      <label class="f">davon MwSt (€)<input id="bl-mwst" name="mwst" inputmode="decimal" placeholder="optional" value="${b.mwst!=null&&b.mwst!==""?esc(String(b.mwst).replace(".",",")):""}"></label>
+      <label class="f full" id="bl-gar-wrap" ${ber0===ABLAGE?"":"hidden"}>Garantie bis (optional)<input id="bl-garantie" name="garantie" type="date" value="${esc(b.garantie)}"></label>
+      <label class="f full">Beschreibung<input id="bl-beschr" name="beschreibung" placeholder="z. B. Heizungswartung, Arbeitslohn 180 €" value="${esc(b.beschreibung)}"></label>
+    </div>${foot()}</form>`);
+  pending = { canScan };
+}
+
+async function shrink(file){
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = url; });
+    const max = 1600, sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth*sc); c.height = Math.round(img.naturalHeight*sc);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return await new Promise(res => c.toBlob(b => res(b), "image/jpeg", 0.85));
+  } finally { URL.revokeObjectURL(url); }
+}
+
+async function onPhoto(file){
+  const st = $("#bl-status"), prev = $("#bl-prev");
+  st.className = "scan-status"; st.textContent = "Foto wird vorbereitet …";
+  let blob;
+  try { blob = await shrink(file); } catch { st.className = "scan-status warn"; st.textContent = "Dieses Bildformat kann nicht gelesen werden. Bitte ein JPG oder PNG wählen."; return; }
+  if (!pending) return;
+  pending.blob = blob;
+  prev.src = URL.createObjectURL(blob); prev.hidden = false;
+  if (!pending.canScan) { st.className = "scan-status"; st.textContent = "Foto übernommen. Bitte Betrag und Datum eintragen."; return; }
+  st.textContent = "Rechnung wird gelesen … (dauert meist 10–30 Sekunden)";
+  const ctl = new AbortController(); pending.ctl = ctl;
+  const scanBereich = $("#bl-bereich")?.value || "H&E Tools";
+  try {
+    const r = await sample.json(
+      `Das Bild zeigt eine deutsche Rechnung oder einen Kassenbon. Lies die Angaben aus.
+Antworte NUR mit einem JSON-Objekt dieser Form:
+{"betrag": 123.45, "datum": "YYYY-MM-DD", "haendler": "Name des Ausstellers", "beschreibung": "kurze Beschreibung der Leistung, max. 60 Zeichen", "kategorie": "eine aus der Liste", "arbeitskosten": 0, "mwst": 19.00}
+- betrag: Endbetrag brutto in Euro als Zahl (Punkt als Dezimaltrenner). Falls unlesbar: null.
+- datum: Rechnungsdatum; falls unlesbar: null.
+- mwst: Summe der ausgewiesenen Mehrwertsteuer in Euro (alle Steuersätze zusammen); falls nicht ausgewiesen: null.
+- arbeitskosten: ausgewiesener Lohn-/Arbeitsanteil brutto (wichtig für §35a), sonst 0.
+- kategorie: genau eine aus ${JSON.stringify(katsFor(scanBereich))}.${scanBereich === ABLAGE ? " Es ist ein privater Kaufbeleg zur Ablage (z. B. für Garantie); beschreibung = gekaufter Artikel." : ""}${scanBereich === "H&E Tools" ? " Es ist ein Firmenbeleg der Firma H&E Tools – ordne nach betrieblicher Verwendung zu." : ""} Handwerker-Rechnungen (Reparatur, Wartung, Renovierung) → "Handwerkerleistungen §35a"; Reinigung, Gartenpflege, Haushaltshilfe → "Haushaltsnahe Dienstleistungen §35a"; Arbeitsmittel, Fachliteratur, Fortbildung → "Werbungskosten (Beruf)"; Spenden, Versicherungen → "Sonderausgaben"; Arzt, Apotheke, Brille → "Außergewöhnliche Belastungen"; Werkstatt, Tanken, TÜV → "Fahrzeug".`,
+      { images: blob, signal: ctl.signal });
+    if (!pending || pending.ctl !== ctl) return;
+    const set = (sel, v) => { const el = $(sel); if (el && v != null && v !== "") el.value = v; };
+    const amt = parseAmount(r?.betrag);
+    if (isFinite(amt)) set("#bl-betrag", amt.toFixed(2).replace(".", ","));
+    if (/^\d{4}-\d{2}-\d{2}$/.test(r?.datum || "")) set("#bl-datum", r.datum);
+    set("#bl-haendler", r?.haendler);
+    let beschr = r?.beschreibung || "";
+    const ak = parseAmount(r?.arbeitskosten);
+    if (isFinite(ak) && ak > 0) beschr = (beschr ? beschr + ", " : "") + "Arbeitskosten " + eur.format(ak);
+    set("#bl-beschr", beschr);
+    if (katsFor($("#bl-bereich")?.value).includes(r?.kategorie)) set("#bl-kat", r.kategorie);
+    const mw = parseAmount(r?.mwst);
+    if (isFinite(mw) && mw > 0) set("#bl-mwst", mw.toFixed(2).replace(".", ","));
+    st.className = isFinite(amt) ? "scan-status ok" : "scan-status warn";
+    st.textContent = isFinite(amt) ? `Erkannt: ${eur.format(amt)}. Bitte kurz prüfen und speichern.` : "Der Betrag war nicht lesbar. Bitte selbst eintragen.";
+  } catch (e) {
+    if (e?.code === "cancelled") return;
+    st.className = "scan-status warn";
+    st.textContent = e?.code === "no_api_key" ? "Das automatische Auslesen ist noch nicht eingerichtet (API-Key fehlt). Bitte Betrag selbst eintragen."
+      : e?.code === "forbidden" ? "Du darfst in dieser Kachel nichts hinzufügen."
+      : e?.code === "not_granted" ? "Auslesen wurde nicht erlaubt. Bitte Betrag selbst eintragen."
+      : e?.code === "rate_limited" ? "Gerade zu viele Anfragen. Bitte Betrag selbst eintragen oder gleich ein neues Foto wählen."
+      : "Die Rechnung konnte nicht ausgelesen werden. Bitte Betrag selbst eintragen.";
+  }
+}
+
+async function submitForm(form){
+  const kind = form.dataset.kind, id = form.dataset.id || undefined;
+  const fd = Object.fromEntries(new FormData(form).entries());
+  const old = id ? S.items.find(i => i.id === id) || {} : {};
+  const btn = $("#saveBtn"); btn.disabled = true; btn.textContent = "Speichert …";
+  try {
+    let obj;
+    if (kind === "fahrzeug") obj = { ...old, kind, kennzeichen: fd.kennzeichen.trim().toUpperCase(), name: fd.name.trim(), tuev: fd.tuev || "", km: fd.km ? parseInt(fd.km.replace(/\D/g,""),10) || "" : "", notiz: fd.notiz.trim() };
+    else if (kind === "fix") {
+      const betrag = parseAmount(fd.betrag);
+      if (!isFinite(betrag)) { btn.disabled = false; btn.textContent = "Speichern"; $("#fx-betrag").focus(); toast("Bitte einen gültigen Betrag eingeben, z. B. 850,00"); return; }
+      obj = { ...old, kind, typ: fd.typ, name: fd.name.trim(), betrag: Math.round(betrag*100)/100, rhythmus: Number(fd.rhythmus)||1, datum: fd.datum, konto: fd.konto.trim(), anbieter: fd.anbieter.trim(), vertragsnr: fd.vertragsnr.trim(), notiz: fd.notiz.trim() };
+    }
+    else if (kind === "muell") obj = { ...old, kind, art: fd.art, datum: fd.datum, rhythmus: Number(fd.rhythmus)||0, notiz: fd.notiz.trim() };
+    else if (kind === "geburtstag") obj = { ...old, kind, name: fd.name.trim(), beziehung: fd.beziehung.trim(), datum: fd.datum, jahrUnbekannt: !!fd.jahrUnbekannt, notiz: fd.notiz.trim() };
+    else if (kind === "termin") obj = { ...old, kind, titel: fd.titel.trim(), datum: fd.datum, zeit: fd.zeit || "", ort: fd.ort.trim(), notiz: fd.notiz.trim() };
+    else {
+      const betrag = parseAmount(fd.betrag);
+      if (!isFinite(betrag)) { btn.disabled = false; btn.textContent = "Speichern"; $("#bl-betrag").focus(); toast("Bitte einen gültigen Betrag eingeben, z. B. 49,90"); return; }
+      const mw = parseAmount(fd.mwst);
+      obj = { ...old, kind, bereich: fd.bereich || "H&E Tools", betrag: Math.round(betrag*100)/100, mwst: isFinite(mw) ? Math.round(mw*100)/100 : "", datum: fd.datum, haendler: fd.haendler.trim(), kategorie: fd.kategorie, beschreibung: fd.beschreibung.trim(), garantie: fd.bereich === ABLAGE ? (fd.garantie || "") : (old.garantie || "") };
+      if (pending?.blob && assets) {
+        btn.textContent = "Foto wird gespeichert …";
+        try { const a = await assets.upload(pending.blob, tileOf(obj)); obj.assetId = a.id; }
+        catch { toast("Foto konnte nicht gespeichert werden – Beleg ohne Foto gesichert."); }
+      }
+    }
+    delete obj.id; delete obj.geaendert;
+    await saveItem({ id, ...obj });
+    closeModal(); toast("Gespeichert");
+    if (kind === "beleg" && obj.datum) { belegJahr = Number(obj.datum.slice(0,4)) || belegJahr; if (obj.bereich !== ABLAGE) belegBereich = "H&E Tools"; render(); }
+  } catch (e) {
+    btn.disabled = false; btn.textContent = "Speichern";
+    toast("Speichern hat nicht geklappt. Bitte erneut versuchen.");
+  }
+}
+
+function confirmDelete(id){
+  const it = S.items.find(i => i.id === id); if (!it) return;
+  const what = it.kind === "fix" ? `die Zahlung „${it.name}“` : it.kind === "muell" ? `die Tonne „${it.art}“` : it.kind === "geburtstag" ? `den Geburtstag von ${it.name}` : it.kind === "fahrzeug" ? `das Fahrzeug ${it.kennzeichen}` : it.kind === "termin" ? `den Termin „${it.titel}“` : `die Rechnung von ${it.haendler || "–"} über ${eur.format(it.betrag||0)}`;
+  openModal(`${head("Löschen?")}<p style="margin:0">Möchtest du ${esc(what)} wirklich löschen? Das lässt sich nicht rückgängig machen.</p>
+    <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" style="background:var(--crit);border-color:var(--crit)" data-act="del-yes" data-id="${id}">Löschen</button></div>`);
+}
+
+async function exportCsv(){
+  const list = belegeJahr(belegJahr).slice().reverse();
+  const n = v => (Number(v)||0).toFixed(2).replace(".", ",");
+  const q = s => `"${String(s??"").replace(/"/g,'""')}"`;
+  const biz = belegBereich === "H&E Tools";
+  const mw = list.reduce((s,b) => s + (Number(b.mwst)||0), 0);
+  const lines = [[`Belege ${belegBereich} ${belegJahr}`].map(q).join(";"), "",
+    (biz ? ["Datum","Aussteller","Beschreibung","Kategorie","Netto (EUR)","MwSt (EUR)","Brutto (EUR)"] : ["Datum","Aussteller","Beschreibung","Kategorie","Betrag (EUR)"]).map(q).join(";"),
+    ...list.map(b => [fmtDate(b.datum), b.haendler, b.beschreibung, b.kategorie].map(q).concat(biz ? [n((Number(b.betrag)||0)-(Number(b.mwst)||0)), n(b.mwst), n(b.betrag)] : [n(b.betrag)]).join(";")),
+    "", ...katsFor(belegBereich).map(k => [k, n(sum(list.filter(b => b.kategorie === k)))]).filter(([,v]) => v !== "0,00").map(([k,v]) => `;;;${q("Summe "+k)}${biz?";;":""};${v}`),
+    ...(biz ? [`;;;${q("Vorsteuer gesamt")};;${n(mw)};`] : []),
+    `;;;${q("Gesamt "+belegJahr)}${biz?";"+n(sum(list)-mw)+";"+n(mw):""};${n(sum(list))}`];
+  const csv = "﻿" + lines.join("\r\n");
+  if (downloads) {
+    try { await downloads.save({ filename: `Belege_HE_Tools_${belegJahr}.csv`, data: csv }); toast("Export gespeichert"); }
+    catch (e) { if (e?.code !== "declined") toast("Export ist hier nicht möglich."); }
+  } else {
+    try { await navigator.clipboard.writeText(csv.slice(1).replace(/;/g, "\t")); toast("Tabelle kopiert – in Excel einfügen"); }
+    catch { toast("Kopieren nicht möglich in dieser Ansicht."); }
+  }
+}
+
+/* ---------- Ereignisse ---------- */
+document.addEventListener("click", e => {
+  const el = e.target.closest("[data-act]"); if (!el) return;
+  const act = el.dataset.act;
+  if (act === "close-bg" && e.target !== el) return;
+  if (el.closest(".tile") && act.startsWith("new-")) e.preventDefault();
+  if (el.tagName === "BUTTON" || el.classList.contains("btn")) e.preventDefault();
+  if (act === "close" || act === "close-bg") { pending?.ctl?.abort(); closeModal(); }
+  else if (act === "new-fahrzeug") formFahrzeug();
+  else if (act === "new-termin") formTermin();
+  else if (act === "new-muell") formMuell();
+  else if (act === "share") openShare();
+  else if (act === "logout") sb.auth.signOut();
+  else if (act === "reload") refreshAll();
+  else if (act === "member-del") { const u = el.dataset.uid; if (el.dataset.sure) { sb.from("he_members").delete().eq("user_id", u).then(({ error }) => { if (error) toast("Entfernen hat nicht geklappt."); else { closeModal(); toast("Person entfernt"); loadMembers().then(render); } }); } else { el.dataset.sure = "1"; el.textContent = "Wirklich entfernen?"; } }
+  else if (act === "seen") markSeen();
+  else if (act === "muell-typ") { const k = el.dataset.k; muellAus = muellAus.includes(k) ? muellAus.filter(x => x !== k) : [...muellAus, k]; saveMuellAus(); render(); }
+  else if (act === "new-fix") formFix();
+  else if (act === "new-geburtstag") formGeburtstag();
+  else if (act === "new-beleg") formBeleg();
+  else if (act === "new-ablage") formBeleg({}, ABLAGE);
+  else if (act === "edit") { const it = S.items.find(i => i.id === el.dataset.id); if (!it) return; ({fahrzeug:formFahrzeug, termin:formTermin, beleg:formBeleg, muell:formMuell, geburtstag:formGeburtstag, fix:formFix})[it.kind]?.(it); }
+  else if (act === "del") confirmDelete(el.dataset.id);
+  else if (act === "del-yes") { deleteItem(el.dataset.id).then(() => { closeModal(); toast("Gelöscht"); }, () => toast("Löschen hat nicht geklappt.")); }
+  else if (act === "export") exportCsv();
+  else if (act === "bereich") { belegBereich = el.dataset.b; render(); }
+  else if (act === "view-img") openModal(`${head("Beleg")}<img class="big-img" data-big="${esc(el.dataset.asset)}" src="${blobUrl(el.dataset.asset)}" alt="Foto der Rechnung">`);
+});
+document.addEventListener("submit", async e => {
+  e.preventDefault();
+  if (e.target.id === "loginFrm") return sendLink(e.target);
+  if (e.target.id === "shareFrm") {
+    const btn = $("#shareSave"); btn.disabled = true; btn.textContent = "Wird gespeichert …";
+    try { await saveShare(e.target); closeModal(); toast("Freigaben gespeichert"); render(); }
+    catch { btn.disabled = false; btn.textContent = "Speichern"; toast("Freigaben konnten nicht gespeichert werden."); }
+    return;
+  }
+  submitForm(e.target);
+});
+document.addEventListener("input", e => { if (e.target.id === "ablageQ") { ablageQ = e.target.value; $("#ablageList").innerHTML = ablageRows(); } });
+document.addEventListener("change", e => {
+  if (e.target.id === "bl-foto" && e.target.files[0]) { pending?.ctl?.abort(); onPhoto(e.target.files[0]); }
+  if (e.target.id === "bl-bereich") { const k = $("#bl-kat"); if (k) k.innerHTML = katOptions(e.target.value, k.value); const g = $("#bl-gar-wrap"); if (g) g.hidden = e.target.value !== ABLAGE; }
+  if (e.target.id === "ablageKat") { ablageKat = e.target.value; $("#ablageList").innerHTML = ablageRows(); }
+  if (e.target.id === "jahrSel") { belegJahr = Number(e.target.value); render(); }
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#modalRoot").innerHTML) { pending?.ctl?.abort(); closeModal(); } });
+
+render();
+initStore();
+})();
+</script>
+<script>if ("serviceWorker" in navigator) addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));</script>
+</body>
+</html>
