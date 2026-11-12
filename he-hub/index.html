@@ -253,7 +253,7 @@ textarea{resize:vertical;min-height:64px}
       <div class="logo" aria-hidden="true"><span class="mono">H<span class="amp">&amp;</span>E</span></div>
       <div class="hello"><h1 class="wordmark" aria-label="H und E Hub">H<span class="amp">&amp;</span>E<span class="hub">Hub</span></h1><div class="eyebrow" id="today"></div></div>
     </div>
-    <div class="toolbar"><button id="logoutBtn" class="ghost" data-act="logout" hidden>Abmelden</button><button id="shareBtn" data-act="share" hidden><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5M16 5.2a3 3 0 0 1 0 5.6M18 14.3c1.6.6 2.7 2.2 3 4.7"/></svg>Personen &amp; Freigaben</button><div class="status" id="storeStatus">Daten werden geladen …</div></div>
+    <div class="toolbar"><button id="pwBtn" class="ghost" data-act="set-pw" hidden>Passwort</button><button id="logoutBtn" class="ghost" data-act="logout" hidden>Abmelden</button><button id="shareBtn" data-act="share" hidden><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5M16 5.2a3 3 0 0 1 0 5.6M18 14.3c1.6.6 2.7 2.2 3 4.7"/></svg>Personen &amp; Freigaben</button><div class="status" id="storeStatus">Daten werden geladen …</div></div>
   </header>
   <div id="banner" class="banner" hidden></div>
   <main id="app"></main>
@@ -346,7 +346,8 @@ async function afterLogin(session){
   let m = await loadMe();
   if (!m) { await sb.from("he_members").insert({ user_id: uid, name: session.user.user_metadata?.name || "" }); m = await loadMe(); }
   member = m;
-  $("#logoutBtn").hidden = false;
+  $("#logoutBtn").hidden = false; $("#pwBtn").hidden = false;
+  if (location.hash.includes("access_token")) history.replaceState(null, "", location.pathname);
   if (!m || m.status !== "approved") { S.auth = m?.status === "blocked" ? "blocked" : "pending"; $("#storeStatus").textContent = S.email; render(); return; }
   me.owner = m.role === "admin"; S.auth = "ok";
   await Promise.all([loadItems(), loadMembers()]);
@@ -556,23 +557,58 @@ function render(){
   app.innerHTML = r === "fahrzeuge" ? viewFahrzeuge() : r === "termine" ? viewTermine() : r === "belege" ? viewBelege() : r === "muell" ? viewMuell() : r === "geburtstage" ? viewGeburtstage() : r === "fixkosten" ? viewFix() : r === "ablage" ? viewAblage() : viewHome();
 }
 
+const urlErr = (() => { const h = new URLSearchParams(location.hash.slice(1)); return h.get("error_code") || h.get("error") || ""; })();
+let loginMode = "pw";
 function loginHtml(){
-  return `<form id="loginFrm" class="auth-card">
-    <h2>Anmelden</h2>
-    <p class="muted" style="margin:0">Gib deine E-Mail-Adresse ein. Du bekommst einen Link, mit dem du dich ohne Passwort anmeldest.</p>
+  const err = urlErr ? `<div class="scan-status warn">${urlErr === "otp_expired" ? "Dieser Login-Link ist abgelaufen oder wurde schon benutzt. Melde dich mit Passwort an oder fordere einen neuen Link an." : "Die Anmeldung über den Link hat nicht geklappt. Bitte mit Passwort anmelden."}</div>` : "";
+  const tabs = `<div class="seg" role="tablist"><button type="button" class="${loginMode==="pw"?"on":""}" data-act="login-mode" data-m="pw">Mit Passwort</button><button type="button" class="${loginMode==="link"?"on":""}" data-act="login-mode" data-m="link">Per E-Mail-Link</button></div>`;
+  if (loginMode === "link") return `<form id="loginFrm" class="auth-card" data-mode="link">
+    <h2>Anmelden</h2>${tabs}${err}
+    <p class="muted" style="margin:0">Du bekommst einen Link per E-Mail. Öffne ihn im <b>Browser</b> und lege danach unter „Passwort“ ein Passwort fest – damit klappt die Anmeldung auch in der App auf dem Homescreen.</p>
     <label class="f">E-Mail<input id="lg-mail" name="email" type="email" autocomplete="email" required placeholder="name@beispiel.de"></label>
     <label class="f">Dein Name (beim ersten Mal)<input id="lg-name" name="name" autocomplete="given-name" placeholder="z. B. Eva"></label>
     <button class="primary" type="submit" id="lg-btn">Login-Link senden</button>
     <div id="lg-msg" class="scan-status" hidden></div>
   </form>`;
+  return `<form id="loginFrm" class="auth-card" data-mode="pw">
+    <h2>Anmelden</h2>${tabs}${err}
+    <label class="f">E-Mail<input id="lg-mail" name="email" type="email" autocomplete="email" required placeholder="name@beispiel.de"></label>
+    <label class="f">Passwort<input id="lg-pw" name="password" type="password" autocomplete="current-password" required minlength="8" placeholder="mindestens 8 Zeichen"></label>
+    <button class="primary" type="submit" id="lg-btn" name="go" value="login">Anmelden</button>
+    <details><summary class="muted" style="cursor:pointer;font-weight:600">Noch kein Konto? Registrieren</summary>
+      <div style="display:grid;gap:10px;margin-top:10px">
+        <label class="f">Dein Name<input id="lg-name" name="name" autocomplete="given-name" placeholder="z. B. Eva"></label>
+        <button type="submit" name="go" value="register" id="lg-reg">Konto anlegen</button>
+        <p class="muted" style="margin:0;font-size:.82rem">Du bekommst eine E-Mail zur Bestätigung. Danach hier mit E-Mail und Passwort anmelden.</p>
+      </div></details>
+    <div id="lg-msg" class="scan-status" hidden></div>
+  </form>`;
 }
-async function sendLink(form){
-  const fd = new FormData(form), btn = $("#lg-btn"), msg = $("#lg-msg");
-  btn.disabled = true; btn.textContent = "Wird gesendet …";
-  const { error } = await sb.auth.signInWithOtp({ email: String(fd.get("email")).trim(), options: { emailRedirectTo: location.origin + location.pathname, data: { app: "hehub", name: String(fd.get("name") || "").trim() } } });
-  btn.disabled = false; btn.textContent = "Login-Link senden"; msg.hidden = false;
-  if (error) { msg.className = "scan-status warn"; msg.textContent = "Der Link konnte nicht gesendet werden. Bitte gleich noch einmal versuchen."; }
-  else { msg.className = "scan-status ok"; msg.textContent = "Link verschickt. Öffne die E-Mail und tippe auf den Link – am besten auf diesem Gerät."; }
+async function sendLink(form, submitter){
+  const fd = new FormData(form), msg = $("#lg-msg");
+  const show = (ok, t) => { msg.hidden = false; msg.className = "scan-status " + (ok ? "ok" : "warn"); msg.textContent = t; };
+  const email = String(fd.get("email") || "").trim();
+  if (form.dataset.mode === "link") {
+    const btn = $("#lg-btn"); btn.disabled = true; btn.textContent = "Wird gesendet …";
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname, data: { app: "hehub", name: String(fd.get("name") || "").trim() } } });
+    btn.disabled = false; btn.textContent = "Login-Link senden";
+    return error ? show(false, error.status === 429 ? "Bitte kurz warten und dann erneut senden." : "Der Link konnte nicht gesendet werden.") : show(true, "Link verschickt. Öffne ihn im Browser (Safari/Chrome) und lege danach ein Passwort fest.");
+  }
+  const password = String(fd.get("password") || "");
+  if (submitter?.value === "register") {
+    const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname, data: { app: "hehub", name: String(fd.get("name") || "").trim() } } });
+    if (error) return show(false, /registered|exists/i.test(error.message) ? "Diese E-Mail hat schon ein Konto – einfach oben anmelden." : "Registrierung hat nicht geklappt: " + error.message);
+    return data.session ? null : show(true, "Fast fertig: Bestätige die E-Mail, die du gerade bekommen hast, und melde dich dann hier an.");
+  }
+  const { error } = await sb.auth.signInWithPassword({ email, password });
+  if (error) show(false, /confirm/i.test(error.message) ? "Bitte zuerst die Bestätigungs-E-Mail öffnen." : "E-Mail oder Passwort stimmt nicht. Noch kein Passwort? Melde dich einmal per E-Mail-Link an und lege es dann fest.");
+}
+function openPassword(){
+  openModal(`<form id="pwFrm" style="display:grid;gap:14px">${head("Passwort festlegen")}
+    <p class="muted" style="margin:0;font-size:.9rem">Damit meldest du dich in der App auf dem Homescreen mit E-Mail und Passwort an. Es gilt für dein Konto – also auch für Florian HQ.</p>
+    <label class="f">Neues Passwort<input id="pw1" name="pw1" type="password" autocomplete="new-password" minlength="8" required></label>
+    <label class="f">Wiederholen<input id="pw2" name="pw2" type="password" autocomplete="new-password" minlength="8" required></label>
+    <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" type="submit" id="pwSave">Speichern</button></div></form>`);
 }
 
 function viewHome(){
@@ -1156,6 +1192,8 @@ document.addEventListener("click", e => {
   else if (act === "new-muell") formMuell();
   else if (act === "share") openShare();
   else if (act === "logout") sb.auth.signOut();
+  else if (act === "set-pw") openPassword();
+  else if (act === "login-mode") { loginMode = el.dataset.m; render(); }
   else if (act === "reload") refreshAll();
   else if (act === "member-del") { const u = el.dataset.uid; if (el.dataset.sure) { sb.from("he_members").delete().eq("user_id", u).then(({ error }) => { if (error) toast("Entfernen hat nicht geklappt."); else { closeModal(); toast("Person entfernt"); loadMembers().then(render); } }); } else { el.dataset.sure = "1"; el.textContent = "Wirklich entfernen?"; } }
   else if (act === "seen") markSeen();
@@ -1173,7 +1211,14 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("submit", async e => {
   e.preventDefault();
-  if (e.target.id === "loginFrm") return sendLink(e.target);
+  if (e.target.id === "loginFrm") return sendLink(e.target, e.submitter);
+  if (e.target.id === "pwFrm") {
+    const fd = new FormData(e.target);
+    if (fd.get("pw1") !== fd.get("pw2")) return toast("Die Passwörter stimmen nicht überein.");
+    const { error } = await sb.auth.updateUser({ password: String(fd.get("pw1")) });
+    if (error) return toast("Passwort konnte nicht gespeichert werden: " + error.message);
+    closeModal(); return toast("Passwort gespeichert");
+  }
   if (e.target.id === "shareFrm") {
     const btn = $("#shareSave"); btn.disabled = true; btn.textContent = "Wird gespeichert …";
     try { await saveShare(e.target); closeModal(); toast("Freigaben gespeichert"); render(); }
