@@ -1,5 +1,5 @@
 // H&E Hub – Service Worker: App-Hülle offline verfügbar, Daten immer frisch aus Supabase
-const CACHE = "hehub-v3";
+const CACHE = "hehub-v4";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
