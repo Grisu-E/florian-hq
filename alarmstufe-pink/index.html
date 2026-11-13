@@ -459,6 +459,14 @@ body.chat-open{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
 body.chat-open .homebar{display:none}
 .chat-form textarea{min-height:46px;max-height:140px;resize:none;border-radius:22px;padding:12px 16px;background:var(--surface);border:1px solid var(--line)}
 .chat-form button{width:48px;height:48px;padding:0;border-radius:50%;align-self:end;background:var(--accent);border-color:var(--accent);color:#fff}
+.proj-list{display:grid;gap:10px;grid-template-columns:repeat(auto-fill,minmax(280px,1fr))}
+.proj-card{display:flex;align-items:center;gap:14px;padding:16px;border-radius:20px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);color:inherit;text-decoration:none;min-width:0;transition:transform .15s,box-shadow .15s}
+.proj-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-hi)}
+.proj-card.crit{border-color:var(--crit)}
+.proj-emoji{width:54px;height:54px;border-radius:16px;display:grid;place-items:center;font-size:1.8rem;background:var(--accent-soft);flex:none}
+.proj-body{display:grid;gap:2px;min-width:0;flex:1}
+.proj-name{font-weight:800;font-size:1.08rem;letter-spacing:-.01em}
+.proj-go{font-size:1.6rem;color:var(--muted);font-weight:300}
 .quick{display:flex;gap:6px;flex-wrap:wrap}
 .quick button{min-height:32px;padding:4px 10px;font-size:.78rem}
 </style>
@@ -523,7 +531,7 @@ let uid = null, member = null, members = [];
 const TILES = [["standdienst","Standdienst"],["chat","Chat"],["aufgaben","Aufgaben"],["termine","Termine & Treffen"],["einkauf","Einkaufsliste"],["material","Material & Deko"],["angebot","Angebot & Preise"],["kasse","Kasse"],["infos","Infos & Kontakte"]];
 const LEVEL = { none: "Kein Zugriff", view: "Ansehen", edit: "Bearbeiten" };
 const me = { owner: false };
-const KIND_TILE = { schicht:"standdienst", aufgabe:"aufgaben", termin:"termine", einkauf:"einkauf", material:"material", produkt:"angebot", buchung:"kasse", info:"infos" };
+const KIND_TILE = { projekt:"projekte", schicht:"standdienst", aufgabe:"aufgaben", termin:"termine", einkauf:"einkauf", material:"material", produkt:"angebot", buchung:"kasse", info:"infos" };
 const tileOf = it => KIND_TILE[it.kind] || "infos";
 const lvl = t => me.owner ? "edit" : ((member?.tiles || {})[t] || "none");
 const visible = t => lvl(t) !== "none";
@@ -583,7 +591,7 @@ async function initStore(){
 }
 async function saveItem(obj){
   const { id, _tile, _by, erstellt, geaendert, ...data } = obj;
-  const row = { tile: tileOf(obj), kind: obj.kind, data };
+  const row = { tile: tileOf(obj), kind: obj.kind, data: obj.kind === "projekt" || data.projekt ? data : { ...data, projekt: PROJ } };
   const res = id ? await sb.from("fm_items").update(row).eq("id", id) : await sb.from("fm_items").insert(row);
   if (res.error) throw res.error;
   await loadItems();
@@ -594,7 +602,14 @@ async function deleteItem(id){
   if (error) throw error;
   await loadItems();
 }
-const ofKind = k => S.items.filter(i => i.kind === k);
+let PROJ = null;
+const ofKind = k => S.items.filter(i => i.kind === k && (k === "projekt" || !PROJ || i.projekt === PROJ));
+const withProj = (id, fn) => { const o = PROJ; PROJ = id; try { return fn(); } finally { PROJ = o; } };
+const projekte = (alle = false) => S.items.filter(i => i.kind === "projekt" && (alle || !i.archiviert)).sort((a,b) => (a.sort ?? 99) - (b.sort ?? 99) || String(a.name).localeCompare(String(b.name), "de"));
+const projOf = id => S.items.find(i => i.kind === "projekt" && i.id === id);
+const projName = id => { const p = projOf(id); return p ? `${p.emoji ? p.emoji + " " : ""}${p.name}` : ""; };
+const itemHref = c => c.projekt ? `#p/${c.projekt}/${tileOf(c)}` : "#";
+const tHref = t => PROJ ? `#p/${PROJ}/${t}` : "#";
 function dayLabel(s){
   const d = parseDate(s); if (!d) return "";
   const diff = Math.round((d - today())/86400000);
@@ -604,7 +619,7 @@ function dayLabel(s){
 const daysText = n => n === 0 ? "heute" : n === 1 ? "morgen" : `in ${n} Tagen`;
 const wd = s => { const d = parseDate(s); return d ? d.toLocaleDateString("de-DE", { weekday: "short", day: "2-digit", month: "2-digit" }) : "–"; };
 const tagName = d => { const x = parseDate(d); if (!x) return "Ohne Datum"; const n = Math.round((x - today())/86400000); return (n === 0 ? "Heute" : n === 1 ? "Morgen" : x.toLocaleDateString("de-DE", { weekday: "long" })) + ", " + x.toLocaleDateString("de-DE", { day: "numeric", month: "long" }); };
-const backBtn = `<a class="btn ghost back" href="#">${ICON.back}Übersicht</a>`;
+const backBtn = () => PROJ ? `<a class="btn ghost back" href="#p/${PROJ}">${ICON.back}${esc(projOf(PROJ)?.name || "Projekt")}</a>` : `<a class="btn ghost back" href="#">${ICON.back}Übersicht</a>`;
 const opt = (list, sel) => list.map(k => `<option ${k === sel ? "selected" : ""}>${esc(k)}</option>`).join("");
 /* Namen der freigegebenen Mädels (für Auswahllisten und „wer hat geändert“) */
 const names = {}; let namesPending = false, namesLoaded = false;
@@ -647,7 +662,7 @@ function viewStanddienst(){
         ${w ? `<button class="ghost" data-act="edit" data-id="${s.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${s.id}">Löschen</button>` : ""}</div>
     </div>`; };
   return `<section style="display:grid;gap:14px">
-    <div class="view-head">${backBtn}${w ? `<div class="toolbar"><button data-act="new-plan">${ICON.cal}Mehrere anlegen</button><button class="primary" data-act="new-schicht">${ICON.plus}Schicht</button></div>` : ""}</div>
+    <div class="view-head">${backBtn()}${w ? `<div class="toolbar"><button data-act="new-plan">${ICON.cal}Mehrere anlegen</button><button class="primary" data-act="new-schicht">${ICON.plus}Schicht</button></div>` : ""}</div>
     <h2 class="page-title">Standdienst</h2>
     <p class="muted" style="margin:-6px 0 0;font-size:.9rem">Tipp auf <b>„Ich bin dabei“</b>, um dich einzutragen. Am Vorabend kommt eine Erinnerung.</p>
     <div class="seg" role="tablist">${[["alle","Alle"],["frei","Mit freien Plätzen"],["meine",`Meine (${schichtZukunft().filter(isMine).length})`]].map(([k,l]) => `<button role="tab" class="${sdFilter===k?"on":""}" data-act="sd-filter" data-f="${k}">${l}</button>`).join("")}</div>
@@ -670,7 +685,7 @@ function formSchicht(s = {}){
 function formPlan(){
   const lastDay = schichtZukunft().slice(-1)[0]?.datum;
   openModal(`<form id="planFrm" style="display:grid;gap:14px">${head("Mehrere Schichten anlegen")}
-    <p class="muted" style="margin:0;font-size:.9rem">Z. B. Markttag 14–22 Uhr in 2-Stunden-Blöcken – für jede Aufgabe wird pro Block eine Schicht angelegt.</p>
+    <p class="muted" style="margin:0;font-size:.9rem">Z. B. Veranstaltung 14–22 Uhr in 2-Stunden-Blöcken – für jede Aufgabe wird pro Block eine Schicht angelegt.</p>
     <div class="fields">
       <label class="f full">Tag<input name="datum" type="date" required value="${esc(lastDay || iso(today()))}"></label>
       <label class="f">Von<input name="von" type="time" required value="14:00"></label>
@@ -694,7 +709,7 @@ async function savePlan(form){
   const auf = [...fd.getAll("auf"), String(fd.get("extra") || "").trim()].filter(Boolean);
   if (!auf.length) return toast("Bitte mindestens eine Aufgabe wählen.");
   const blocks = []; for (let t = a; t < b; t += (block || (b - a))) blocks.push([t, Math.min(b, t + (block || (b - a)))]);
-  const rows = []; for (const [x, y] of blocks) for (const au of auf) rows.push({ tile: "standdienst", kind: "schicht", data: { kind: "schicht", aufgabe: au, datum: String(fd.get("datum")), von: toHM(x), bis: toHM(y), plaetze: parseInt(fd.get("plaetze"), 10) || 2, notiz: "", helfer: [] } });
+  const rows = []; for (const [x, y] of blocks) for (const au of auf) rows.push({ tile: "standdienst", kind: "schicht", data: { kind: "schicht", projekt: PROJ, aufgabe: au, datum: String(fd.get("datum")), von: toHM(x), bis: toHM(y), plaetze: parseInt(fd.get("plaetze"), 10) || 2, notiz: "", helfer: [] } });
   if (rows.length > 80) return toast("Das wären über 80 Schichten – bitte größere Blöcke wählen.");
   const btn = $("#planSave"); btn.disabled = true; btn.textContent = `${rows.length} Schichten werden angelegt …`;
   const { error } = await sb.from("fm_items").insert(rows);
@@ -724,7 +739,7 @@ function viewAufgaben(){
     ${w ? `<div class="acts">${!a.wer && !a.erledigt ? `<button data-act="auf-ich" data-id="${a.id}">Mach ich</button>` : ""}<button class="ghost" data-act="edit" data-id="${a.id}" aria-label="Bearbeiten">✎</button></div>` : ""}
   </div>`; };
   return `<section style="display:grid;gap:14px">
-    <div class="view-head">${backBtn}${w ? `<button class="primary" data-act="new-aufgabe">${ICON.plus}Aufgabe</button>` : ""}</div>
+    <div class="view-head">${backBtn()}${w ? `<button class="primary" data-act="new-aufgabe">${ICON.plus}Aufgabe</button>` : ""}</div>
     <h2 class="page-title">Aufgaben</h2>
     <div class="seg" role="tablist">${[["offen",`Offen (${aufOffen().length})`],["meine","Meine"],["erledigt","Erledigt"]].map(([k,l]) => `<button role="tab" class="${aufFilter===k?"on":""}" data-act="auf-filter" data-f="${k}">${l}</button>`).join("")}</div>
     ${list.length ? `<div class="shop-list">${list.map(item).join("")}</div>` : `<div class="empty">${aufFilter === "erledigt" ? "Noch nichts erledigt." : aufFilter === "meine" ? "Dir ist gerade keine offene Aufgabe zugeteilt." : "Keine offenen Aufgaben – stark!"}</div>`}
@@ -742,10 +757,11 @@ function formAufgabe(a = {}){
 }
 
 /* ---------- Termine & Treffen ---------- */
-const TERMIN_ART = ["Treffen","Markttag","Aufbau","Abbau","Einkauf","Sonstiges"];
+const TERMIN_ART = ["Treffen","Veranstaltung","Aufbau","Abbau","Einkauf","Sonstiges"];
+const isMain = t => t.art === "Veranstaltung" || t.art === "Markttag";
 const sortedTermine = () => ofKind("termin").slice().sort((a,b) => (a.datum+(a.zeit||"")).localeCompare(b.datum+(b.zeit||"")));
 const upcoming = () => sortedTermine().filter(t => (parseDate(t.datum)||0) >= today());
-const markttage = () => upcoming().filter(t => t.art === "Markttag");
+const markttage = () => upcoming().filter(isMain);
 const RSVP = [["ja","✅","Komme"],["vielleicht","❓","Vielleicht"],["nein","❌","Kann nicht"]];
 const rsvpOf = t => Object.entries(t.rsvp || {}).map(([u, v]) => ({ uid: u, ...v }));
 function rsvpHtml(t, isPast){
@@ -765,7 +781,7 @@ function openRsvp(t){
 function viewTermine(){
   const w = canWrite("termine"); const all = sortedTermine(); const t0 = today();
   const fut = all.filter(t => (parseDate(t.datum)||0) >= t0), past = all.filter(t => (parseDate(t.datum)||0) < t0).reverse();
-  const row = (t, isPast) => { const d = parseDate(t.datum) || new Date(); const mt = t.art === "Markttag"; return `
+  const row = (t, isPast) => { const d = parseDate(t.datum) || new Date(); const mt = isMain(t); return `
     <div class="row ${isPast?"past":""}"><div class="date-block" style="${mt ? "background:var(--red-soft);color:var(--red)" : ""}"><div class="d">${d.getDate()}</div><div class="m">${MONATE[d.getMonth()]}</div></div>
       <div class="main"><span class="t">${mt ? "🎄 " : ""}${esc(t.titel)}</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${t.art ? `<span class="pill ${mt ? "crit" : "neutral"}">${esc(t.art)}</span>` : ""}<span class="muted" style="font-size:.88rem">${wd(t.datum)}${t.zeit?" · "+esc(t.zeit)+(t.zeitBis ? "–" + esc(t.zeitBis) : "")+" Uhr":""} · ${dayLabel(t.datum)}${t.ort?" · "+esc(t.ort):""}</span></div>
@@ -773,9 +789,9 @@ function viewTermine(){
       ${rsvpHtml(t, isPast)}</div>
       ${w ? `<div class="acts"><button data-act="edit" data-id="${t.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${t.id}">Löschen</button></div>` : ""}</div>`; };
   return `<section style="display:grid;gap:16px">
-    <div class="view-head">${backBtn}${w ? `<button class="primary" data-act="new-termin">${ICON.plus}Termin</button>` : ""}</div>
+    <div class="view-head">${backBtn()}${w ? `<button class="primary" data-act="new-termin">${ICON.plus}Termin</button>` : ""}</div>
     <h2 class="page-title">Termine &amp; Treffen</h2>
-    ${fut.length ? `<div class="list">${fut.map(t => row(t,false)).join("")}</div>` : `<div class="empty">Keine anstehenden Termine.${w ? " Trag die Markttage mit Art „Markttag“ ein – dann zählt die Startseite die Tage runter." : ""}</div>`}
+    ${fut.length ? `<div class="list">${fut.map(t => row(t,false)).join("")}</div>` : `<div class="empty">Keine anstehenden Termine.${w ? " Trag den Veranstaltungstag mit Art „Veranstaltung“ ein – dann zählt das Banner die Tage runter." : ""}</div>`}
     ${past.length ? `<details><summary class="eyebrow" style="cursor:pointer">Vergangene Termine (${past.length})</summary><div class="list" style="margin-top:10px">${past.map(t => row(t,true)).join("")}</div></details>` : ""}
   </section>`;
 }
@@ -801,7 +817,7 @@ function viewEinkauf(){
   const vorschlag = [...new Map(done.map(i => [(i.name || "").toLowerCase(), i])).values()].filter(i => !offenNamen.has((i.name || "").toLowerCase())).slice(0, 12);
   const item = i => `<div class="shop-item ${i.erledigt ? "done" : ""}">${w ? `<button class="check" data-act="ek-toggle" data-id="${i.id}" aria-label="${i.erledigt ? "Wieder auf die Liste" : "Abhaken"}"></button>` : ""}<span class="t">${esc(i.name)}${i.wer ? `<span class="muted" style="display:block;font-size:.78rem;font-weight:600">besorgt ${esc(i.wer)}</span>` : ""}</span>${i.menge ? `<span class="m">${esc(i.menge)}</span>` : ""}${w && !i.erledigt ? `<button class="ghost" style="min-height:34px;padding:4px 8px" data-act="ek-wer" data-id="${i.id}" aria-label="Wer besorgt das?">${i.wer ? "✎" : "Ich"}</button>` : ""}</div>`;
   return `<section style="display:grid;gap:12px">
-    <div class="view-head">${backBtn}${w && done.length ? `<button class="ghost danger" data-act="ek-clear">Erledigte löschen (${done.length})</button>` : ""}</div>
+    <div class="view-head">${backBtn()}${w && done.length ? `<button class="ghost danger" data-act="ek-clear">Erledigte löschen (${done.length})</button>` : ""}</div>
     <h2 class="page-title">Einkaufsliste</h2>
     ${w ? `<form id="einkaufFrm" class="shop-add"><input id="ek-name" name="name" placeholder="Was fehlt? z. B. Zimtstangen" autocomplete="off" enterkeyhint="done" required><input id="ek-menge" name="menge" placeholder="Menge" autocomplete="off"><button class="primary" type="submit" aria-label="Hinzufügen">+</button></form>` : ""}
     ${w && vorschlag.length ? `<div class="chips-row">${vorschlag.map(i => `<button data-act="ek-again" data-id="${i.id}">+ ${esc(i.name)}</button>`).join("")}</div>` : ""}
@@ -826,7 +842,7 @@ function viewMaterial(){
       ${m.notiz ? `<span class="muted" style="font-size:.85rem;overflow-wrap:anywhere">${esc(m.notiz)}</span>` : ""}</div>
     ${w ? `<div class="acts"><button class="ghost" data-act="edit" data-id="${m.id}" aria-label="Bearbeiten">✎</button></div>` : ""}</div>`;
   return `<section style="display:grid;gap:14px">
-    <div class="view-head">${backBtn}<div class="toolbar">${w && done ? `<button class="ghost" data-act="mat-reset">Häkchen zurücksetzen</button>` : ""}${w ? `<button class="primary" data-act="new-material">${ICON.plus}Gegenstand</button>` : ""}</div></div>
+    <div class="view-head">${backBtn()}<div class="toolbar">${w && done ? `<button class="ghost" data-act="mat-reset">Häkchen zurücksetzen</button>` : ""}${w ? `<button class="primary" data-act="new-material">${ICON.plus}Gegenstand</button>` : ""}</div></div>
     <h2 class="page-title">Material &amp; Deko</h2>
     <div class="seg" role="tablist">${[["alle",`Alles (${all.length})`],["offen",`Noch nicht eingepackt (${all.length - done})`]].map(([k,l]) => `<button role="tab" class="${matFilter===k?"on":""}" data-act="mat-filter" data-f="${k}">${l}</button>`).join("")}</div>
     ${list.length ? kats.map(k => `<div class="day-head">${esc(k)}</div><div class="shop-list">${list.filter(m => (m.kategorie || "Sonstiges") === k).map(item).join("")}</div>`).join("")
@@ -854,7 +870,7 @@ function viewAngebot(){
     ${p.pfand ? `<span class="n">+ ${eur.format(p.pfand)} Pfand</span>` : ""}${p.rezept ? `<span class="n">${esc(p.rezept)}</span>` : ""}
     ${w ? `<div class="acts"><button data-act="prod-aus" data-id="${p.id}">${p.aus ? "Wieder da" : "Ausverkauft"}</button><button class="ghost" data-act="edit" data-id="${p.id}">Bearbeiten</button></div>` : ""}</div>`;
   return `<section style="display:grid;gap:14px">
-    <div class="view-head">${backBtn}<div class="toolbar">${all.length ? `<button data-act="preisliste">Preisliste groß</button>` : ""}${w ? `<button class="primary" data-act="new-produkt">${ICON.plus}Produkt</button>` : ""}</div></div>
+    <div class="view-head">${backBtn()}<div class="toolbar">${all.length ? `<button data-act="preisliste">Preisliste groß</button>` : ""}${w ? `<button class="primary" data-act="new-produkt">${ICON.plus}Produkt</button>` : ""}</div></div>
     <h2 class="page-title">Angebot &amp; Preise</h2>
     ${all.length ? kats.map(k => `<div class="day-head">${esc(k)}</div><div class="price-list">${all.filter(p => (p.kategorie || "Sonstiges") === k).map(item).join("")}</div>`).join("") : `<div class="empty">Noch keine Produkte. Trag ein, was ihr verkauft – mit Preis, Pfand und gern dem Rezept (z. B. für den Glühwein).</div>`}
   </section>`;
@@ -892,7 +908,7 @@ function viewKasse(){
       ${b.notiz ? `<span class="muted" style="font-size:.85rem;overflow-wrap:anywhere">${esc(b.notiz)}</span>` : ""}
       ${w ? `<div class="toolbar" style="margin-top:2px">${b.privat && !e ? `<button data-act="ka-erst" data-id="${b.id}">${b.erstattet ? "Nicht erstattet" : "Erstattet"}</button>` : ""}<button class="ghost" data-act="edit" data-id="${b.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${b.id}">Löschen</button></div>` : ""}</div></div>`; };
   return `<section style="display:grid;gap:14px">
-    <div class="view-head">${backBtn}<div class="toolbar">${buchungen().length ? `<button data-act="ka-export">${ICON.dl}CSV</button>` : ""}${w ? `<button data-act="new-buchung" data-typ="einnahme">${ICON.plus}Einnahme</button><button class="primary" data-act="new-buchung" data-typ="ausgabe">${ICON.plus}Ausgabe</button>` : ""}</div></div>
+    <div class="view-head">${backBtn()}<div class="toolbar">${buchungen().length ? `<button data-act="ka-export">${ICON.dl}CSV</button>` : ""}${w ? `<button data-act="new-buchung" data-typ="einnahme">${ICON.plus}Einnahme</button><button class="primary" data-act="new-buchung" data-typ="ausgabe">${ICON.plus}Ausgabe</button>` : ""}</div></div>
     <h2 class="page-title">Kasse</h2>
     <div class="sums"><div class="sum"><span class="k">Einnahmen</span><span class="v num" style="color:var(--ok)">${eur.format(ein)}</span></div><div class="sum"><span class="k">Ausgaben</span><span class="v num" style="color:var(--crit)">${eur.format(aus)}</span></div><div class="sum total"><span class="k">Ergebnis</span><span class="v num">${eur.format(ein - aus)}</span></div></div>
     ${oe.length ? `<div class="notice warn">${ICON.money}<span><b>Noch zu erstatten:</b> ${esc([...new Set(oe.map(b => b.wer))].map(n => `${n} ${eur.format(oe.filter(b => b.wer === n).reduce((s,b) => s + (Number(b.betrag)||0), 0))}`).join(" · "))}</span></div>` : ""}
@@ -921,7 +937,7 @@ async function exportKasse(){
     "", `;;;;${q("Einnahmen")};${n(kSum("einnahme"))}`, `;;;;${q("Ausgaben")};-${n(kSum("ausgabe"))}`, `;;;;${q("Ergebnis")};${n(kSum("einnahme") - kSum("ausgabe"))}`];
   const a = document.createElement("a");
   a.href = URL.createObjectURL(new Blob(["﻿" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" }));
-  a.download = `Kasse_Weihnachtsmarkt_${new Date().getFullYear()}.csv`; document.body.append(a); a.click();
+  a.download = `Kasse_${(projOf(PROJ)?.name || "Projekt").replace(/[^\wäöüÄÖÜß-]+/g, "_")}_${new Date().getFullYear()}.csv`; document.body.append(a); a.click();
   setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
 }
 
@@ -935,7 +951,7 @@ function viewInfos(){
     ${i.link && /^https?:\/\//i.test(i.link) ? `<a href="${esc(i.link)}" target="_blank" rel="noopener" style="overflow-wrap:anywhere">${esc(i.link)}</a>` : ""}
     ${w ? `<div class="toolbar"><button class="ghost" data-act="edit" data-id="${i.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${i.id}">Löschen</button></div>` : ""}</div>`;
   return `<section style="display:grid;gap:14px">
-    <div class="view-head">${backBtn}${w ? `<div class="toolbar"><button data-act="new-info" data-typ="kontakt">${ICON.phone}Kontakt</button><button class="primary" data-act="new-info" data-typ="info">${ICON.plus}Info</button></div>` : ""}</div>
+    <div class="view-head">${backBtn()}${w ? `<div class="toolbar"><button data-act="new-info" data-typ="kontakt">${ICON.phone}Kontakt</button><button class="primary" data-act="new-info" data-typ="info">${ICON.plus}Info</button></div>` : ""}</div>
     <h2 class="page-title">Infos &amp; Kontakte</h2>
     ${infos.length ? `<div class="idea-grid">${infos.map(card).join("")}</div>` : `<div class="empty">Noch keine Infos. Z. B. Standplatz, Stromanschluss, Hygieneregeln, WLAN der Kasse …</div>`}
     <div class="day-head">Kontakte</div>
@@ -993,7 +1009,7 @@ function viewChat(){
     return out + `<div class="msg ${mine ? "me" : ""} ${cont ? "cont" : ""}">${mine ? "" : `<span class="who">${esc(m.name || "Jemand")}</span>`}${mine || me.owner ? `<button class="bubble" data-act="chat-menu" data-id="${m.id}">${esc(m.text)}</button>` : `<div class="bubble">${esc(m.text)}</div>`}<span class="time">${d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</span></div>`;
   }).join("");
   return `<section style="display:grid;gap:10px">
-    <div class="view-head">${backBtn}${chatPushBtns()}</div>
+    <div class="view-head">${backBtn()}${chatPushBtns()}</div>
     <h2 class="page-title">Chat</h2>
     ${chat.length ? `<div class="chat-list">${rows}</div>` : `<div class="empty">${chatLoaded ? "Noch keine Nachrichten – schreib die erste! 💬" : "Nachrichten werden geladen …"}</div>`}
     <form id="chatFrm" class="chat-form"><textarea id="chat-text" name="text" rows="1" maxlength="2000" placeholder="Nachricht an alle …" enterkeyhint="send" required></textarea><button type="submit" aria-label="Senden"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg></button></form>
@@ -1001,19 +1017,25 @@ function viewChat(){
 }
 
 /* ---------- Ansichten ---------- */
-const VIEWS = { standdienst: viewStanddienst, chat: viewChat, aufgaben: viewAufgaben, termine: viewTermine, einkauf: viewEinkauf, material: viewMaterial, angebot: viewAngebot, kasse: viewKasse, infos: viewInfos };
-function route(){ const h = location.hash.slice(1); return VIEWS[h] ? h : ""; }
+const VIEWS = { projekt: viewProjekt, standdienst: viewStanddienst, chat: viewChat, aufgaben: viewAufgaben, termine: viewTermine, einkauf: viewEinkauf, material: viewMaterial, angebot: viewAngebot, kasse: viewKasse, infos: viewInfos };
+function route(){
+  const h = decodeURIComponent(location.hash.slice(1)); let m; PROJ = null;
+  if ((m = /^p\/([\w-]+)(?:\/(\w+))?$/.exec(h))) { if (!projOf(m[1])) return ""; PROJ = m[1]; return m[2] && VIEWS[m[2]] && m[2] !== "chat" && m[2] !== "projekt" ? m[2] : "projekt"; }
+  if (h === "chat") return "chat";
+  if (VIEWS[h] && h !== "projekt") { const p = projekte()[0]; if (p) { PROJ = p.id; history.replaceState(null, "", location.pathname + location.search + `#p/${p.id}/${h}`); return h; } }
+  return "";
+}
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); if (route() === "chat") { scrollChat(); loadChat(); } });
 
 function render(){
   const app = $("#app");
   if (S.auth === "signedout") { app.innerHTML = loginHtml(); return; }
-  if (S.auth === "pending" || S.auth === "blocked") { app.innerHTML = `<div class="auth-card"><h2>${S.auth === "blocked" ? "Kein Zugriff" : "Fast geschafft 🎄"}</h2><p class="muted" style="margin:0">${S.auth === "blocked" ? "Dein Zugang wurde gesperrt." : "Du bist angemeldet als <b>" + esc(S.email) + "</b>. Sobald du freigegeben bist, siehst du hier die Kacheln für die Weihnachtsmarkt-Orga."}</p><div class="toolbar"><button class="primary" data-act="reload">Erneut prüfen</button><button class="ghost" data-act="logout">Abmelden</button></div></div>`; return; }
+  if (S.auth === "pending" || S.auth === "blocked") { app.innerHTML = `<div class="auth-card"><h2>${S.auth === "blocked" ? "Kein Zugriff" : "Fast geschafft 🎄"}</h2><p class="muted" style="margin:0">${S.auth === "blocked" ? "Dein Zugang wurde gesperrt." : "Du bist angemeldet als <b>" + esc(S.email) + "</b>. Sobald du freigegeben bist, siehst du hier eure Projekte wie Weihnachtsmarkt und Kuchenstand."}</p><div class="toolbar"><button class="primary" data-act="reload">Erneut prüfen</button><button class="ghost" data-act="logout">Abmelden</button></div></div>`; return; }
   if (!S.ready) { app.innerHTML = `<div class="empty">Alarmstufe Pink wird geladen …</div>`; return; }
   if (!namesLoaded && !namesPending) loadNames();
   if (!chatLoaded && !chatPending && visible("chat")) loadChat();
   if (location.hash === "#freigaben") { history.replaceState(null, "", location.pathname + location.search); if (me.owner) setTimeout(openShare, 0); }
-  let r = route(); if (r && !visible(r)) r = "";
+  let r = route(); if (r && r !== "projekt" && !visible(r)) { r = PROJ ? "projekt" : ""; }
   const hb = $("#homeBtn"); if (hb) { hb.classList.toggle("on", !r); hb.closest(".homebar").hidden = S.auth !== "ok"; }
   const ct = $("#chat-text"), draft = ct?.value || "", foc = document.activeElement === ct;
   app.innerHTML = r ? VIEWS[r]() : viewHome();
@@ -1102,12 +1124,14 @@ function heroHtml(){
   if (!visible("termine") && !visible("standdienst")) return "";
   const mt = visible("termine") ? markttage() : [];
   const meine = visible("standdienst") ? schichtZukunft().filter(isMine) : [];
-  const z = saison(); let k = z === "sommer" ? "Badesaison eröffnet! 🏖️" : z === "fruehling" ? "Der Frühling ist da 🌷" : z === "nikolaus" ? "Der Nikolaus kommt 🎅" : z === "weihnachten" ? "Frohe Weihnachten 🎄" : "Weihnachtsmarkt " + new Date().getFullYear(), v = "", s = "";
-  if (mt.length) { const n = Math.round((parseDate(mt[0].datum) - today())/86400000); v = n === 0 ? "Heute ist Markttag! 🎄" : n === 1 ? "Morgen geht's los!" : `Noch ${n} Tage`; s = `${wd(mt[0].datum)}${mt[0].zeit ? " · ab " + mt[0].zeit + " Uhr" : ""}${mt[0].ort ? " · " + mt[0].ort : ""}${mt.length > 1 ? ` · ${mt.length} Markttage` : ""}`; }
+  const pid = PROJ || mt[0]?.projekt || meine[0]?.projekt || "";
+  const z = saison(); let k = z === "sommer" ? "Badesaison eröffnet! 🏖️" : z === "fruehling" ? "Der Frühling ist da 🌷" : z === "nikolaus" ? "Der Nikolaus kommt 🎅" : z === "weihnachten" ? "Frohe Weihnachten 🎄" : (projName(pid) || "Alarmstufe Pink") + " " + new Date().getFullYear(), v = "", s = "";
+  if (mt.length) { const n = Math.round((parseDate(mt[0].datum) - today())/86400000); v = (!PROJ && (z === "sommer" || z === "fruehling" || z === "nikolaus" || z === "weihnachten") ? (projOf(mt[0].projekt)?.name || "") + ": " : "") + (n === 0 ? "Heute ist es so weit! 🎉" : n === 1 ? "Morgen geht's los!" : `Noch ${n} Tage`); s = `${wd(mt[0].datum)}${mt[0].zeit ? " · ab " + mt[0].zeit + " Uhr" : ""}${mt[0].ort ? " · " + mt[0].ort : ""}`; }
   else v = "Gemeinsam organisiert";
-  if (meine.length) s += (s ? "<br>" : "") + `Deine nächste Schicht: <b>${esc(wd(meine[0].datum))} ${esc(zeitStr(meine[0]))}</b> · ${esc(meine[0].aufgabe || "")}`;
-  else if (visible("standdienst") && schichtZukunft().length) s += (s ? "<br>" : "") + "Du bist noch für keine Schicht eingetragen.";
-  return `<a class="hero ${SAISON[saison()]?.[0] || ""}" href="${meine.length || schichtZukunft().length ? "#standdienst" : "#termine"}" style="text-decoration:none"><span class="flakes" aria-hidden="true">${SAISON[saison()]?.[1] ?? "❄"}</span><span class="fx" aria-hidden="true">${saisonFx()}</span><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>${s ? `<span class="s">${s.replace(/\n/g, "")}</span>` : ""}</a>`;
+  if (meine.length) s += (s ? "<br>" : "") + `Deine nächste Schicht: <b>${esc(wd(meine[0].datum))} ${esc(zeitStr(meine[0]))}</b> · ${esc(meine[0].aufgabe || "")}${!PROJ && meine[0].projekt ? " · " + esc(projOf(meine[0].projekt)?.name || "") : ""}`;
+  else if (PROJ && visible("standdienst") && schichtZukunft().length) s += (s ? "<br>" : "") + "Du bist noch für keine Schicht eingetragen.";
+  const href = pid ? `#p/${pid}${meine.length || withProj(pid, () => schichtZukunft().length) ? "/standdienst" : mt.length ? "/termine" : ""}` : "#";
+  return `<a class="hero ${SAISON[saison()]?.[0] || ""}" href="${href}" style="text-decoration:none"><span class="flakes" aria-hidden="true">${SAISON[saison()]?.[1] ?? "❄"}</span><span class="fx" aria-hidden="true">${saisonFx()}</span><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>${s ? `<span class="s">${s.replace(/\n/g, "")}</span>` : ""}</a>`;
 }
 function homeTile(k){
   let chip, title = Object.fromEntries(TILES)[k], main = "", sub = "", st = "", num = false;
@@ -1128,7 +1152,7 @@ function homeTile(k){
   } else if (k === "termine") {
     const up = upcoming(); chip = ["cal", ICON.cal];
     if (up.length) { main = up[0].titel; sub = `${wd(up[0].datum)}${up[0].zeit ? " · " + up[0].zeit : ""} · ${dayLabel(up[0].datum)}`; st = Math.round((parseDate(up[0].datum) - today())/86400000) <= 1 ? "warn" : ""; }
-    else { main = "Keine Termine"; sub = "Treffen & Markttage"; }
+    else { main = "Keine Termine"; sub = "Treffen & Veranstaltung"; }
   } else if (k === "einkauf") {
     const o = ekOffen(); chip = ["cart", ICON.cart];
     if (o.length) { main = `${o.length} Artikel`; sub = o.slice(0, 3).map(i => i.name).join(", ") + (o.length > 3 ? " …" : ""); }
@@ -1150,16 +1174,48 @@ function homeTile(k){
   }
   let share = "";
   if (me.owner) { const c = members.filter(m => m.status === "approved" && m.role !== "admin" && (m.tiles?.[k] || "none") !== "none").length; share = `<button class="t2-share" data-act="share" aria-label="Freigaben verwalten">${c ? ICON.people + c : ICON.lock}</button>`; }
-  return `<a class="t2 ${st === "crit" || st === "warn" ? st : ""} ${share ? "has-share" : ""}" href="#${k}">
+  return `<a class="t2 ${st === "crit" || st === "warn" ? st : ""} ${share ? "has-share" : ""}" href="${k === "chat" ? "#chat" : tHref(k)}">
     <span class="t2-dot ${st}" aria-hidden="true"></span>
     <div class="t2-top"><span class="chip ${chip[0]}">${chip[1]}</span><span class="t2-title">${esc(title)}</span></div>
     <div class="t2-body"><span class="t2-main ${num ? "num" : ""}">${esc(main)}</span><span class="t2-sub">${esc(sub)}</span></div>
     ${share}
   </a>`;
 }
+const PROJ_EMOJI = ["🎄","🍰","🍷","🎪","🎉","🔥","🌸","🎃","⛺","🍺"];
+function projCard(p){
+  return withProj(p.id, () => {
+    const mt = visible("termine") ? markttage() : [], fut = visible("standdienst") ? schichtZukunft() : [];
+    const frei = fut.reduce((x, s) => x + (freiOf(s) || 0), 0), mine = fut.filter(isMine), auf = visible("aufgaben") ? aufOffen() : [];
+    const ue = auf.filter(a => aufStatus(a).cls === "crit").length;
+    const n = mt.length ? Math.round((parseDate(mt[0].datum) - today())/86400000) : null;
+    const sub = [mt.length ? `${wd(mt[0].datum)} · ${n === 0 ? "heute" : n === 1 ? "morgen" : `noch ${n} Tage`}` : "", mine.length ? `Du: ${wd(mine[0].datum)} ${zeitStr(mine[0])}` : ""].filter(Boolean).join(" · ") || "Noch kein Termin";
+    const facts = [auf.length ? `${auf.length} Aufgaben offen` : "", frei ? `${frei} Plätze frei` : ""].filter(Boolean).join(" · ");
+    return `<a class="proj-card ${ue ? "crit" : ""}" href="#p/${p.id}"><span class="proj-emoji">${esc(p.emoji || "📁")}</span><span class="proj-body"><span class="proj-name">${esc(p.name)}</span><span class="t2-sub">${esc(sub)}</span>${facts ? `<span class="t2-sub" style="color:var(--accent);font-weight:700">${esc(facts)}</span>` : ""}</span><span class="proj-go">›</span></a>`;
+  });
+}
 function viewHome(){
-  const shown = TILES.map(([k]) => k).filter(visible);
-  return `${heroHtml()}${neuigkeitenHtml()}${hinweiseHtml()}${shown.length ? `<div class="tiles">${shown.map(homeTile).join("")}</div>` : `<div class="empty">Für dich wurden noch keine Kacheln freigegeben.</div>`}`;
+  const ps = projekte(), arch = projekte(true).filter(p => p.archiviert);
+  return `${heroHtml()}
+    <div class="eyebrow" style="display:flex;justify-content:space-between;align-items:center">Projekte${me.owner ? `<button class="ghost" data-act="new-projekt" style="min-height:32px;padding:4px 12px;font-size:.8rem">${ICON.plus}Projekt</button>` : ""}</div>
+    ${ps.length ? `<div class="proj-list">${ps.map(projCard).join("")}</div>` : `<div class="empty">Noch keine Projekte.</div>`}
+    ${visible("chat") ? `<div class="tiles">${homeTile("chat")}</div>` : ""}
+    ${neuigkeitenHtml()}${hinweiseHtml()}
+    ${arch.length ? `<details><summary class="eyebrow" style="cursor:pointer">Archiv (${arch.length})</summary><div class="proj-list" style="margin-top:10px">${arch.map(projCard).join("")}</div></details>` : ""}`;
+}
+function viewProjekt(){
+  const p = projOf(PROJ); const shown = TILES.map(([k]) => k).filter(k => k !== "chat" && visible(k));
+  return `<div class="view-head"><a class="btn ghost back" href="#">${ICON.back}Übersicht</a>${me.owner ? `<button class="ghost" data-act="edit-projekt" data-id="${p.id}">Bearbeiten</button>` : ""}</div>
+    <h2 class="page-title">${esc(p.emoji || "")} ${esc(p.name)}${p.archiviert ? ` <span class="pill neutral">Archiv</span>` : ""}</h2>
+    ${heroHtml()}${hinweiseHtml()}
+    ${shown.length ? `<div class="tiles">${shown.map(homeTile).join("")}</div>` : `<div class="empty">Für dich wurden noch keine Kacheln freigegeben.</div>`}`;
+}
+function formProjekt(p = {}){
+  openModal(`<form id="frm" data-kind="projekt" data-id="${p.id||""}" style="display:grid;gap:14px">${head(p.id ? "Projekt bearbeiten" : "Neues Projekt")}
+    <div class="fields">
+      <label class="f full">Name<input name="name" required placeholder="z. B. Kuchenstand Winzerfest" value="${esc(p.name)}"></label>
+      <div class="f full" style="display:grid;gap:6px;font-size:.8rem;font-weight:700;color:var(--muted)">Symbol<div class="chips-row">${PROJ_EMOJI.map(e => `<label class="pick" style="font-size:1.2rem;padding:4px 10px"><input type="radio" name="emoji" value="${e}" ${(p.emoji || PROJ_EMOJI[0]) === e ? "checked" : ""}>${e}</label>`).join("")}</div></div>
+      ${p.id ? `<label class="pick full" style="border-radius:12px"><input type="checkbox" name="archiviert" ${p.archiviert ? "checked" : ""}> Archivieren (vorbei, nur noch im Archiv sichtbar)</label>` : ""}
+    </div>${foot()}</form>`);
 }
 
 function openMenu(){
@@ -1241,25 +1297,32 @@ function openPush(){
 }
 
 /* ---------- Hinweise ---------- */
-function hinweise(){
+function projHinweise(prefix){
   const out = []; const h0 = iso(today()), m = new Date(today()); m.setDate(m.getDate() + 1); const m0 = iso(m);
-  if (me.owner) { const p = members.filter(x => x.status === "pending").length; if (p) out.push({ cls: "warn", icon: ICON.people, href: "#", act: "share", text: `<b>${p} ${p === 1 ? "Person wartet" : "Personen warten"} auf Freigabe</b> – jetzt Kacheln freigeben` }); }
+  const pn = prefix ? `${esc(projName(PROJ))} · ` : "";
   if (visible("standdienst")) {
-    for (const s of schichtZukunft().filter(isMine).filter(s => s.datum === h0 || s.datum === m0)) out.push({ cls: s.datum === h0 ? "crit" : "warn", icon: ICON.shift, href: "#standdienst", text: `<b>${s.datum === h0 ? "Heute" : "Morgen"} Standdienst:</b> ${esc(zeitStr(s))} Uhr · ${esc(s.aufgabe || "")}` });
-    const bald = schichtZukunft().filter(s => Math.round((parseDate(s.datum) - today())/86400000) <= 7 && (freiOf(s) || 0) > 0);
-    const frei = bald.reduce((x, s) => x + freiOf(s), 0);
-    if (frei) out.push({ cls: "info", icon: ICON.shift, href: "#standdienst", text: `<b>${frei} freie Plätze</b> im Standdienst in den nächsten 7 Tagen – wer kann?` });
+    for (const s of schichtZukunft().filter(isMine).filter(s => s.datum === h0 || s.datum === m0)) out.push({ cls: s.datum === h0 ? "crit" : "warn", icon: ICON.shift, href: tHref("standdienst"), text: `${pn}<b>${s.datum === h0 ? "Heute" : "Morgen"} Standdienst:</b> ${esc(zeitStr(s))} Uhr · ${esc(s.aufgabe || "")}` });
+    const frei = schichtZukunft().filter(s => Math.round((parseDate(s.datum) - today())/86400000) <= 7 && (freiOf(s) || 0) > 0).reduce((x, s) => x + freiOf(s), 0);
+    if (frei) out.push({ cls: "info", icon: ICON.shift, href: tHref("standdienst"), text: `${pn}<b>${frei} freie Plätze</b> im Standdienst in den nächsten 7 Tagen – wer kann?` });
   }
-  if (visible("aufgaben")) { const ue = aufOffen().filter(a => aufStatus(a).cls === "crit"); if (ue.length) out.push({ cls: "crit", icon: ICON.task, href: "#aufgaben", text: `<b>${ue.length} Aufgabe${ue.length === 1 ? "" : "n"} überfällig:</b> ${esc(ue.slice(0, 2).map(a => a.titel).join(", "))}${ue.length > 2 ? " …" : ""}` }); }
-  if (visible("termine")) for (const t of upcoming().filter(t => t.datum === h0 || t.datum === m0)) out.push({ cls: "info", icon: ICON.cal, href: "#termine", text: `<b>${t.datum === h0 ? "Heute" : "Morgen"}:</b> ${esc(t.titel)}${t.zeit ? " · " + esc(t.zeit) + " Uhr" : ""}${t.ort ? " · " + esc(t.ort) : ""}` });
-  if (!PUSH.on && pushSupported() && (() => { try { return !localStorage.getItem("fwm-push-hint"); } catch { return true; } })()) out.push({ cls: "info", icon: ICON.bell, href: "#", act: "push-open", text: `<b>Benachrichtigungen einschalten</b> – Erinnerung an deine Schicht direkt aufs Handy` });
+  if (visible("aufgaben")) { const ue = aufOffen().filter(a => aufStatus(a).cls === "crit"); if (ue.length) out.push({ cls: "crit", icon: ICON.task, href: tHref("aufgaben"), text: `${pn}<b>${ue.length} Aufgabe${ue.length === 1 ? "" : "n"} überfällig:</b> ${esc(ue.slice(0, 2).map(a => a.titel).join(", "))}${ue.length > 2 ? " …" : ""}` }); }
+  if (visible("termine")) for (const t of upcoming().filter(t => t.datum === h0 || t.datum === m0)) out.push({ cls: "info", icon: ICON.cal, href: tHref("termine"), text: `${pn}<b>${t.datum === h0 ? "Heute" : "Morgen"}:</b> ${esc(t.titel)}${t.zeit ? " · " + esc(t.zeit) + " Uhr" : ""}${t.ort ? " · " + esc(t.ort) : ""}` });
+  return out;
+}
+function hinweise(){
+  const out = [];
+  if (!PROJ) {
+    if (me.owner) { const p = members.filter(x => x.status === "pending").length; if (p) out.push({ cls: "warn", icon: ICON.people, href: "#", act: "share", text: `<b>${p} ${p === 1 ? "Person wartet" : "Personen warten"} auf Freigabe</b> – jetzt Kacheln freigeben` }); }
+    for (const p of projekte()) out.push(...withProj(p.id, () => projHinweise(true)));
+    if (!PUSH.on && pushSupported() && (() => { try { return !localStorage.getItem("fwm-push-hint"); } catch { return true; } })()) out.push({ cls: "info", icon: ICON.bell, href: "#", act: "push-open", text: `<b>Benachrichtigungen einschalten</b> – Erinnerung an deine Schicht direkt aufs Handy` });
+  } else out.push(...projHinweise(false));
   return out;
 }
 /* Neuigkeiten pro Person: neu freigegebene Kacheln und Änderungen anderer seit dem letzten Besuch */
 const SEEN_KEY = "fwm-gesehen";
 let seen = (() => { try { return JSON.parse(localStorage.getItem(SEEN_KEY) || "null"); } catch { return null; } })();
 const firstVisitTs = Date.now();
-const itemTitle = it => it.kind === "schicht" ? `${it.aufgabe || "Schicht"} ${wd(it.datum)} ${zeitStr(it)}` : it.kind === "produkt" ? it.produkt : it.kind === "material" ? it.gegenstand : it.kind === "einkauf" ? it.name : it.kind === "buchung" ? it.zweck : (it.titel || "Eintrag");
+const itemTitle = it => it.kind === "projekt" ? `Projekt ${it.name}` : it.kind === "schicht" ? `${it.aufgabe || "Schicht"} ${wd(it.datum)} ${zeitStr(it)}` : it.kind === "produkt" ? it.produkt : it.kind === "material" ? it.gegenstand : it.kind === "einkauf" ? it.name : it.kind === "buchung" ? it.zweck : (it.titel || "Eintrag");
 function neuigkeiten(){
   if (S.mode !== "db") return { tiles: [], changes: [] };
   const vis = TILES.map(([k]) => k).filter(visible);
@@ -1280,7 +1343,7 @@ function neuigkeitenHtml(){
   const label = Object.fromEntries(TILES);
   const rows = [
     ...tiles.map(k => `<a class="notice info" href="#${k}">${ICON.people}<span><b>Für dich freigegeben:</b> ${esc(label[k])}</span></a>`),
-    ...changes.slice(0, 6).map(c => { const who = names[c._by] || "Jemand"; const neu = (c.erstellt || 0) > (seen?.ts ?? firstVisitTs); return `<a class="notice info" href="#${tileOf(c)}">${ICON.bell}<span><b>${esc(who)}</b> hat „${esc(itemTitle(c))}“ in ${esc(label[tileOf(c)])} ${neu ? "hinzugefügt" : "geändert"}</span></a>`; })
+    ...changes.slice(0, 6).map(c => { const who = names[c._by] || "Jemand"; const neu = (c.erstellt || 0) > (seen?.ts ?? firstVisitTs); return `<a class="notice info" href="${itemHref(c)}">${ICON.bell}<span><b>${esc(who)}</b> hat „${esc(itemTitle(c))}“ in ${esc(label[tileOf(c)])} ${neu ? "hinzugefügt" : "geändert"}</span></a>`; })
   ];
   if (changes.length > 6) rows.push(`<span class="muted" style="font-size:.85rem;padding-left:4px">+ ${changes.length - 6} weitere Änderungen</span>`);
   return `<section class="notices" aria-label="Neuigkeiten"><div class="eyebrow" style="display:flex;align-items:center;gap:8px;justify-content:space-between"><span style="display:inline-flex;gap:8px;align-items:center">${ICON.people}Neu für dich</span><button class="ghost" style="min-height:30px;padding:4px 10px;font-size:.78rem" data-act="seen">Als gelesen markieren</button></div>${rows.join("")}</section>`;
@@ -1354,6 +1417,7 @@ async function submitForm(form){
       const typ = form.dataset.typ;
       obj = { ...old, kind, typ, zweck: tx("zweck"), betrag: Math.round(betrag * 100) / 100, datum: fd.datum, kategorie: fd.kategorie, wer: tx("wer"), privat: typ === "ausgabe" && !!fd.privat, erstattet: !!old.erstattet, notiz: tx("notiz") };
     }
+    else if (kind === "projekt") obj = { ...old, kind, name: tx("name"), emoji: fd.emoji || old.emoji || "📁", archiviert: !!fd.archiviert, sort: old.sort ?? (projekte(true).length + 1) };
     else if (kind === "info") obj = { ...old, kind, typ: form.dataset.typ, titel: tx("titel"), text: tx("text"), telefon: tx("telefon"), link: tx("link"), pin: !!fd.pin };
     else return fail("Unbekannter Eintrag.");
     delete obj.id; delete obj.geaendert;
@@ -1369,7 +1433,7 @@ function confirmDelete(id){
     <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" style="background:var(--crit);border-color:var(--crit)" data-act="del-yes" data-id="${id}">Löschen</button></div>`);
 }
 
-const FORMS = { schicht: formSchicht, aufgabe: formAufgabe, termin: formTermin, material: formMaterial, produkt: formProdukt, buchung: formBuchung, info: formInfo };
+const FORMS = { projekt: formProjekt, schicht: formSchicht, aufgabe: formAufgabe, termin: formTermin, material: formMaterial, produkt: formProdukt, buchung: formBuchung, info: formInfo };
 const quickSave = (el, obj, msg) => { el.disabled = true; saveItem(obj).then(() => msg && toast(msg), () => { el.disabled = false; toast("Speichern hat nicht geklappt."); }); };
 const byId = id => S.items.find(i => i.id === id);
 
@@ -1381,6 +1445,8 @@ document.addEventListener("click", e => {
   if (el.tagName === "BUTTON" || el.classList.contains("btn")) e.preventDefault();
   const it = el.dataset.id ? byId(el.dataset.id) : null;
   if (act === "close" || act === "close-bg") closeModal();
+  else if (act === "new-projekt") formProjekt();
+  else if (act === "edit-projekt" && it) formProjekt(it);
   else if (act === "new-schicht") formSchicht();
   else if (act === "new-plan") formPlan();
   else if (act === "new-aufgabe") formAufgabe();
