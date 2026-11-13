@@ -999,7 +999,7 @@ function saison(){
   const d = new Date(), m = d.getMonth() + 1, t = d.getDate();
   if (m === 12 && (t === 5 || t === 6)) return "nikolaus";
   if (m === 12 && t >= 24 && t <= 26) return "weihnachten";
-  if (m === 12 || m <= 2) return "winter";
+  if (m === 12 || m <= 2 || (m === 11 && t >= 14)) return "winter";
   if (m <= 5) return "fruehling";
   if (m <= 8) return "sommer";
   return "herbst";
@@ -1093,7 +1093,7 @@ function openName(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS = [["anfrage","Neue Anfragen – wer auf Freigabe wartet","__admin"],["schicht","Meine Schicht – am Vorabend","standdienst"],["frei","Morgen noch Plätze frei","standdienst"],["termin","Termine – am Vorabend","termine"],["aufgabe","Aufgaben – am Tag vor der Frist","aufgaben"],["neu","Neue Einträge von anderen",null]];
+const PUSH_CATS = [["anfrage","Neue Anfragen – wer auf Freigabe wartet","__admin"],["schicht","Meine Schicht – am Vorabend","standdienst"],["frei","Morgen noch Plätze frei","standdienst"],["termin","Termine – am Vorabend","termine"],["aufgabe","Aufgaben – am Tag vor der Frist","aufgaben"]];
 const PUSH = { on: false, row: null, endpoint: null };
 const pushSupported = () => ("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window);
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -1138,7 +1138,7 @@ function openPush(){
       ? `<div class="scan-status warn">Auf dem iPhone gehen Benachrichtigungen nur in der installierten App.</div><ol class="muted" style="margin:0;padding-left:20px;display:grid;gap:4px;font-size:.9rem"><li>In Safari unten auf <b>Teilen</b> tippen → <b>„Zum Home-Bildschirm“</b>.</li><li>Alarmstufe Pink über das neue Icon öffnen.</li><li>Dort im Menü <b>Benachrichtigungen</b> einschalten.</li></ol>`
       : `<div class="scan-status warn">Dieser Browser unterstützt leider keine Benachrichtigungen. Nimm auf dem iPhone Safari (iOS 16.4 oder neuer), auf Android Chrome.</div>`;
   } else if (!PUSH.on) {
-    body = `<p class="muted" style="margin:0">Du bekommst Nachrichten aufs Handy, z. B. am Vorabend deiner Schicht, wenn morgen noch Plätze frei sind oder jemand etwas Neues einträgt – nur für Kacheln, die du sehen darfst.</p>
+    body = `<p class="muted" style="margin:0">Du bekommst Erinnerungen aufs Handy: am Vorabend deiner Schicht, vor Terminen, vor Aufgaben-Fristen und wenn morgen noch Plätze frei sind – nur für Kacheln, die du sehen darfst.</p>
       <button class="primary" data-act="push-on">Benachrichtigungen einschalten</button>
       <p class="muted" style="margin:0;font-size:.8rem">Gilt für dieses Gerät. Auf weiteren Geräten einfach dort auch einschalten.</p>`;
   } else {
