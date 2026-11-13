@@ -443,6 +443,20 @@ textarea{resize:vertical;min-height:64px}
 .info-card.pin{border-color:var(--gold);box-shadow:0 0 0 2px var(--gold-soft)}
 .pick{display:inline-flex;align-items:center;gap:6px;background:var(--sunken);border-radius:999px;padding:6px 12px;color:var(--ink);font-size:.85rem;font-weight:600;cursor:pointer}
 .pick input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.chip.chat{background:var(--accent-soft);color:var(--accent)}
+.chat-list{display:grid;gap:4px;padding-bottom:8px}
+.msg{max-width:82%;justify-self:start;display:grid;gap:2px}
+.msg.me{justify-self:end}
+.msg .who{font-size:.72rem;font-weight:800;color:var(--accent);padding:0 10px}
+.msg .bubble{background:var(--surface);border:1px solid var(--line);border-radius:18px 18px 18px 6px;padding:8px 12px;white-space:pre-wrap;overflow-wrap:anywhere;font-size:.95rem;line-height:1.35;box-shadow:var(--shadow);text-align:left;font-weight:500;min-height:0;display:block;color:var(--ink);cursor:default}
+.msg.me .bubble{background:linear-gradient(135deg,#E0367F,#B3125A);color:#fff;border-color:transparent;border-radius:18px 18px 6px 18px;cursor:pointer}
+.msg .time{font-size:.68rem;color:var(--muted);padding:0 10px}
+.msg.me .time{text-align:right}
+.msg.cont .who{display:none}
+.chat-day{justify-self:center;font-size:.72rem;font-weight:800;color:var(--muted);background:var(--sunken);border-radius:999px;padding:3px 10px;margin:10px 0 4px}
+.chat-form{position:sticky;bottom:calc(76px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr auto;gap:8px;background:var(--bg);padding:8px 0;z-index:5}
+.chat-form textarea{min-height:46px;max-height:140px;resize:none;border-radius:22px;padding:12px 16px;background:var(--surface);border:1px solid var(--line)}
+.chat-form button{width:48px;height:48px;padding:0;border-radius:50%;align-self:end;background:var(--accent);border-color:var(--accent);color:#fff}
 .quick{display:flex;gap:6px;flex-wrap:wrap}
 .quick button{min-height:32px;padding:4px 10px;font-size:.78rem}
 </style>
@@ -477,6 +491,7 @@ const ICON = {
   box:'<svg class="i" viewBox="0 0 24 24"><path d="M3 8l9-4 9 4-9 4z"/><path d="M3 8v8l9 4 9-4V8M12 12v8"/></svg>',
   star:'<svg class="i" viewBox="0 0 24 24"><path d="M7 21h10M9 21v-3h6v3M6 4h12l-1.5 7a4.5 4.5 0 0 1-9 0z"/><path d="M12 15.5V18"/></svg>',
   money:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5v.01M17.5 14.5v.01"/></svg>',
+  chat:'<svg class="i" viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/><path d="M8 9.5h8M8 12.5h5"/></svg>',
   info:'<svg class="i" viewBox="0 0 24 24"><path d="M5 4h14v12l-4 4H5z"/><path d="M15 20v-4h4M9 9h6M9 12.5h4"/></svg>',
   tree:'<svg class="i" viewBox="0 0 24 24"><path d="M12 3l5 6h-3l4 5h-3l4 5H5l4-5H6l4-5H7z"/><path d="M12 19v3"/></svg>',
   lock:'<svg class="i" viewBox="0 0 24 24"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>',
@@ -503,7 +518,7 @@ const SB_KEY = "sb_publishable_bEARbfjx56Xq7oUg9GQESA_BILmK_Jm";
 const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 const S = { items: [], mode: "db", ready: false, auth: "loading", email: "" };
 let uid = null, member = null, members = [];
-const TILES = [["standdienst","Standdienst"],["aufgaben","Aufgaben"],["termine","Termine & Treffen"],["einkauf","Einkaufsliste"],["material","Material & Deko"],["angebot","Angebot & Preise"],["kasse","Kasse"],["infos","Infos & Kontakte"]];
+const TILES = [["standdienst","Standdienst"],["chat","Chat"],["aufgaben","Aufgaben"],["termine","Termine & Treffen"],["einkauf","Einkaufsliste"],["material","Material & Deko"],["angebot","Angebot & Preise"],["kasse","Kasse"],["infos","Infos & Kontakte"]];
 const LEVEL = { none: "Kein Zugriff", view: "Ansehen", edit: "Bearbeiten" };
 const me = { owner: false };
 const KIND_TILE = { schicht:"standdienst", aufgabe:"aufgaben", termin:"termine", einkauf:"einkauf", material:"material", produkt:"angebot", buchung:"kasse", info:"infos" };
@@ -920,10 +935,48 @@ function formInfo(i = {}){
     </div>${foot()}</form>`);
 }
 
+/* ---------- Chat ---------- */
+let chat = [], chatLoaded = false, chatPending = false, chatChannel = null;
+const CHAT_SEEN = "fwm-chat-gesehen";
+const chatSeen = () => { try { return Number(localStorage.getItem(CHAT_SEEN) || 0); } catch { return 0; } };
+const chatUnread = () => chat.filter(m => m.user_id !== uid && Date.parse(m.created_at) > chatSeen()).length;
+async function loadChat(){
+  if (!visible("chat") || chatPending) return;
+  chatPending = true;
+  const { data, error } = await sb.from("fm_chat").select("*").order("created_at", { ascending: false }).limit(300);
+  chatPending = false; chatLoaded = true;
+  if (error) return;
+  const nearBottom = window.innerHeight + window.scrollY >= document.body.scrollHeight - 160;
+  chat = (data || []).reverse();
+  if (!chatChannel) chatChannel = sb.channel("fm-chat").on("postgres_changes", { event: "*", schema: "public", table: "fm_chat" }, () => loadChat()).subscribe();
+  render();
+  if (route() === "chat" && nearBottom) scrollChat();
+}
+const scrollChat = () => setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 30);
+const markChatSeen = () => { const last = chat[chat.length - 1]; if (last) try { localStorage.setItem(CHAT_SEEN, String(Date.parse(last.created_at))); } catch {} };
+function viewChat(){
+  markChatSeen();
+  let lastDay = "", lastUser = "", lastTs = 0;
+  const rows = chat.map(m => {
+    const d = new Date(m.created_at), day = iso(d), mine = m.user_id === uid;
+    let out = "";
+    if (day !== lastDay) { out += `<div class="chat-day">${esc(tagName(day))}</div>`; lastUser = ""; }
+    const cont = lastUser === m.user_id && (d - lastTs) < 5 * 60000;
+    lastDay = day; lastUser = m.user_id; lastTs = d;
+    return out + `<div class="msg ${mine ? "me" : ""} ${cont ? "cont" : ""}">${mine ? "" : `<span class="who">${esc(m.name || "Jemand")}</span>`}${mine || me.owner ? `<button class="bubble" data-act="chat-menu" data-id="${m.id}">${esc(m.text)}</button>` : `<div class="bubble">${esc(m.text)}</div>`}<span class="time">${d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</span></div>`;
+  }).join("");
+  return `<section style="display:grid;gap:10px">
+    <div class="view-head">${backBtn}</div>
+    <h2 class="page-title">Chat</h2>
+    ${chat.length ? `<div class="chat-list">${rows}</div>` : `<div class="empty">${chatLoaded ? "Noch keine Nachrichten – schreib die erste! 💬" : "Nachrichten werden geladen …"}</div>`}
+    <form id="chatFrm" class="chat-form"><textarea id="chat-text" name="text" rows="1" maxlength="2000" placeholder="Nachricht an alle …" enterkeyhint="send" required></textarea><button type="submit" aria-label="Senden"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg></button></form>
+  </section>`;
+}
+
 /* ---------- Ansichten ---------- */
-const VIEWS = { standdienst: viewStanddienst, aufgaben: viewAufgaben, termine: viewTermine, einkauf: viewEinkauf, material: viewMaterial, angebot: viewAngebot, kasse: viewKasse, infos: viewInfos };
+const VIEWS = { standdienst: viewStanddienst, chat: viewChat, aufgaben: viewAufgaben, termine: viewTermine, einkauf: viewEinkauf, material: viewMaterial, angebot: viewAngebot, kasse: viewKasse, infos: viewInfos };
 function route(){ const h = location.hash.slice(1); return VIEWS[h] ? h : ""; }
-window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); });
+window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); if (route() === "chat") { scrollChat(); loadChat(); } });
 
 function render(){
   const app = $("#app");
@@ -931,10 +984,13 @@ function render(){
   if (S.auth === "pending" || S.auth === "blocked") { app.innerHTML = `<div class="auth-card"><h2>${S.auth === "blocked" ? "Kein Zugriff" : "Fast geschafft 🎄"}</h2><p class="muted" style="margin:0">${S.auth === "blocked" ? "Dein Zugang wurde gesperrt." : "Du bist angemeldet als <b>" + esc(S.email) + "</b>. Sobald du freigegeben bist, siehst du hier die Kacheln für die Weihnachtsmarkt-Orga."}</p><div class="toolbar"><button class="primary" data-act="reload">Erneut prüfen</button><button class="ghost" data-act="logout">Abmelden</button></div></div>`; return; }
   if (!S.ready) { app.innerHTML = `<div class="empty">Alarmstufe Pink wird geladen …</div>`; return; }
   if (!namesLoaded && !namesPending) loadNames();
+  if (!chatLoaded && !chatPending && visible("chat")) loadChat();
   if (location.hash === "#freigaben") { history.replaceState(null, "", location.pathname + location.search); if (me.owner) setTimeout(openShare, 0); }
   let r = route(); if (r && !visible(r)) r = "";
   const hb = $("#homeBtn"); if (hb) { hb.classList.toggle("on", !r); hb.closest(".homebar").hidden = S.auth !== "ok"; }
+  const ct = $("#chat-text"), draft = ct?.value || "", foc = document.activeElement === ct;
   app.innerHTML = r ? VIEWS[r]() : viewHome();
+  const ct2 = $("#chat-text"); if (ct2 && draft) { ct2.value = draft; } if (ct2 && foc) ct2.focus();
 }
 
 const urlErr = (() => { const h = new URLSearchParams(location.hash.slice(1)); return h.get("error_code") || h.get("error") || ""; })();
@@ -1032,6 +1088,10 @@ function homeTile(k){
     const frei = fut.reduce((s, x) => s + (freiOf(x) || 0), 0), mine = fut.filter(isMine);
     if (fut.length) { main = frei ? `${frei} Plätze frei` : "Alles besetzt"; sub = mine.length ? `Du: ${wd(mine[0].datum)} ${zeitStr(mine[0])}` : `${fut.length} Schichten · trag dich ein`; st = frei && Math.round((parseDate(fut[0].datum) - today())/86400000) <= 3 ? "warn" : ""; }
     else { main = "Noch leer"; sub = "Schichtplan anlegen"; }
+  } else if (k === "chat") {
+    chip = ["chat", ICON.chat]; const last = chat[chat.length - 1], n = chatUnread();
+    if (last) { main = n ? `${n} neu` : (last.user_id === uid ? "Du" : (last.name || "Jemand")); sub = (n ? (last.name || "") + ": " : "") + last.text; st = n ? "warn" : ""; }
+    else { main = chatLoaded ? "Noch still hier" : "…"; sub = "Schreib den Mädels"; }
   } else if (k === "aufgaben") {
     const o = aufOffen(); chip = ["task", ICON.task];
     const ue = o.filter(a => aufStatus(a).cls === "crit").length, bald = o.filter(a => aufStatus(a).cls === "warn").length, ohne = o.filter(a => !a.wer).length;
@@ -1337,6 +1397,9 @@ document.addEventListener("click", e => {
   else if (act === "reload") refreshAll();
   else if (act === "member-del") { const u = el.dataset.uid; if (el.dataset.sure) { sb.from("fm_members").delete().eq("user_id", u).then(({ error }) => { if (error) toast("Entfernen hat nicht geklappt."); else { closeModal(); toast("Person entfernt"); loadMembers().then(render); } }); } else { el.dataset.sure = "1"; el.textContent = "Wirklich entfernen?"; } }
   else if (act === "seen") markSeen();
+  else if (act === "chat-menu") { const m = chat.find(x => x.id === el.dataset.id); if (m) openModal(`${head("Nachricht")}<p style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere">${esc(m.text)}</p><div class="sheet-foot"><button data-act="chat-copy" data-id="${m.id}">Kopieren</button><button class="primary" style="background:var(--crit);border-color:var(--crit)" data-act="chat-del" data-id="${m.id}">Löschen</button></div>`); }
+  else if (act === "chat-copy") { const m = chat.find(x => x.id === el.dataset.id); if (m) (navigator.clipboard?.writeText(m.text) || Promise.reject()).then(() => { closeModal(); toast("Kopiert"); }, () => {}); }
+  else if (act === "chat-del") { sb.from("fm_chat").delete().eq("id", el.dataset.id).then(({ error }) => { if (error) toast("Löschen hat nicht geklappt."); else { closeModal(); toast("Nachricht gelöscht"); loadChat(); } }); }
 });
 const cleanItem = it => { const { id, _tile, _by, erstellt, geaendert, ...data } = it; return data; };
 document.addEventListener("submit", async e => {
@@ -1350,6 +1413,7 @@ document.addEventListener("submit", async e => {
     $("#ek-name")?.focus(); return;
   }
   if (f.id === "planFrm") return savePlan(f);
+  if (f.id === "chatFrm") { const ta = $("#chat-text"); const text = ta.value.trim(); if (!text) return; ta.value = ""; ta.style.height = ""; const { error } = await sb.from("fm_chat").insert({ text }); if (error) { ta.value = text; return toast("Senden hat nicht geklappt."); } await loadChat(); scrollChat(); $("#chat-text")?.focus(); return; }
   if (f.id === "nameFrm") {
     const n = String(new FormData(f).get("name") || "").trim(); if (!n) return;
     const { error } = await sb.rpc("fm_set_name", { n });
@@ -1374,7 +1438,8 @@ document.addEventListener("submit", async e => {
 document.addEventListener("change", e => {
   if (e.target.dataset && e.target.dataset.pushcat && PUSH.row) { const prefs = { ...(PUSH.row.prefs || {}), [e.target.dataset.pushcat]: e.target.checked }; sb.from("fm_push_subs").update({ prefs }).eq("id", PUSH.row.id).then(({ error }) => { if (error) toast("Speichern hat nicht geklappt."); else { PUSH.row.prefs = prefs; toast(e.target.checked ? "Eingeschaltet" : "Ausgeschaltet"); } }); }
 });
-document.addEventListener("keydown", e => { if (e.key === "Escape" && $("#modalRoot").innerHTML) closeModal(); });
+document.addEventListener("input", e => { if (e.target.id === "chat-text") { e.target.style.height = "auto"; e.target.style.height = Math.min(140, e.target.scrollHeight) + "px"; } });
+document.addEventListener("keydown", e => { if (e.target.id === "chat-text" && e.key === "Enter" && !e.shiftKey && !matchMedia("(pointer: coarse)").matches) { e.preventDefault(); e.target.form.requestSubmit(); return; } if (e.key === "Escape" && $("#modalRoot").innerHTML) closeModal(); });
 
 render();
 initStore();
