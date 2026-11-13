@@ -378,6 +378,10 @@ textarea{resize:vertical;min-height:64px}
 .hero .v{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;line-height:1.15}
 .hero .s{font-size:.9rem;opacity:.92}
 .hero .flakes{position:absolute;right:-6px;top:-8px;font-size:4.6rem;opacity:.16;line-height:1;pointer-events:none}
+.hero .snow{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.hero .snow i{position:absolute;top:-14px;color:#fff;font-style:normal;line-height:1;opacity:0;text-shadow:0 0 6px rgba(255,255,255,.6);animation:snowfall linear infinite}
+@keyframes snowfall{0%{transform:translate(0,0) rotate(0);opacity:0}10%{opacity:.9}50%{transform:translate(14px,90px) rotate(180deg)}90%{opacity:.8}100%{transform:translate(-6px,190px) rotate(360deg);opacity:0}}
+.hero > span:not(.snow):not(.flakes){position:relative}
 .shift{display:grid;gap:10px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);min-width:0}
 .shift.full{box-shadow:none}
 .shift.mine{border-color:var(--green);box-shadow:0 0 0 2px var(--green-soft)}
@@ -960,6 +964,7 @@ function openPassword(){
     <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" type="submit" id="pwSave">Speichern</button></div></form>`);
 }
 
+const SNOW = Array.from({ length: 18 }, (_, i) => { const r = n => ((Math.sin(i * 97.13 + n * 13.7) + 1) / 2); return `<i style="left:${(r(1) * 100).toFixed(1)}%;font-size:${(8 + r(2) * 12).toFixed(0)}px;animation-duration:${(5 + r(3) * 6).toFixed(1)}s;animation-delay:-${(r(4) * 10).toFixed(1)}s">${i % 3 ? "❄" : "•"}</i>`; }).join("");
 function heroHtml(){
   if (!visible("termine") && !visible("standdienst")) return "";
   const mt = visible("termine") ? markttage() : [];
@@ -969,7 +974,7 @@ function heroHtml(){
   else v = "Gemeinsam organisiert";
   if (meine.length) s += (s ? "<br>" : "") + `Deine nächste Schicht: <b>${esc(wd(meine[0].datum))} ${esc(zeitStr(meine[0]))}</b> · ${esc(meine[0].aufgabe || "")}`;
   else if (visible("standdienst") && schichtZukunft().length) s += (s ? "<br>" : "") + "Du bist noch für keine Schicht eingetragen.";
-  return `<a class="hero" href="${meine.length || schichtZukunft().length ? "#standdienst" : "#termine"}" style="text-decoration:none"><span class="flakes" aria-hidden="true">❄</span><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>${s ? `<span class="s">${s.replace(/\n/g, "")}</span>` : ""}</a>`;
+  return `<a class="hero" href="${meine.length || schichtZukunft().length ? "#standdienst" : "#termine"}" style="text-decoration:none"><span class="flakes" aria-hidden="true">❄</span><span class="snow" aria-hidden="true">${SNOW}</span><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>${s ? `<span class="s">${s.replace(/\n/g, "")}</span>` : ""}</a>`;
 }
 function homeTile(k){
   let chip, title = Object.fromEntries(TILES)[k], main = "", sub = "", st = "", num = false;
