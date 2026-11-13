@@ -931,6 +931,7 @@ function render(){
   if (S.auth === "pending" || S.auth === "blocked") { app.innerHTML = `<div class="auth-card"><h2>${S.auth === "blocked" ? "Kein Zugriff" : "Fast geschafft 🎄"}</h2><p class="muted" style="margin:0">${S.auth === "blocked" ? "Dein Zugang wurde gesperrt." : "Du bist angemeldet als <b>" + esc(S.email) + "</b>. Sobald du freigegeben bist, siehst du hier die Kacheln für die Weihnachtsmarkt-Orga."}</p><div class="toolbar"><button class="primary" data-act="reload">Erneut prüfen</button><button class="ghost" data-act="logout">Abmelden</button></div></div>`; return; }
   if (!S.ready) { app.innerHTML = `<div class="empty">Alarmstufe Pink wird geladen …</div>`; return; }
   if (!namesLoaded && !namesPending) loadNames();
+  if (location.hash === "#freigaben") { history.replaceState(null, "", location.pathname + location.search); if (me.owner) setTimeout(openShare, 0); }
   let r = route(); if (r && !visible(r)) r = "";
   const hb = $("#homeBtn"); if (hb) { hb.classList.toggle("on", !r); hb.closest(".homebar").hidden = S.auth !== "ok"; }
   app.innerHTML = r ? VIEWS[r]() : viewHome();
@@ -1092,7 +1093,7 @@ function openName(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS = [["schicht","Meine Schicht – am Vorabend","standdienst"],["frei","Morgen noch Plätze frei","standdienst"],["termin","Termine – am Vorabend","termine"],["aufgabe","Aufgaben – am Tag vor der Frist","aufgaben"],["neu","Neue Einträge von anderen",null]];
+const PUSH_CATS = [["anfrage","Neue Anfragen – wer auf Freigabe wartet","__admin"],["schicht","Meine Schicht – am Vorabend","standdienst"],["frei","Morgen noch Plätze frei","standdienst"],["termin","Termine – am Vorabend","termine"],["aufgabe","Aufgaben – am Tag vor der Frist","aufgaben"],["neu","Neue Einträge von anderen",null]];
 const PUSH = { on: false, row: null, endpoint: null };
 const pushSupported = () => ("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window);
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -1142,7 +1143,7 @@ function openPush(){
       <p class="muted" style="margin:0;font-size:.8rem">Gilt für dieses Gerät. Auf weiteren Geräten einfach dort auch einschalten.</p>`;
   } else {
     const prefs = PUSH.row?.prefs || {};
-    const cats = PUSH_CATS.filter(([,, t]) => !t || visible(t));
+    const cats = PUSH_CATS.filter(([,, t]) => t === "__admin" ? me.owner : !t || visible(t));
     body = `<div class="scan-status ok">Benachrichtigungen sind auf diesem Gerät an.</div>
       <div class="menu-list">${cats.map(([k, l]) => `<label class="check" style="justify-content:space-between;padding:10px 12px;border-radius:12px;background:var(--sunken);color:var(--ink)"><span>${esc(l)}</span><input type="checkbox" data-pushcat="${k}" ${prefs[k] !== false ? "checked" : ""} style="width:22px;height:22px"></label>`).join("")}</div>
       <div class="toolbar"><button data-act="push-test">Testnachricht senden</button><button class="ghost danger" data-act="push-off">Ausschalten</button></div>
