@@ -390,8 +390,6 @@ textarea{resize:vertical;min-height:64px}
 @keyframes walk{0%{transform:translateX(0)}100%{transform:translateX(calc(-100vw - 160px))}}
 @keyframes bob{from{transform:translateY(0) rotate(-4deg)}to{transform:translateY(-4px) rotate(4deg)}}
 .hero .fx .sleigh{top:6px;right:-140px;font-size:24px;white-space:nowrap;animation:fly 13s linear infinite}
-.hero .fx .angel{top:40%;left:-60px;font-size:28px;animation:angel 15s ease-in-out infinite;animation-delay:-6s}
-.hero .fx .angel::after{content:"✨";font-size:16px;position:absolute;left:-14px;top:10px;animation:twinkle .8s ease-in-out infinite alternate}
 @keyframes fly{0%{transform:translate(0,0)}25%{transform:translate(-30vw,14px)}50%{transform:translate(-60vw,-2px)}75%{transform:translate(-90vw,12px)}100%{transform:translate(calc(-100vw - 300px),0)}}
 @keyframes angel{0%{transform:translate(0,0)}25%{transform:translate(28vw,-22px)}50%{transform:translate(56vw,8px)}75%{transform:translate(84vw,-18px)}100%{transform:translate(calc(100vw + 160px),0)}}
 @keyframes twinkle{from{opacity:.3;transform:scale(.7)}to{opacity:1;transform:scale(1.1)}}
@@ -1010,7 +1008,7 @@ function saisonFx(){
   const z = saison(); const snow = fallers(16, ["❄","•","❄"], "snow");
   if (z === "herbst") return fallers(12, ["🍂","🍁","🍂","🍃"], "leaf", [18, 30], [7, 12]);
   if (z === "nikolaus") return fallers(10, ["❄","•"], "snow") + `<i class="walk"><b>🎅</b><b style="animation-delay:.25s">🎁</b></i>`;
-  if (z === "weihnachten") return fallers(10, ["❄","•","✨"], "snow") + `<i class="sleigh">🦌🦌🛷🎅</i><i class="angel">👼</i>`;
+  if (z === "weihnachten") return fallers(10, ["❄","•","✨"], "snow") + `<i class="sleigh">🦌🦌🛷🎅</i>`;
   if (z === "fruehling") return Array.from({ length: 9 }, (_, i) => `<i class="flower" style="left:${(4 + i * 11 + rnd(i,1) * 5).toFixed(0)}%;font-size:${(18 + rnd(i,2) * 10).toFixed(0)}px;animation-delay:-${(rnd(i,3) * 9).toFixed(1)}s">${["🌷","🌼","🌸","🌱","🌻"][i % 5]}</i>`).join("") + `<i class="butterfly">🦋</i>`;
   if (z === "sommer") return `<i class="sun">☀️</i><i class="waves w2"></i><i class="waves"></i><i class="swim"><b>🏊‍♀️</b></i><i class="ball">🏐</i>`;
   return snow;
