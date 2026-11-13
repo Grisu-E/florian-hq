@@ -954,6 +954,14 @@ async function loadChat(){
 }
 const scrollChat = () => setTimeout(() => window.scrollTo(0, document.body.scrollHeight), 30);
 const markChatSeen = () => { const last = chat[chat.length - 1]; if (last) try { localStorage.setItem(CHAT_SEEN, String(Date.parse(last.created_at))); } catch {} };
+function chatPushBtns(){
+  if (!pushSupported()) return `<button class="ghost" data-act="push-open" style="min-height:36px;font-size:.8rem">${ICON.bell}Push</button>`;
+  const chatOn = PUSH.on && PUSH.row?.prefs?.chat !== false;
+  return `<div class="toolbar" style="gap:6px">
+    ${PUSH.on ? `<button data-act="chat-push" style="min-height:36px;padding:6px 12px;font-size:.8rem;${chatOn ? "background:var(--accent-soft);color:var(--accent);border-color:transparent" : ""}" aria-pressed="${chatOn}">${chatOn ? "🔔 Chat-Push an" : "🔕 Chat-Push aus"}</button>` : ""}
+    <button data-act="push-all" style="min-height:36px;padding:6px 12px;font-size:.8rem;${PUSH.on ? "" : "background:var(--accent);color:#fff;border-color:var(--accent)"}" aria-pressed="${PUSH.on}">${PUSH.on ? "Alle Push: an" : "🔔 Push einschalten"}</button>
+  </div>`;
+}
 function viewChat(){
   markChatSeen();
   let lastDay = "", lastUser = "", lastTs = 0;
@@ -966,7 +974,7 @@ function viewChat(){
     return out + `<div class="msg ${mine ? "me" : ""} ${cont ? "cont" : ""}">${mine ? "" : `<span class="who">${esc(m.name || "Jemand")}</span>`}${mine || me.owner ? `<button class="bubble" data-act="chat-menu" data-id="${m.id}">${esc(m.text)}</button>` : `<div class="bubble">${esc(m.text)}</div>`}<span class="time">${d.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })}</span></div>`;
   }).join("");
   return `<section style="display:grid;gap:10px">
-    <div class="view-head">${backBtn}</div>
+    <div class="view-head">${backBtn}${chatPushBtns()}</div>
     <h2 class="page-title">Chat</h2>
     ${chat.length ? `<div class="chat-list">${rows}</div>` : `<div class="empty">${chatLoaded ? "Noch keine Nachrichten – schreib die erste! 💬" : "Nachrichten werden geladen …"}</div>`}
     <form id="chatFrm" class="chat-form"><textarea id="chat-text" name="text" rows="1" maxlength="2000" placeholder="Nachricht an alle …" enterkeyhint="send" required></textarea><button type="submit" aria-label="Senden"><svg class="i" viewBox="0 0 24 24"><path d="M4 12l16-8-6 16-2.5-6.5z"/></svg></button></form>
@@ -1153,7 +1161,7 @@ function openName(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS = [["anfrage","Neue Anfragen – wer auf Freigabe wartet","__admin"],["schicht","Meine Schicht – am Vorabend","standdienst"],["frei","Morgen noch Plätze frei","standdienst"],["termin","Termine – am Vorabend","termine"],["aufgabe","Aufgaben – am Tag vor der Frist","aufgaben"]];
+const PUSH_CATS = [["chat","Neue Chat-Nachrichten","chat"],["anfrage","Neue Anfragen – wer auf Freigabe wartet","__admin"],["schicht","Meine Schicht – am Vorabend","standdienst"],["frei","Morgen noch Plätze frei","standdienst"],["termin","Termine – am Vorabend","termine"],["aufgabe","Aufgaben – am Tag vor der Frist","aufgaben"]];
 const PUSH = { on: false, row: null, endpoint: null };
 const pushSupported = () => ("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window);
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -1397,6 +1405,8 @@ document.addEventListener("click", e => {
   else if (act === "reload") refreshAll();
   else if (act === "member-del") { const u = el.dataset.uid; if (el.dataset.sure) { sb.from("fm_members").delete().eq("user_id", u).then(({ error }) => { if (error) toast("Entfernen hat nicht geklappt."); else { closeModal(); toast("Person entfernt"); loadMembers().then(render); } }); } else { el.dataset.sure = "1"; el.textContent = "Wirklich entfernen?"; } }
   else if (act === "seen") markSeen();
+  else if (act === "chat-push" && PUSH.row) { el.disabled = true; const prefs = { ...(PUSH.row.prefs || {}), chat: PUSH.row.prefs?.chat === false }; sb.from("fm_push_subs").update({ prefs }).eq("id", PUSH.row.id).then(({ error }) => { el.disabled = false; if (error) toast("Speichern hat nicht geklappt."); else { PUSH.row.prefs = prefs; toast(prefs.chat ? "Chat-Benachrichtigungen an" : "Chat-Benachrichtigungen aus"); render(); } }); }
+  else if (act === "push-all") { if (PUSH.on) { el.disabled = true; (async () => { try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) { await sb.from("fm_push_subs").delete().eq("endpoint", sub.endpoint); await sub.unsubscribe(); } } catch {} await refreshPush(); toast("Alle Benachrichtigungen aus"); render(); })(); } else enablePush(el).then(render); }
   else if (act === "chat-menu") { const m = chat.find(x => x.id === el.dataset.id); if (m) openModal(`${head("Nachricht")}<p style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere">${esc(m.text)}</p><div class="sheet-foot"><button data-act="chat-copy" data-id="${m.id}">Kopieren</button><button class="primary" style="background:var(--crit);border-color:var(--crit)" data-act="chat-del" data-id="${m.id}">Löschen</button></div>`); }
   else if (act === "chat-copy") { const m = chat.find(x => x.id === el.dataset.id); if (m) (navigator.clipboard?.writeText(m.text) || Promise.reject()).then(() => { closeModal(); toast("Kopiert"); }, () => {}); }
   else if (act === "chat-del") { sb.from("fm_chat").delete().eq("id", el.dataset.id).then(({ error }) => { if (error) toast("Löschen hat nicht geklappt."); else { closeModal(); toast("Nachricht gelöscht"); loadChat(); } }); }
