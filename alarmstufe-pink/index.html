@@ -467,6 +467,14 @@ body.chat-open .homebar{display:none}
 .proj-body{display:grid;gap:2px;min-width:0;flex:1}
 .proj-name{font-weight:800;font-size:1.08rem;letter-spacing:-.01em}
 .proj-go{font-size:1.6rem;color:var(--muted);font-weight:300}
+.push-toggle{display:flex;align-items:center;gap:12px;width:100%;justify-content:flex-start;text-align:left;padding:12px 16px;border-radius:18px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);min-height:60px}
+.push-toggle .pt-ico{font-size:1.4rem}
+.push-toggle .pt-txt{display:grid;gap:1px;flex:1;min-width:0}
+.push-toggle .pt-txt span{font-size:.78rem;color:var(--muted);font-weight:600}
+.push-toggle .pt-switch{width:50px;height:30px;border-radius:999px;background:var(--sunken);border:1px solid var(--line);position:relative;flex:none;transition:background .2s}
+.push-toggle .pt-switch i{position:absolute;top:2px;left:2px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .2s}
+.push-toggle.on .pt-switch{background:var(--accent);border-color:var(--accent)}
+.push-toggle.on .pt-switch i{transform:translateX(20px)}
 .quick{display:flex;gap:6px;flex-wrap:wrap}
 .quick button{min-height:32px;padding:4px 10px;font-size:.78rem}
 </style>
@@ -1193,9 +1201,18 @@ function projCard(p){
     return `<a class="proj-card ${ue ? "crit" : ""}" href="#p/${p.id}"><span class="proj-emoji">${esc(p.emoji || "📁")}</span><span class="proj-body"><span class="proj-name">${esc(p.name)}</span><span class="t2-sub">${esc(sub)}</span>${facts ? `<span class="t2-sub" style="color:var(--accent);font-weight:700">${esc(facts)}</span>` : ""}</span><span class="proj-go">›</span></a>`;
   });
 }
+function pushToggleHtml(){
+  const on = PUSH.on;
+  const act = pushSupported() ? "push-all" : "push-open";
+  return `<button class="push-toggle ${on ? "on" : ""}" data-act="${act}" aria-pressed="${on}">
+    <span class="pt-ico">${on ? "🔔" : "🔕"}</span>
+    <span class="pt-txt"><b>Push-Benachrichtigungen ${on ? "an" : "aus"}</b><span>${on ? "Tippen zum Ausschalten · Details im Menü" : pushSupported() ? "Tippen zum Einschalten" : "So geht’s auf deinem Handy"}</span></span>
+    <span class="pt-switch" aria-hidden="true"><i></i></span>
+  </button>`;
+}
 function viewHome(){
   const ps = projekte(), arch = projekte(true).filter(p => p.archiviert);
-  return `${heroHtml()}
+  return `${heroHtml()}${pushToggleHtml()}
     <div class="eyebrow" style="display:flex;justify-content:space-between;align-items:center">Projekte${me.owner ? `<button class="ghost" data-act="new-projekt" style="min-height:32px;padding:4px 12px;font-size:.8rem">${ICON.plus}Projekt</button>` : ""}</div>
     ${ps.length ? `<div class="proj-list">${ps.map(projCard).join("")}</div>` : `<div class="empty">Noch keine Projekte.</div>`}
     ${visible("chat") ? `<div class="tiles">${homeTile("chat")}</div>` : ""}
@@ -1314,7 +1331,6 @@ function hinweise(){
   if (!PROJ) {
     if (me.owner) { const p = members.filter(x => x.status === "pending").length; if (p) out.push({ cls: "warn", icon: ICON.people, href: "#", act: "share", text: `<b>${p} ${p === 1 ? "Person wartet" : "Personen warten"} auf Freigabe</b> – jetzt Kacheln freigeben` }); }
     for (const p of projekte()) out.push(...withProj(p.id, () => projHinweise(true)));
-    if (!PUSH.on && pushSupported() && (() => { try { return !localStorage.getItem("fwm-push-hint"); } catch { return true; } })()) out.push({ cls: "info", icon: ICON.bell, href: "#", act: "push-open", text: `<b>Benachrichtigungen einschalten</b> – Erinnerung an deine Schicht direkt aufs Handy` });
   } else out.push(...projHinweise(false));
   return out;
 }
