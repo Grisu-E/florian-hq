@@ -155,6 +155,23 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:12p
 .chip.bill{background:var(--c-bill-soft);color:var(--c-bill)}
 .chip.bin{background:var(--c-bin-soft);color:var(--c-bin)}
 .chip.bday{background:var(--c-bday-soft);color:var(--c-bday)}
+.chip.cart{background:var(--ok-soft);color:var(--ok)}
+.chip.priv{background:var(--c-bday-soft);color:var(--c-bday)}
+.shop-add{display:grid;grid-template-columns:1fr 88px auto;gap:8px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:6px 0}
+.shop-add button{min-width:52px;font-size:1.3rem}
+.shop-list{display:grid;gap:6px}
+.shop-item{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--surface);border:1px solid var(--line);min-height:52px}
+.shop-item .t{flex:1;min-width:0;font-weight:700;overflow-wrap:anywhere}
+.shop-item .m{color:var(--muted);font-size:.85rem;white-space:nowrap}
+.shop-item.done .t{text-decoration:line-through;color:var(--muted);font-weight:500}
+.check{width:30px;height:30px;min-height:0;padding:0;border-radius:50%;border:2px solid var(--line);background:var(--surface);flex:none}
+.shop-item.done .check{background:var(--ok);border-color:var(--ok);color:#fff}
+.shop-item.done .check::after{content:"✓";font-weight:800}
+.day-head{font-size:.8rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin:8px 4px 0}
+.src-badge{display:inline-flex;align-items:center;gap:4px;font-size:.72rem;font-weight:700;border-radius:999px;padding:2px 8px;background:var(--accent-soft);color:var(--accent)}
+.connect{display:grid;gap:12px;padding:16px;border-radius:18px;background:var(--surface);border:1px solid var(--line)}
+.connect h3{font-size:1rem}
+.connect ol{margin:0;padding-left:20px;color:var(--muted);font-size:.88rem;display:grid;gap:4px}
 .chip.idea{background:var(--warn-soft);color:var(--warn)}
 .idea-card{display:grid;gap:8px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);min-width:0}
 .idea-card.done{opacity:.6;box-shadow:none}
@@ -363,6 +380,8 @@ const ICON = {
   plus:'<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   back:'<svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
   bin:'<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1zM6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M10 11v6M14 11v6"/></svg>',
+  cart:'<svg class="i" viewBox="0 0 24 24"><path d="M3 4h2l2.2 11h10.6L20 7H6.2"/><circle cx="9" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/></svg>',
+  priv:'<svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M10 15.5h4v3h-4zM10.6 15.5v-1a1.4 1.4 0 0 1 2.8 0v1"/></svg>',
   idea:'<svg class="i" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg>',
   money:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5v.01M17.5 14.5v.01"/></svg>',
   lend:'<svg class="i" viewBox="0 0 24 24"><path d="M3 8l9-4 9 4-9 4z"/><path d="M3 8v8l9 4 9-4V8M12 12v8"/></svg>',
@@ -394,10 +413,10 @@ const SB_KEY = "sb_publishable_bEARbfjx56Xq7oUg9GQESA_BILmK_Jm";
 const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 const S = { items: [], mode: "db", ready: false, auth: "loading", email: "" };
 let uid = null, member = null, members = [];
-const TILES = [["fahrzeuge","Fahrzeuge"],["termine","Termine"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["muell","Müllplan"],["geburtstage","Geburtstage"],["ausleihe","Ausleihliste"],["forderungen","Offene Beträge"],["ideen","Ideen"]];
+const TILES = [["fahrzeuge","Fahrzeuge"],["termine","Termine"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["muell","Müllplan"],["geburtstage","Geburtstage"],["ausleihe","Ausleihliste"],["forderungen","Offene Beträge"],["ideen","Ideen"],["einkauf","Einkaufsliste"],["privattermine","Private Termine"]];
 const LEVEL = { none: "Kein Zugriff", view: "Ansehen", edit: "Bearbeiten" };
 const me = { owner: false };
-const tileOf = it => ({ fahrzeug:"fahrzeuge", termin:"termine", fix:"fixkosten", muell:"muell", geburtstag:"geburtstage", ausleihe:"ausleihe", forderung:"forderungen", idee:"ideen" })[it.kind] || (it.kind === "beleg" ? (it.bereich === "H&E Tools" ? "belege" : "ablage") : "fahrzeuge");
+const tileOf = it => ({ fahrzeug:"fahrzeuge", termin:"termine", fix:"fixkosten", muell:"muell", geburtstag:"geburtstage", ausleihe:"ausleihe", forderung:"forderungen", idee:"ideen", einkauf:"einkauf", privtermin:"privattermine", kalquelle:"privattermine" })[it.kind] || (it.kind === "beleg" ? (it.bereich === "H&E Tools" ? "belege" : "ablage") : "fahrzeuge");
 const lvl = t => me.owner ? "edit" : ((member?.tiles || {})[t] || "none");
 const visible = t => lvl(t) !== "none";
 const canWrite = t => lvl(t) === "edit";
@@ -430,6 +449,7 @@ async function afterLogin(session){
   if (!m || m.status !== "approved") { S.auth = m?.status === "blocked" ? "blocked" : "pending"; $("#storeStatus").textContent = S.email; render(); return; }
   me.owner = m.role === "admin"; S.auth = "ok";
   await Promise.all([loadItems(), loadMembers()]);
+  setTimeout(() => loadKal(true), 50);
   S.ready = true;
   $("#storeStatus").textContent = (m.name || S.email) + (me.owner ? " · Admin" : "");
   $("#shareBtn").hidden = !me.owner;
@@ -624,7 +644,7 @@ const belegeJahr = (y, ber = belegBereich) => ofKind("beleg").filter(b => String
 const sum = arr => arr.reduce((s,b) => s + (Number(b.betrag)||0), 0);
 
 /* ---------- Ansichten ---------- */
-function route(){ const h = location.hash.slice(1); return ["fahrzeuge","termine","belege","muell","geburtstage","fixkosten","ablage","ausleihe","forderungen","ideen"].includes(h) ? h : ""; }
+function route(){ const h = location.hash.slice(1); return ["fahrzeuge","termine","belege","muell","geburtstage","fixkosten","ablage","ausleihe","forderungen","ideen","einkauf","privattermine"].includes(h) ? h : ""; }
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); });
 
 function render(){
@@ -634,7 +654,7 @@ function render(){
   if (!S.ready) { app.innerHTML = `<div class="empty">H&amp;E Hub wird geladen …</div>`; return; }
   let r = route(); if (r && !visible(r)) r = "";
   const hb = $("#homeBtn"); if (hb) { hb.classList.toggle("on", !r); hb.closest(".homebar").hidden = S.auth !== "ok"; }
-  app.innerHTML = r === "fahrzeuge" ? viewFahrzeuge() : r === "termine" ? viewTermine() : r === "belege" ? viewBelege() : r === "muell" ? viewMuell() : r === "geburtstage" ? viewGeburtstage() : r === "fixkosten" ? viewFix() : r === "ablage" ? viewAblage() : r === "ausleihe" ? viewAusleihe() : r === "forderungen" ? viewForderungen() : r === "ideen" ? viewIdeen() : viewHome();
+  app.innerHTML = r === "fahrzeuge" ? viewFahrzeuge() : r === "termine" ? viewTermine() : r === "belege" ? viewBelege() : r === "muell" ? viewMuell() : r === "geburtstage" ? viewGeburtstage() : r === "fixkosten" ? viewFix() : r === "ablage" ? viewAblage() : r === "ausleihe" ? viewAusleihe() : r === "forderungen" ? viewForderungen() : r === "ideen" ? viewIdeen() : r === "einkauf" ? viewEinkauf() : r === "privattermine" ? viewPriv() : viewHome();
 }
 
 const urlErr = (() => { const h = new URLSearchParams(location.hash.slice(1)); return h.get("error_code") || h.get("error") || ""; })();
@@ -719,6 +739,15 @@ function homeTile(k){
     if (nx.length) { const d0 = nx[0].d; const arts = [...new Set(nx.filter(x => +x.d === +d0).map(x => x.m.label || x.m.art))]; const n = Math.round((d0 - t)/86400000);
       main = arts.join(" + "); sub = `${dayLabelD(d0)} · ${d0.toLocaleDateString("de-DE",{ weekday:"short" })} ${dd(d0)}`; st = n === 0 ? "warn" : n === 1 ? "crit" : ""; }
     else { main = "Keine Termine"; sub = "Kalender " + (+AWA.bis.slice(0,4) + 1) + " fehlt"; }
+  } else if (k === "einkauf") {
+    const o = ekOffen(); chip = ["cart", ICON.cart]; title = "Einkaufsliste";
+    if (o.length) { main = `${o.length} Artikel`; sub = o.slice(0, 3).map(i => i.name).join(", ") + (o.length > 3 ? " …" : ""); }
+    else { main = "Alles da"; sub = "Liste ist leer"; }
+  } else if (k === "privattermine") {
+    loadKal(false);
+    const l = privAlle(); chip = ["priv", ICON.priv]; title = "Private Termine";
+    if (l.length) { const e = l[0]; const n = Math.round((parseDate(e.datum) - t)/86400000); main = e.titel; sub = `${n === 0 ? "heute" : n === 1 ? "morgen" : dd(parseDate(e.datum))}${e.zeit ? " · " + e.zeit : ""}${l.length > 1 ? ` · +${l.length - 1}` : ""}`; st = n === 0 ? "warn" : ""; }
+    else { main = "Keine Termine"; sub = "Nur für dich sichtbar"; }
   } else if (k === "ideen") {
     const o = ideenOffen(); chip = ["idea", ICON.idea]; title = "Ideen";
     if (o.length) { const g = o.filter(i => i.status === "geplant").length; const top = o.find(i => i.fav) || o.slice().sort((a,b) => (b.geaendert||0) - (a.geaendert||0))[0];
@@ -776,6 +805,7 @@ function hinweise(){
     if (heute.length) out.push({ cls: "warn", icon: ICON.bin, href: "#muell", text: `<b>Heute Abfuhr:</b> ${esc([...new Set(heute)].join(" + "))} – bis 6 Uhr bereitstellen` });
     if (morgen.length) out.push({ cls: "crit", icon: ICON.bin, href: "#muell", text: `<b>Morgen Abfuhr:</b> ${esc([...new Set(morgen)].join(" + "))} – heute Abend rausstellen` });
   }
+  if (visible("privattermine")) { const h0 = iso(today()); const heute = privAlle().filter(e => e.datum === h0); if (heute.length) out.push({ cls: "info", icon: ICON.priv, href: "#privattermine", text: `<b>Heute privat:</b> ${esc(heute.slice(0, 3).map(e => (e.zeit ? e.zeit + " " : "") + e.titel).join(" · "))}` }); }
   if (visible("forderungen")) { const ue = offeneFord().filter(f => fordStatus(f).cls === "crit"); if (ue.length) out.push({ cls: "crit", icon: ICON.money, href: "#forderungen", text: `<b>${ue.length} Zahlung${ue.length === 1 ? "" : "en"} überfällig:</b> ${esc([...new Set(ue.map(f => f.kunde))].join(", "))} – ${eur.format(ue.reduce((s,f) => s + offenBetrag(f), 0))}` }); }
   if (visible("ausleihe")) for (const a of offenAus()) { const s = ausStatus(a); if (s.cls === "crit" || s.cls === "warn") out.push({ cls: s.cls, icon: ICON.lend, href: "#ausleihe", text: `<b>${esc(a.gegenstand)}</b> ${esc(ausWer(a))}: ${esc(s.txt)}` }); }
   if (me.owner) { const p = members.filter(m => m.status === "pending").length; if (p) out.push({ cls: "warn", icon: ICON.people, href: "#", act: "share", text: `<b>${p} ${p === 1 ? "Person wartet" : "Personen warten"} auf Freigabe</b> – jetzt Kacheln freigeben` }); }
@@ -799,7 +829,7 @@ async function loadNames(ids){
   need.forEach(i => { if (!(i in names)) names[i] = ""; });
   namesPending = false; render();
 }
-const itemTitle = it => it.kind === "fahrzeug" ? (it.kennzeichen || it.name) : it.kind === "termin" ? it.titel : it.kind === "beleg" ? (it.haendler || "Rechnung") : it.kind === "fix" ? it.name : it.kind === "muell" ? it.art : it.kind === "geburtstag" ? it.name : it.kind === "ausleihe" ? it.gegenstand : it.kind === "forderung" ? `${it.kunde} – ${it.baustelle}` : it.kind === "idee" ? it.titel : "Eintrag";
+const itemTitle = it => it.kind === "fahrzeug" ? (it.kennzeichen || it.name) : it.kind === "termin" ? it.titel : it.kind === "beleg" ? (it.haendler || "Rechnung") : it.kind === "fix" ? it.name : it.kind === "muell" ? it.art : it.kind === "geburtstag" ? it.name : it.kind === "ausleihe" ? it.gegenstand : it.kind === "forderung" ? `${it.kunde} – ${it.baustelle}` : it.kind === "idee" ? it.titel : it.kind === "einkauf" ? it.name : it.kind === "privtermin" ? it.titel : it.kind === "kalquelle" ? (it.name || "Kalender") : "Eintrag";
 function neuigkeiten(){
   if (S.mode !== "db") return { tiles: [], changes: [] };
   const vis = TILES.map(([k]) => k).filter(visible);
@@ -998,6 +1028,100 @@ function viewMuell(){
       </div>`).join("")}</div>`
       : `<div class="empty">Für zusätzliche Abholungen, z. B. Sperrmüll nach Anmeldung.</div>`}
   </section>`;
+}
+
+/* ---------- Einkaufsliste ---------- */
+const ekOffen = () => ofKind("einkauf").filter(i => !i.erledigt).sort((a,b) => (a.erstellt||0) - (b.erstellt||0));
+const ekDone = () => ofKind("einkauf").filter(i => i.erledigt).sort((a,b) => (b.geaendert||0) - (a.geaendert||0));
+function viewEinkauf(){
+  const w = canWrite("einkauf"); const offen = ekOffen(), done = ekDone();
+  const offenNamen = new Set(offen.map(i => (i.name || "").toLowerCase()));
+  const vorschlag = [...new Map(done.map(i => [(i.name || "").toLowerCase(), i])).values()].filter(i => !offenNamen.has((i.name || "").toLowerCase())).slice(0, 10);
+  const item = i => `<div class="shop-item ${i.erledigt ? "done" : ""}">${w ? `<button class="check" data-act="ek-toggle" data-id="${i.id}" aria-label="${i.erledigt ? "Wieder auf die Liste" : "Abhaken"}"></button>` : ""}<span class="t">${esc(i.name)}</span>${i.menge ? `<span class="m">${esc(i.menge)}</span>` : ""}</div>`;
+  return `<section style="display:grid;gap:12px">
+    <div class="view-head">${backBtn}${w && done.length ? `<button class="ghost danger" data-act="ek-clear">Erledigte löschen (${done.length})</button>` : ""}</div>
+    <h2 class="page-title">Einkaufsliste</h2>
+    ${w ? `<form id="einkaufFrm" class="shop-add"><input id="ek-name" name="name" placeholder="Was fehlt?" autocomplete="off" enterkeyhint="done" required><input id="ek-menge" name="menge" placeholder="Menge" autocomplete="off"><button class="primary" type="submit" aria-label="Hinzufügen">+</button></form>` : ""}
+    ${w && vorschlag.length ? `<div class="chips-row">${vorschlag.map(i => `<button data-act="ek-again" data-id="${i.id}">+ ${esc(i.name)}</button>`).join("")}</div>` : ""}
+    ${offen.length ? `<div class="shop-list">${offen.map(item).join("")}</div>` : `<div class="empty">Die Liste ist leer – alles da.</div>`}
+    ${done.length ? `<div class="day-head">Im Wagen</div><div class="shop-list">${done.slice(0, 30).map(item).join("")}</div>` : ""}
+  </section>`;
+}
+
+/* ---------- Private Termine + Handy-Kalender ---------- */
+const KAL = { events: [], errors: [], loadedAt: 0, loading: false };
+let calToken = null;
+const kalQuellen = () => ofKind("kalquelle");
+async function loadKal(force){
+  if (!visible("privattermine") || KAL.loading) return;
+  const urls = kalQuellen().map(q => q.url).filter(Boolean);
+  if (!urls.length) { KAL.events = []; KAL.errors = []; return; }
+  if (!force && Date.now() - KAL.loadedAt < 5 * 60000) return;
+  KAL.loading = true;
+  try {
+    const { data, error } = await sb.functions.invoke("he-kal-import", { body: { urls } });
+    if (error) throw error;
+    KAL.events = []; KAL.errors = [];
+    for (const r of data.results || []) {
+      const q = kalQuellen().find(x => x.url === r.url);
+      if (r.error) KAL.errors.push({ url: r.url, error: r.error, name: q?.name });
+      else { (r.events || []).forEach(e => KAL.events.push({ ...e, quelle: q?.name || r.name || "Handy-Kalender" })); if (q && r.name && !q.name) saveItem({ ...q, name: r.name }).catch(() => {}); }
+    }
+    KAL.loadedAt = Date.now();
+  } catch { KAL.errors = [{ error: "failed" }]; }
+  KAL.loading = false; KAL.loadedAt = Date.now(); render();
+}
+function privAlle(){
+  const t0 = iso(today());
+  const eigene = ofKind("privtermin").map(t => ({ datum: t.datum, zeit: t.zeit || "", bisZeit: t.zeitBis || "", titel: t.titel, ort: t.ort || "", notiz: t.notiz || "", id: t.id, eigen: true }));
+  return [...eigene, ...KAL.events].filter(e => e.datum >= t0).sort((a,b) => (a.datum + (a.zeit || "00:00")).localeCompare(b.datum + (b.zeit || "00:00")));
+}
+const tagName = d => { const x = parseDate(d); const n = Math.round((x - today())/86400000); return (n === 0 ? "Heute" : n === 1 ? "Morgen" : x.toLocaleDateString("de-DE", { weekday: "long" })) + ", " + x.toLocaleDateString("de-DE", { day: "numeric", month: "long" }); };
+function viewPriv(){
+  loadKal(false);
+  if (calToken === null) { calToken = ""; sb.rpc("he_cal_token").then(({ data }) => { calToken = data || ""; render(); }); }
+  const w = canWrite("privattermine");
+  const list = privAlle().slice(0, 80);
+  const days = []; for (const e of list) { let g = days.find(x => x.d === e.datum); if (!g) { g = { d: e.datum, items: [] }; days.push(g); } g.items.push(e); }
+  const feed = calToken ? `kdqtfbhwjqymfbaunkwg.supabase.co/functions/v1/he-ical?t=${calToken}` : "";
+  const ERR = { host_not_allowed: "Dieser Anbieter wird nicht unterstützt (iCloud, Google, Outlook gehen).", fetch_failed: "Kalender war nicht erreichbar.", not_calendar: "Der Link ist kein Kalender-Link.", invalid_url: "Ungültiger Link." };
+  return `<section style="display:grid;gap:14px">
+    <div class="view-head">${backBtn}${w ? `<button class="primary" data-act="new-privtermin">${ICON.plus}Termin</button>` : ""}</div>
+    <h2 class="page-title">Private Termine</h2>
+    <p class="muted" style="margin:-6px 0 0;font-size:.88rem">Nur du siehst diese Termine – auch der Admin nicht.${KAL.loading ? " · Handy-Kalender wird geladen …" : ""}</p>
+    ${days.length ? days.map(g => `<div class="day-head">${esc(tagName(g.d))}</div><div class="list">${g.items.map(e => `
+      <div class="row" style="grid-template-columns:auto 1fr${e.eigen && w ? " auto" : ""};padding:12px">
+        <div class="date-block bday" style="width:62px;padding:6px 0"><div class="d" style="font-size:1.05rem">${e.zeit || "ganzt."}</div>${e.bisZeit ? `<div class="m" style="text-transform:none">bis ${esc(e.bisZeit)}</div>` : ""}</div>
+        <div class="main"><span class="t">${esc(e.titel)}</span>${e.ort ? `<span class="muted" style="font-size:.85rem">${esc(e.ort)}</span>` : ""}${e.eigen ? "" : `<span><span class="src-badge">${ICON.priv}${esc(e.quelle)}</span></span>`}</div>
+        ${e.eigen && w ? `<div class="acts" style="grid-column:auto"><button class="ghost" data-act="edit" data-id="${e.id}">Bearbeiten</button></div>` : ""}
+      </div>`).join("")}</div>`).join("") : `<div class="empty">Keine anstehenden privaten Termine.</div>`}
+    <div class="connect">
+      <h3>H&amp;E-Termine im Handy-Kalender</h3>
+      <p class="muted" style="margin:0;font-size:.88rem">Deine privaten und die gemeinsamen Termine erscheinen automatisch im Kalender deines Handys und aktualisieren sich von selbst.</p>
+      ${feed ? `<div class="toolbar"><a class="btn primary" href="webcal://${esc(feed)}">Kalender abonnieren</a><button data-act="copy" data-text="https://${esc(feed)}">Link kopieren</button></div>
+      <ol><li><b>iPhone:</b> „Kalender abonnieren“ tippen → „Abonnieren“ → „Hinzufügen“.</li><li><b>Android:</b> Link kopieren → am Computer calendar.google.com → links „Weitere Kalender +“ → „Per URL“ → einfügen.</li></ol>
+      <p class="muted" style="margin:0;font-size:.78rem">Der Link ist geheim und gehört nur dir – nicht weitergeben.</p>` : `<span class="muted">Link wird erstellt …</span>`}
+    </div>
+    <div class="connect">
+      <h3>Handy-Kalender in H&amp;E anzeigen</h3>
+      ${kalQuellen().length ? `<div class="list">${kalQuellen().map(q => { const err = KAL.errors.find(e => e.url === q.url); return `<div class="shop-item"><span class="t">${esc(q.name || "Handy-Kalender")}<br><span class="muted" style="font-weight:500;font-size:.78rem">${err ? esc(ERR[err.error] || "Fehler beim Laden") : "verbunden"}</span></span>${w ? `<button class="ghost danger" data-act="del" data-id="${q.id}">Entfernen</button>` : ""}</div>`; }).join("")}</div>` : ""}
+      ${w ? `<form id="kalFrm" style="display:grid;gap:8px"><input id="kal-url" name="url" inputmode="url" placeholder="Kalender-Link (webcal:// oder https://)" required><button class="primary" type="submit">Kalender verbinden</button></form>` : ""}
+      <ol><li><b>iPhone (iCloud):</b> Kalender-App → unten „Kalender“ → beim Kalender auf ⓘ → „Öffentlicher Kalender“ einschalten → „Link teilen“ → „Kopieren“ → hier einfügen.</li><li><b>Google:</b> calendar.google.com → Einstellungen → deinen Kalender wählen → „Geheime Adresse im iCal-Format“ kopieren → hier einfügen.</li></ol>
+      <p class="muted" style="margin:0;font-size:.78rem">Hinweis: Ein öffentlicher iCloud-Kalender kann von jedem gelesen werden, der den Link kennt. Die Google-Adresse ist geheim. Aktualisierung alle paar Minuten beim Öffnen.</p>
+    </div>
+  </section>`;
+}
+function formPriv(t = {}){
+  openModal(`<form id="frm" data-kind="privtermin" data-id="${t.id||""}" style="display:grid;gap:14px">${head(t.id ? "Termin bearbeiten" : "Privater Termin")}
+    <div class="fields">
+      <label class="f full">Was?<input id="pt-titel" name="titel" required placeholder="z. B. Zahnarzt" value="${esc(t.titel)}"></label>
+      <label class="f full">Datum<input id="pt-datum" name="datum" type="date" required value="${esc(t.datum || iso(today()))}"></label>
+      <label class="f">Von<input id="pt-zeit" name="zeit" type="time" value="${esc(t.zeit)}"></label>
+      <label class="f">Bis<input id="pt-bis" name="zeitBis" type="time" value="${esc(t.zeitBis)}"></label>
+      <label class="f full">Ort<input id="pt-ort" name="ort" value="${esc(t.ort)}"></label>
+      <label class="f full">Notiz<textarea id="pt-notiz" name="notiz">${esc(t.notiz)}</textarea></label>
+    </div>
+    <div class="sheet-foot">${t.id ? `<button class="ghost danger" data-act="del" data-id="${t.id}" style="margin-right:auto">Löschen</button>` : ""}<button class="ghost" data-act="close">Abbrechen</button><button class="primary" type="submit" id="saveBtn">Speichern</button></div></form>`);
 }
 
 /* ---------- Ideen ---------- */
@@ -1401,6 +1525,7 @@ async function submitForm(form){
   try {
     let obj;
     if (kind === "fahrzeug") obj = { ...old, kind, kennzeichen: fd.kennzeichen.trim().toUpperCase(), name: fd.name.trim(), tuev: fd.tuev || "", km: fd.km ? parseInt(fd.km.replace(/\D/g,""),10) || "" : "", notiz: fd.notiz.trim() };
+    else if (kind === "privtermin") obj = { ...old, kind, titel: fd.titel.trim(), datum: fd.datum, zeit: fd.zeit || "", zeitBis: fd.zeitBis || "", ort: fd.ort.trim(), notiz: fd.notiz.trim() };
     else if (kind === "idee") obj = { ...old, kind, titel: fd.titel.trim(), notiz: fd.notiz.trim(), kategorie: fd.kategorie, status: fd.status, kosten: fd.kosten.trim(), link: fd.link.trim(), fav: !!old.fav };
     else if (kind === "forderung") {
       const betrag = parseAmount(fd.betrag), bez = fd.bezahlt ? parseAmount(fd.bezahlt) : 0;
@@ -1440,7 +1565,7 @@ async function submitForm(form){
 
 function confirmDelete(id){
   const it = S.items.find(i => i.id === id); if (!it) return;
-  const what = it.kind === "idee" ? `die Idee „${it.titel}“` : it.kind === "forderung" ? `den Betrag ${eur.format(it.betrag||0)} von ${it.kunde}` : it.kind === "ausleihe" ? `„${it.gegenstand}“ aus der Ausleihliste` : it.kind === "fix" ? `die Zahlung „${it.name}“` : it.kind === "muell" ? `die Tonne „${it.art}“` : it.kind === "geburtstag" ? `den Geburtstag von ${it.name}` : it.kind === "fahrzeug" ? `das Fahrzeug ${it.kennzeichen}` : it.kind === "termin" ? `den Termin „${it.titel}“` : `die Rechnung von ${it.haendler || "–"} über ${eur.format(it.betrag||0)}`;
+  const what = it.kind === "kalquelle" ? `die Verbindung zu „${it.name || "Handy-Kalender"}“` : it.kind === "privtermin" ? `den Termin „${it.titel}“` : it.kind === "einkauf" ? `„${it.name}“` : it.kind === "idee" ? `die Idee „${it.titel}“` : it.kind === "forderung" ? `den Betrag ${eur.format(it.betrag||0)} von ${it.kunde}` : it.kind === "ausleihe" ? `„${it.gegenstand}“ aus der Ausleihliste` : it.kind === "fix" ? `die Zahlung „${it.name}“` : it.kind === "muell" ? `die Tonne „${it.art}“` : it.kind === "geburtstag" ? `den Geburtstag von ${it.name}` : it.kind === "fahrzeug" ? `das Fahrzeug ${it.kennzeichen}` : it.kind === "termin" ? `den Termin „${it.titel}“` : `die Rechnung von ${it.haendler || "–"} über ${eur.format(it.betrag||0)}`;
   openModal(`${head("Löschen?")}<p style="margin:0">Möchtest du ${esc(what)} wirklich löschen? Das lässt sich nicht rückgängig machen.</p>
     <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" style="background:var(--crit);border-color:var(--crit)" data-act="del-yes" data-id="${id}">Löschen</button></div>`);
 }
@@ -1481,6 +1606,10 @@ document.addEventListener("click", e => {
   else if (act === "new-ausleihe") formAusleihe();
   else if (act === "new-forderung") formForderung();
   else if (act === "new-idee") formIdee();
+  else if (act === "new-privtermin") formPriv();
+  else if (act === "copy") { const tx = el.dataset.text; (navigator.clipboard?.writeText(tx) || Promise.reject()).then(() => toast("Link kopiert"), () => { window.prompt?.("Link kopieren:", tx); }); }
+  else if (act === "ek-toggle" || act === "ek-again") { const it = S.items.find(i => i.id === el.dataset.id); if (it) { el.disabled = true; const p2 = act === "ek-again" ? saveItem({ kind: "einkauf", name: it.name, menge: it.menge || "", erledigt: false }) : saveItem({ ...it, erledigt: !it.erledigt }); p2.catch(() => toast("Speichern hat nicht geklappt.")); } }
+  else if (act === "ek-clear") { if (el.dataset.sure) { const ids = ekDone().map(i => i.id); sb.from("he_items").delete().in("id", ids).then(({ error }) => { if (error) toast("Löschen hat nicht geklappt."); else { toast("Erledigte gelöscht"); loadItems(); } }); } else { el.dataset.sure = "1"; el.textContent = "Wirklich löschen?"; } }
   else if (act === "idee-filter") { ideeFilter = el.dataset.f; render(); }
   else if (act === "idee-kat") { ideeKat = el.dataset.k; render(); }
   else if (act === "idee-status" || act === "idee-fav") { const it = S.items.find(i => i.id === el.dataset.id); if (it) { el.disabled = true; saveItem(act === "idee-fav" ? { ...it, fav: !it.fav } : { ...it, status: el.dataset.s }).then(() => { if (el.dataset.s === "erledigt") toast("Umgesetzt – stark!"); }, () => { el.disabled = false; toast("Speichern hat nicht geklappt."); }); } }
@@ -1503,7 +1632,7 @@ document.addEventListener("click", e => {
   else if (act === "new-geburtstag") formGeburtstag();
   else if (act === "new-beleg") formBeleg();
   else if (act === "new-ablage") formBeleg({}, ABLAGE);
-  else if (act === "edit") { const it = S.items.find(i => i.id === el.dataset.id); if (!it) return; ({fahrzeug:formFahrzeug, termin:formTermin, beleg:formBeleg, muell:formMuell, geburtstag:formGeburtstag, fix:formFix, ausleihe:formAusleihe, forderung:formForderung, idee:formIdee})[it.kind]?.(it); }
+  else if (act === "edit") { const it = S.items.find(i => i.id === el.dataset.id); if (!it) return; ({fahrzeug:formFahrzeug, termin:formTermin, beleg:formBeleg, muell:formMuell, geburtstag:formGeburtstag, fix:formFix, ausleihe:formAusleihe, forderung:formForderung, idee:formIdee, privtermin:formPriv})[it.kind]?.(it); }
   else if (act === "del") confirmDelete(el.dataset.id);
   else if (act === "del-yes") { deleteItem(el.dataset.id).then(() => { closeModal(); toast("Gelöscht"); }, () => toast("Löschen hat nicht geklappt.")); }
   else if (act === "export") exportCsv();
@@ -1513,6 +1642,19 @@ document.addEventListener("click", e => {
 document.addEventListener("submit", async e => {
   e.preventDefault();
   if (e.target.id === "loginFrm") return sendLink(e.target, e.submitter);
+  if (e.target.id === "einkaufFrm") {
+    const fd = new FormData(e.target); const name = String(fd.get("name") || "").trim(); if (!name) return;
+    const menge = String(fd.get("menge") || "").trim(); e.target.reset();
+    try { await saveItem({ kind: "einkauf", name, menge, erledigt: false }); } catch { toast("Speichern hat nicht geklappt."); }
+    const inp = $("#ek-name"); if (inp) inp.focus();
+    return;
+  }
+  if (e.target.id === "kalFrm") {
+    const url = String(new FormData(e.target).get("url") || "").trim();
+    if (!/^(webcals?|https):\/\//i.test(url)) return toast("Bitte einen Link mit webcal:// oder https:// einfügen.");
+    try { await saveItem({ kind: "kalquelle", url, name: "" }); toast("Kalender verbunden – wird geladen"); await loadKal(true); } catch { toast("Speichern hat nicht geklappt."); }
+    return;
+  }
   if (e.target.id === "zahlFrm") {
     const it = S.items.find(i => i.id === e.target.dataset.id); if (!it) return closeModal();
     const fd = new FormData(e.target); const z = parseAmount(fd.get("betrag"));
