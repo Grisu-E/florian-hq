@@ -51,7 +51,7 @@ body{margin:0}
 [hidden]{display:none!important}
 img{max-width:100%}
 body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased;
-  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:20px 56px}
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:16px calc(96px + env(safe-area-inset-bottom,0px))}
 .wrap{max-width:1100px;margin:0 auto;display:grid;gap:24px}
 h1,h2,h3{font-family:var(--f-display);font-weight:800;letter-spacing:-.02em;margin:0;text-wrap:balance}
 h1{font-size:1.5rem;line-height:1.1}
@@ -87,7 +87,39 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:12p
 .hello{display:grid;gap:4px}
 
 /* Kacheln */
-.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:18px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+@media (min-width:720px){.tiles{grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px}}
+.t2{position:relative;display:grid;grid-template-rows:auto 1fr;gap:10px;padding:14px;border-radius:18px;background:var(--surface);border:1px solid var(--line);color:inherit;text-decoration:none;box-shadow:var(--shadow);min-width:0;min-height:128px;transition:transform .15s,box-shadow .15s}
+.t2:hover{transform:translateY(-2px);box-shadow:var(--shadow-hi)}
+.t2:active{transform:scale(.98)}
+.t2-top{display:flex;align-items:center;gap:8px;min-width:0}
+.t2 .chip{width:34px;height:34px;border-radius:11px;flex:none}
+.t2 .chip svg.i{width:18px;height:18px}
+.t2-title{font-weight:800;font-size:.95rem;letter-spacing:-.01em;line-height:1.15;min-width:0;overflow-wrap:anywhere}
+.t2-body{display:grid;align-content:end;gap:2px;min-width:0}
+.t2-main{font-weight:700;font-size:1.02rem;line-height:1.25;overflow-wrap:anywhere}
+.t2-main.num{font-size:1.25rem}
+.t2-sub{font-size:.8rem;color:var(--muted);line-height:1.3;overflow-wrap:anywhere}
+.t2-dot{position:absolute;top:12px;right:12px;width:10px;height:10px;border-radius:50%;background:transparent}
+.t2-dot.ok{background:var(--ok)}
+.t2-dot.warn{background:var(--warn);box-shadow:0 0 0 4px var(--warn-soft)}
+.t2-dot.crit{background:var(--crit);box-shadow:0 0 0 4px var(--crit-soft)}
+.t2-share{position:absolute;right:8px;bottom:8px;display:inline-flex;align-items:center;gap:3px;min-height:0;padding:3px 7px;border:none;border-radius:999px;background:var(--sunken);color:var(--muted);font-size:.68rem;font-weight:700}
+.t2-share svg.i{width:12px;height:12px}
+.t2-share:hover{border:none;color:var(--ink)}
+.t2.warn{border-color:var(--warn)}
+.t2.crit{border-color:var(--crit)}
+.homebar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;justify-content:center;pointer-events:none;padding:0 max(16px,env(safe-area-inset-right,0px)) calc(14px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.homebar button{pointer-events:auto;min-height:52px;padding:0 24px;border-radius:999px;background:var(--ink);color:var(--bg);border:none;font-size:.95rem;box-shadow:var(--shadow-hi);gap:10px}
+.homebar button.on{opacity:.92}
+.homebar button:hover{border:none;opacity:.9}
+.homebar svg.i{width:22px;height:22px}
+.brand{cursor:pointer;border:none;background:none;padding:0;color:inherit;font:inherit;text-align:left;min-height:0}
+.brand:hover{border:none}
+.menu-btn{width:44px;height:44px;padding:0;border-radius:14px}
+.menu-list{display:grid;gap:8px}
+.menu-list button{justify-content:flex-start;border-radius:14px;min-height:50px;background:var(--sunken);border-color:transparent}
+.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
 .tile{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-lg);padding:22px;display:flex;flex-direction:column;gap:18px;cursor:pointer;min-width:0;text-align:left;color:inherit;text-decoration:none;box-shadow:var(--shadow);transition:box-shadow .2s,transform .2s}
 .tile:hover{box-shadow:var(--shadow-hi);transform:translateY(-3px)}
 .tile-head{display:flex;justify-content:space-between;align-items:center;gap:10px}
@@ -127,7 +159,8 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:12p
 @media (max-width:520px){.share-row{grid-template-columns:1fr}}
 .notices{display:grid;gap:8px}
 #app{display:grid;gap:20px}
-.notice{display:flex;align-items:center;gap:12px;padding:12px 16px;border-radius:14px;text-decoration:none;color:var(--ink);border:1px solid transparent;font-size:.92rem}
+.notice{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;text-decoration:none;color:var(--ink);border:1px solid transparent;font-size:.86rem;line-height:1.3}
+.notice svg.i{width:18px;height:18px}
 .notice.info{background:var(--accent-soft);border-color:var(--accent)}
 .notice.info svg.i{color:var(--accent)}
 .notice.warn{background:var(--warn-soft);border-color:var(--warn)}
@@ -249,15 +282,17 @@ textarea{resize:vertical;min-height:64px}
 <body>
 <div class="wrap">
   <header class="top">
-    <div class="brand">
+    <button class="brand" data-act="home" aria-label="Zur Startseite">
       <div class="logo" aria-hidden="true"><span class="mono">H<span class="amp">&amp;</span>E</span></div>
       <div class="hello"><h1 class="wordmark" aria-label="H und E Hub">H<span class="amp">&amp;</span>E<span class="hub">Hub</span></h1><div class="eyebrow" id="today"></div></div>
-    </div>
-    <div class="toolbar"><button id="pwBtn" class="ghost" data-act="set-pw" hidden>Passwort</button><button id="logoutBtn" class="ghost" data-act="logout" hidden>Abmelden</button><button id="shareBtn" data-act="share" hidden><svg class="i" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.2"/><path d="M3 19c.6-3.2 3-5 6-5s5.4 1.8 6 5M16 5.2a3 3 0 0 1 0 5.6M18 14.3c1.6.6 2.7 2.2 3 4.7"/></svg>Personen &amp; Freigaben</button><div class="status" id="storeStatus">Daten werden geladen …</div></div>
+    </button>
+    <div class="toolbar"><span id="pwBtn" hidden></span><span id="logoutBtn" hidden></span><span id="shareBtn" hidden></span><span class="status" id="storeStatus" hidden>Daten werden geladen …</span>
+      <button class="menu-btn" data-act="menu" aria-label="Menü"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c1-3.8 4-5.8 7.5-5.8s6.5 2 7.5 5.8"/></svg></button></div>
   </header>
   <div id="banner" class="banner" hidden></div>
   <main id="app"></main>
 </div>
+<nav class="homebar" aria-label="Navigation" hidden><button id="homeBtn" data-act="home"><svg class="i" viewBox="0 0 24 24"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></svg>Start</button></nav>
 <div id="modalRoot"></div>
 <div id="toastRoot"></div>
 
@@ -554,6 +589,7 @@ function render(){
   if (S.auth === "pending" || S.auth === "blocked") { app.innerHTML = `<div class="auth-card"><h2>${S.auth === "blocked" ? "Kein Zugriff" : "Fast geschafft"}</h2><p class="muted" style="margin:0">${S.auth === "blocked" ? "Dein Zugang wurde gesperrt." : "Du bist angemeldet als <b>" + esc(S.email) + "</b>. Sobald der Admin dich freigibt, siehst du hier die Kacheln, die für dich bestimmt sind."}</p><div class="toolbar"><button class="primary" data-act="reload">Erneut prüfen</button><button class="ghost" data-act="logout">Abmelden</button></div></div>`; return; }
   if (!S.ready) { app.innerHTML = `<div class="empty">H&amp;E Hub wird geladen …</div>`; return; }
   let r = route(); if (r && !visible(r)) r = "";
+  const hb = $("#homeBtn"); if (hb) { hb.classList.toggle("on", !r); hb.closest(".homebar").hidden = S.auth !== "ok"; }
   app.innerHTML = r === "fahrzeuge" ? viewFahrzeuge() : r === "termine" ? viewTermine() : r === "belege" ? viewBelege() : r === "muell" ? viewMuell() : r === "geburtstage" ? viewGeburtstage() : r === "fixkosten" ? viewFix() : r === "ablage" ? viewAblage() : viewHome();
 }
 
@@ -611,40 +647,61 @@ function openPassword(){
     <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" type="submit" id="pwSave">Speichern</button></div></form>`);
 }
 
+function homeTile(k){
+  const t = today(); const dd = d => d.toLocaleDateString("de-DE",{ day:"2-digit", month:"2-digit" });
+  let chip, title, main = "", sub = "", st = "", num = false;
+  if (k === "fahrzeuge") {
+    const fz = ofKind("fahrzeug").slice().sort((a,b) => tuevInfo(a.tuev).months - tuevInfo(b.tuev).months);
+    chip = ["car", ICON.car]; title = "Fahrzeuge";
+    if (fz.length) { const i = tuevInfo(fz[0].tuev); main = (fz[0].kennzeichen || fz[0].name || "").toUpperCase(); sub = "TÜV: " + i.label; st = i.cls === "neutral" ? "" : i.cls; if (fz.length > 1) sub += ` · ${fz.length} Fahrzeuge`; }
+    else { main = "Noch leer"; sub = "Fahrzeug anlegen"; }
+  } else if (k === "termine") {
+    const up = upcoming(); chip = ["cal", ICON.cal]; title = "Termine";
+    if (up.length) { main = up[0].titel; sub = `${dayLabel(up[0].datum)}${up[0].zeit ? " · " + up[0].zeit : ""}${up.length > 1 ? ` · +${up.length - 1} weitere` : ""}`; const n = Math.round((parseDate(up[0].datum) - t)/86400000); st = n <= 1 ? "warn" : ""; }
+    else { main = "Keine Termine"; sub = "Termin eintragen"; }
+  } else if (k === "belege") {
+    const y = t.getFullYear(), bj = belegeJahr(y, "H&E Tools"); chip = ["bill", ICON.bill]; title = "Rechnungen";
+    main = eur.format(sum(bj)); num = true; sub = `H&E Tools ${y} · ${bj.length} Beleg${bj.length === 1 ? "" : "e"}`;
+  } else if (k === "ablage") {
+    const all = ablageItems(); const bald = all.filter(b => { const g = garantieInfo(b); return g && g.n >= 0 && g.n <= 60; }).length;
+    chip = ["ablage", ICON.folder]; title = "Wichtige Rechnungen";
+    main = all.length ? `${all.length} abgelegt` : "Noch leer"; sub = bald ? `${bald} Garantie${bald > 1 ? "n laufen" : " läuft"} bald ab` : "Kaufbelege & Garantien"; st = bald ? "warn" : "";
+  } else if (k === "fixkosten") {
+    const list = fixSorted(); chip = ["fix", ICON.fix]; title = "Miete & Versich.";
+    if (list.length) { const a = ampel(list[0].d); main = eur.format(ofKind("fix").reduce((s,f) => s + fixMonat(f), 0)) + " / Monat"; sub = `Nächste: ${list[0].f.name} · ${a.txt}`; st = a.cls; }
+    else { main = "Noch leer"; sub = "Miete & Verträge eintragen"; }
+  } else if (k === "muell") {
+    const nx = muellNext(); chip = ["bin", ICON.bin]; title = "Müllplan";
+    if (nx.length) { const d0 = nx[0].d; const arts = [...new Set(nx.filter(x => +x.d === +d0).map(x => x.m.label || x.m.art))]; const n = Math.round((d0 - t)/86400000);
+      main = arts.join(" + "); sub = `${dayLabelD(d0)} · ${d0.toLocaleDateString("de-DE",{ weekday:"short" })} ${dd(d0)}`; st = n === 0 ? "warn" : n === 1 ? "crit" : ""; }
+    else { main = "Keine Termine"; sub = "Kalender " + (+AWA.bis.slice(0,4) + 1) + " fehlt"; }
+  } else if (k === "geburtstage") {
+    const l = bdaySorted(); chip = ["bday", ICON.cake]; title = "Geburtstage";
+    if (l.length) { const { g, n } = l[0]; main = g.name + (n.alter != null ? ` (${n.alter})` : ""); sub = `${daysText(n.days)} · ${dd(n.d)}`; st = n.days <= 7 ? "warn" : ""; }
+    else { main = "Noch leer"; sub = "Geburtstag eintragen"; }
+  }
+  let share = "";
+  if (me.owner) { const c = members.filter(m => m.status === "approved" && m.role !== "admin" && (m.tiles?.[k] || "none") !== "none").length; share = `<button class="t2-share" data-act="share" aria-label="Freigaben verwalten">${c ? ICON.people + c : ICON.lock}</button>`; }
+  return `<a class="t2 ${st === "crit" || st === "warn" ? st : ""}" href="#${k}">
+    <span class="t2-dot ${st}" aria-hidden="true"></span>
+    <div class="t2-top"><span class="chip ${chip[0]}">${chip[1]}</span><span class="t2-title">${esc(title)}</span></div>
+    <div class="t2-body"><span class="t2-main ${num ? "num" : ""}">${esc(main)}</span><span class="t2-sub">${esc(sub)}</span></div>
+    ${share}
+  </a>`;
+}
 function viewHome(){
-  const fz = ofKind("fahrzeug").slice().sort((a,b) => tuevInfo(a.tuev).months - tuevInfo(b.tuev).months);
-  const next = fz[0];
-  const up = upcoming().slice(0,3);
-  const y = new Date().getFullYear(), bj = belegeJahr(y, "*"), bjH = belegeJahr(y, "H&E Tools");
-  const kritisch = fz.filter(f => ["crit","warn"].includes(tuevInfo(f.tuev).cls)).length;
-  const T = {};
-  T.fahrzeuge = `<a class="tile" href="#fahrzeuge">
-      <div class="tile-head"><div class="tile-title"><span class="chip car">${ICON.car}</span><h2>Fahrzeuge</h2></div><span class="count">${fz.length} im Bestand</span></div>
-      ${next ? `<div style="display:flex;gap:14px;align-items:center">${plakette(next.tuev,64)}<div style="display:grid;gap:6px;min-width:0">${plate(next.kennzeichen)}<span class="muted" style="overflow-wrap:anywhere">${esc(next.name)}</span></div></div>
-        <div><span class="pill ${tuevInfo(next.tuev).cls}">Nächster TÜV · ${esc(tuevInfo(next.tuev).label)}</span></div>`
-        : `<div class="empty">Noch kein Fahrzeug. Lege dein erstes mit Kennzeichen und TÜV-Monat an.</div>`}
-      <div class="tile-foot"><span class="muted">${kritisch ? `${kritisch} TÜV-Termin${kritisch>1?"e":""} bald fällig` : fz.length ? "Alle Plaketten aktuell" : ""}</span><span class="btn primary" data-act="new-fahrzeug">${ICON.plus}Fahrzeug</span></div>
-    </a>`;
-  T.termine = `<a class="tile" href="#termine">
-      <div class="tile-head"><div class="tile-title"><span class="chip cal">${ICON.cal}</span><h2>Termine</h2></div><span class="count">${upcoming().length} anstehend</span></div>
-      ${up.length ? `<ul class="mini-list">${up.map(t => `<li><span class="t"><b>${esc(t.titel)}</b></span><span class="muted num" style="font-size:.85rem;white-space:nowrap">${fmtDate(t.datum).slice(0,6)}${t.zeit?" "+esc(t.zeit):""} · ${dayLabel(t.datum)}</span></li>`).join("")}</ul>`
-        : `<div class="empty">Keine anstehenden Termine.</div>`}
-      <div class="tile-foot"><span></span><span class="btn primary" data-act="new-termin">${ICON.plus}Termin</span></div>
-    </a>`;
-  T.belege = `<a class="tile" href="#belege">
-      <div class="tile-head"><div class="tile-title"><span class="chip bill">${ICON.bill}</span><h2>Rechnungen</h2></div><span class="count">H&amp;E Tools</span></div>
-      <div style="display:grid;gap:4px"><span class="big num">${eur.format(sum(bjH))}</span><span class="muted">H&amp;E Tools · ${bjH.length} Beleg${bjH.length===1?"":"e"} ${y}</span></div>
-      <div class="tile-foot"><span class="muted">Foto machen, Betrag wird ausgelesen</span><span class="btn primary" data-act="new-beleg">${ICON.cam}Fotografieren</span></div>
-    </a>`;
-  T.ablage = tileAblage(); T.fixkosten = tileFix(); T.muell = tileMuell(); T.geburtstage = tileGeburtstage();
   const shown = TILES.map(([k]) => k).filter(visible);
-  const tiles = shown.map(k => {
-    let h = T[k];
-    if (me.owner) { const n = members.filter(m => m.status === "approved" && m.role !== "admin" && (m.tiles?.[k] || "none") !== "none").length; h = h.replace("</h2></div>", `</h2></div><button class="share-badge ${n ? "alle" : "privat"}" data-act="share" aria-label="Freigaben verwalten">${n ? ICON.people : ICON.lock}${n ? n + (n === 1 ? " Person" : " Personen") : "Privat"}</button>`); }
-    if (!canWrite(k)) h = h.replace(/<span class="btn[^"]*" data-act="new-[^"]*">[\s\S]*?<\/span>/g, "");
-    return h;
-  }).join("");
-  return `${neuigkeitenHtml()}${hinweiseHtml()}${shown.length ? `<div class="tiles">${tiles}</div>` : `<div class="empty">Für dich wurden noch keine Kacheln freigegeben.</div>`}`;
+  return `${neuigkeitenHtml()}${hinweiseHtml()}${shown.length ? `<div class="tiles">${shown.map(homeTile).join("")}</div>` : `<div class="empty">Für dich wurden noch keine Kacheln freigegeben.</div>`}`;
+}
+
+function openMenu(){
+  openModal(`${head(esc(member?.name || S.email || "Konto"))}
+    <p class="muted" style="margin:-6px 0 0;font-size:.85rem">${esc(S.email)}${me.owner ? " · Admin" : ""}</p>
+    <div class="menu-list">
+      ${me.owner ? `<button data-act="share">${ICON.people}Personen &amp; Freigaben</button>` : ""}
+      <button data-act="set-pw">${ICON.lock}Passwort festlegen</button>
+      <button data-act="logout" class="danger">Abmelden</button>
+    </div>`);
 }
 
 /* ---------- Hinweise / Benachrichtigungen ---------- */
@@ -1190,9 +1247,11 @@ document.addEventListener("click", e => {
   else if (act === "new-fahrzeug") formFahrzeug();
   else if (act === "new-termin") formTermin();
   else if (act === "new-muell") formMuell();
-  else if (act === "share") openShare();
+  else if (act === "home") { closeModal(); if (location.hash && location.hash !== "#") location.hash = ""; else render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
+  else if (act === "menu") openMenu();
+  else if (act === "share") { closeModal(); openShare(); }
   else if (act === "logout") sb.auth.signOut();
-  else if (act === "set-pw") openPassword();
+  else if (act === "set-pw") { closeModal(); openPassword(); }
   else if (act === "login-mode") { loginMode = el.dataset.m; render(); }
   else if (act === "reload") refreshAll();
   else if (act === "member-del") { const u = el.dataset.uid; if (el.dataset.sure) { sb.from("he_members").delete().eq("user_id", u).then(({ error }) => { if (error) toast("Entfernen hat nicht geklappt."); else { closeModal(); toast("Person entfernt"); loadMembers().then(render); } }); } else { el.dataset.sure = "1"; el.textContent = "Wirklich entfernen?"; } }
