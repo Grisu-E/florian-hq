@@ -158,6 +158,26 @@ header.top .toolbar{flex:none}
 .chip.bill{background:var(--c-bill-soft);color:var(--c-bill)}
 .chip.bin{background:var(--c-bin-soft);color:var(--c-bin)}
 .chip.bday{background:var(--c-bday-soft);color:var(--c-bday)}
+.chip.hours{background:var(--c-bill-soft);color:var(--c-bill)}
+.chip.food{background:var(--c-cal-soft);color:var(--c-cal)}
+.week-nav{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.week-nav b{text-align:center;flex:1}
+.meal-day{display:grid;grid-template-columns:58px 1fr;gap:10px;align-items:start;padding:10px 12px;border-radius:14px;background:var(--surface);border:1px solid var(--line)}
+.meal-day.today{border-color:var(--c-cal);box-shadow:0 0 0 2px var(--c-cal-soft)}
+.meal-day.past{opacity:.6}
+.meal-day .wd{font-weight:800;font-size:.9rem;line-height:1.2}
+.meal-day .wd span{display:block;color:var(--muted);font-weight:600;font-size:.75rem}
+.meal-slots{display:grid;gap:6px;min-width:0}
+.meal{display:flex;gap:8px;align-items:center;min-width:0;border:none;background:var(--sunken);border-radius:10px;padding:8px 10px;min-height:42px;text-align:left;justify-content:flex-start;font-weight:600;color:var(--ink);width:100%}
+.meal .lbl{font-size:.7rem;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;flex:none;width:44px}
+.meal .g{flex:1;min-width:0;overflow-wrap:anywhere}
+.meal.empty-slot .g{color:var(--muted);font-weight:500}
+.meal .who{font-size:.75rem;color:var(--muted);flex:none}
+.hours-group{display:grid;gap:8px;padding:14px;border-radius:18px;background:var(--surface);border:1px solid var(--line)}
+.hours-group .hg-head{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap}
+.hours-row{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line)}
+.hours-row .d{font-size:.8rem;color:var(--muted);width:46px}
+.hours-row .x{font-size:.88rem;min-width:0;overflow-wrap:anywhere}
 .chip.cart{background:var(--ok-soft);color:var(--ok)}
 .chip.priv{background:var(--c-bday-soft);color:var(--c-bday)}
 .shop-add{display:grid;grid-template-columns:1fr 88px auto;gap:8px;position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);padding:6px 0}
@@ -383,6 +403,8 @@ const ICON = {
   plus:'<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   back:'<svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
   bin:'<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1zM6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M10 11v6M14 11v6"/></svg>',
+  hours:'<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9.5 2.5h5"/></svg>',
+  food:'<svg class="i" viewBox="0 0 24 24"><path d="M4 11h16a8 8 0 0 1-16 0zM8 7c0-1.5 1-2 1-3.5M12 7c0-1.5 1-2 1-3.5M16 7c0-1.5 1-2 1-3.5"/></svg>',
   cart:'<svg class="i" viewBox="0 0 24 24"><path d="M3 4h2l2.2 11h10.6L20 7H6.2"/><circle cx="9" cy="19.5" r="1.4"/><circle cx="17" cy="19.5" r="1.4"/></svg>',
   priv:'<svg class="i" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="15" rx="3"/><path d="M3.5 10h17M8 3v4M16 3v4"/><path d="M10 15.5h4v3h-4zM10.6 15.5v-1a1.4 1.4 0 0 1 2.8 0v1"/></svg>',
   idea:'<svg class="i" viewBox="0 0 24 24"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/></svg>',
@@ -416,10 +438,10 @@ const SB_KEY = "sb_publishable_bEARbfjx56Xq7oUg9GQESA_BILmK_Jm";
 const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 const S = { items: [], mode: "db", ready: false, auth: "loading", email: "" };
 let uid = null, member = null, members = [];
-const TILES = [["fahrzeuge","Fahrzeuge"],["termine","Termine"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["muell","Müllplan"],["geburtstage","Geburtstage"],["ausleihe","Ausleihliste"],["forderungen","Offene Beträge"],["ideen","Ideen"],["einkauf","Einkaufsliste"],["privattermine","Private Termine"]];
+const TILES = [["fahrzeuge","Fahrzeuge"],["termine","Termine"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["muell","Müllplan"],["geburtstage","Geburtstage"],["ausleihe","Ausleihliste"],["forderungen","Offene Beträge"],["ideen","Ideen"],["einkauf","Einkaufsliste"],["privattermine","Private Termine"],["stunden","Baustellen-Stunden"],["essen","Essensplan"]];
 const LEVEL = { none: "Kein Zugriff", view: "Ansehen", edit: "Bearbeiten" };
 const me = { owner: false };
-const tileOf = it => ({ fahrzeug:"fahrzeuge", termin:"termine", fix:"fixkosten", muell:"muell", geburtstag:"geburtstage", ausleihe:"ausleihe", forderung:"forderungen", idee:"ideen", einkauf:"einkauf", privtermin:"privattermine", kalquelle:"privattermine" })[it.kind] || (it.kind === "beleg" ? (it.bereich === "H&E Tools" ? "belege" : "ablage") : "fahrzeuge");
+const tileOf = it => ({ fahrzeug:"fahrzeuge", termin:"termine", fix:"fixkosten", muell:"muell", geburtstag:"geburtstage", ausleihe:"ausleihe", forderung:"forderungen", idee:"ideen", einkauf:"einkauf", privtermin:"privattermine", kalquelle:"privattermine", stunde:"stunden", essen:"essen" })[it.kind] || (it.kind === "beleg" ? (it.bereich === "H&E Tools" ? "belege" : "ablage") : "fahrzeuge");
 const lvl = t => me.owner ? "edit" : ((member?.tiles || {})[t] || "none");
 const visible = t => lvl(t) !== "none";
 const canWrite = t => lvl(t) === "edit";
@@ -647,7 +669,7 @@ const belegeJahr = (y, ber = belegBereich) => ofKind("beleg").filter(b => String
 const sum = arr => arr.reduce((s,b) => s + (Number(b.betrag)||0), 0);
 
 /* ---------- Ansichten ---------- */
-function route(){ const h = location.hash.slice(1); return ["fahrzeuge","termine","belege","muell","geburtstage","fixkosten","ablage","ausleihe","forderungen","ideen","einkauf","privattermine"].includes(h) ? h : ""; }
+function route(){ const h = location.hash.slice(1); return ["fahrzeuge","termine","belege","muell","geburtstage","fixkosten","ablage","ausleihe","forderungen","ideen","einkauf","privattermine","stunden","essen"].includes(h) ? h : ""; }
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); });
 
 function render(){
@@ -657,7 +679,7 @@ function render(){
   if (!S.ready) { app.innerHTML = `<div class="empty">H&amp;E Hub wird geladen …</div>`; return; }
   let r = route(); if (r && !visible(r)) r = "";
   const hb = $("#homeBtn"); if (hb) { hb.classList.toggle("on", !r); hb.closest(".homebar").hidden = S.auth !== "ok"; }
-  app.innerHTML = r === "fahrzeuge" ? viewFahrzeuge() : r === "termine" ? viewTermine() : r === "belege" ? viewBelege() : r === "muell" ? viewMuell() : r === "geburtstage" ? viewGeburtstage() : r === "fixkosten" ? viewFix() : r === "ablage" ? viewAblage() : r === "ausleihe" ? viewAusleihe() : r === "forderungen" ? viewForderungen() : r === "ideen" ? viewIdeen() : r === "einkauf" ? viewEinkauf() : r === "privattermine" ? viewPriv() : viewHome();
+  app.innerHTML = r === "fahrzeuge" ? viewFahrzeuge() : r === "termine" ? viewTermine() : r === "belege" ? viewBelege() : r === "muell" ? viewMuell() : r === "geburtstage" ? viewGeburtstage() : r === "fixkosten" ? viewFix() : r === "ablage" ? viewAblage() : r === "ausleihe" ? viewAusleihe() : r === "forderungen" ? viewForderungen() : r === "ideen" ? viewIdeen() : r === "einkauf" ? viewEinkauf() : r === "privattermine" ? viewPriv() : r === "stunden" ? viewStunden() : r === "essen" ? viewEssen() : viewHome();
 }
 
 const urlErr = (() => { const h = new URLSearchParams(location.hash.slice(1)); return h.get("error_code") || h.get("error") || ""; })();
@@ -742,6 +764,15 @@ function homeTile(k){
     if (nx.length) { const d0 = nx[0].d; const arts = [...new Set(nx.filter(x => +x.d === +d0).map(x => x.m.label || x.m.art))]; const n = Math.round((d0 - t)/86400000);
       main = arts.join(" + "); sub = `${dayLabelD(d0)} · ${d0.toLocaleDateString("de-DE",{ weekday:"short" })} ${dd(d0)}`; st = n === 0 ? "warn" : n === 1 ? "crit" : ""; }
     else { main = "Keine Termine"; sub = "Kalender " + (+AWA.bis.slice(0,4) + 1) + " fehlt"; }
+  } else if (k === "stunden") {
+    const all = ofKind("stunde"); const ws = wocheStart(t); chip = ["hours", ICON.hours]; title = "Baustellen-Stunden";
+    const wh = all.filter(e => parseDate(e.datum) >= ws).reduce((s,e) => s + stdDauer(e), 0); const off = all.filter(e => !e.abgerechnet).reduce((s,e) => s + stdBetrag(e), 0);
+    main = hStr(wh) + " diese Woche"; sub = off ? `${eur.format(off)} nicht abgerechnet` : all.length ? "Alles abgerechnet" : "Stunden erfassen";
+  } else if (k === "essen") {
+    const heute = ofKind("essen").filter(e => e.datum === iso(t)); chip = ["food", ICON.food]; title = "Essensplan";
+    const ab = heute.find(e => (e.mahlzeit || "abend") === "abend"), mi = heute.find(e => e.mahlzeit === "mittag");
+    if (ab || mi) { main = (ab || mi).gericht; sub = "Heute " + (ab ? "Abend" : "Mittag") + ((ab || mi).wer ? " · kocht " + (ab || mi).wer : ""); }
+    else { const m2 = new Date(t); m2.setDate(m2.getDate() + 1); const mo = ofKind("essen").find(e => e.datum === iso(m2)); main = "Heute offen"; sub = mo ? "Morgen: " + mo.gericht : "Was gibt's diese Woche?"; }
   } else if (k === "einkauf") {
     const o = ekOffen(); chip = ["cart", ICON.cart]; title = "Einkaufsliste";
     if (o.length) { main = `${o.length} Artikel`; sub = o.slice(0, 3).map(i => i.name).join(", ") + (o.length > 3 ? " …" : ""); }
@@ -832,7 +863,7 @@ async function loadNames(ids){
   need.forEach(i => { if (!(i in names)) names[i] = ""; });
   namesPending = false; render();
 }
-const itemTitle = it => it.kind === "fahrzeug" ? (it.kennzeichen || it.name) : it.kind === "termin" ? it.titel : it.kind === "beleg" ? (it.haendler || "Rechnung") : it.kind === "fix" ? it.name : it.kind === "muell" ? it.art : it.kind === "geburtstag" ? it.name : it.kind === "ausleihe" ? it.gegenstand : it.kind === "forderung" ? `${it.kunde} – ${it.baustelle}` : it.kind === "idee" ? it.titel : it.kind === "einkauf" ? it.name : it.kind === "privtermin" ? it.titel : it.kind === "kalquelle" ? (it.name || "Kalender") : "Eintrag";
+const itemTitle = it => it.kind === "fahrzeug" ? (it.kennzeichen || it.name) : it.kind === "termin" ? it.titel : it.kind === "beleg" ? (it.haendler || "Rechnung") : it.kind === "fix" ? it.name : it.kind === "muell" ? it.art : it.kind === "geburtstag" ? it.name : it.kind === "ausleihe" ? it.gegenstand : it.kind === "forderung" ? `${it.kunde} – ${it.baustelle}` : it.kind === "idee" ? it.titel : it.kind === "einkauf" ? it.name : it.kind === "privtermin" ? it.titel : it.kind === "kalquelle" ? (it.name || "Kalender") : it.kind === "stunde" ? `${it.baustelle} (${hStr(stdDauer(it))})` : it.kind === "essen" ? it.gericht : "Eintrag";
 function neuigkeiten(){
   if (S.mode !== "db") return { tiles: [], changes: [] };
   const vis = TILES.map(([k]) => k).filter(visible);
@@ -1031,6 +1062,122 @@ function viewMuell(){
       </div>`).join("")}</div>`
       : `<div class="empty">Für zusätzliche Abholungen, z. B. Sperrmüll nach Anmeldung.</div>`}
   </section>`;
+}
+
+/* ---------- Baustellen-Stunden ---------- */
+const stdDauer = e => { if (Number(e.stunden) > 0) return Number(e.stunden); const a = /^(\d\d):(\d\d)$/.exec(e.von || ""), b = /^(\d\d):(\d\d)$/.exec(e.bis || ""); if (!a || !b) return 0; const m = (+b[1]*60 + +b[2]) - (+a[1]*60 + +a[2]) - (Number(e.pause) || 0); return Math.max(0, Math.round(m / 60 * 100) / 100); };
+const stdBetrag = e => Math.round((stdDauer(e) * (Number(e.satz) || 0) + (Number(e.maschStd) || 0) * (Number(e.maschSatz) || 0)) * 100) / 100;
+const hStr = h => (Math.round(h * 100) / 100).toLocaleString("de-DE", { maximumFractionDigits: 2 }) + " h";
+const stdKey = e => (e.kunde || "–") + " · " + (e.baustelle || "–");
+const wocheStart = d => { const x = new Date(d); x.setHours(0,0,0,0); x.setDate(x.getDate() - ((x.getDay() + 6) % 7)); return x; };
+let stdFilter = "offen";
+function viewStunden(){
+  const w = canWrite("stunden"); const all = ofKind("stunde");
+  const ws = wocheStart(today()); const woche = all.filter(e => parseDate(e.datum) >= ws);
+  const offen = all.filter(e => !e.abgerechnet);
+  const list = stdFilter === "offen" ? offen : all.filter(e => e.abgerechnet);
+  const groups = [...new Set(list.map(stdKey))].map(k => { const items = list.filter(e => stdKey(e) === k).sort((a,b) => String(b.datum).localeCompare(String(a.datum))); return { k, items, h: items.reduce((s,e) => s + stdDauer(e), 0), m: items.reduce((s,e) => s + (Number(e.maschStd) || 0), 0), eur: items.reduce((s,e) => s + stdBetrag(e), 0) }; }).sort((a,b) => String(b.items[0]?.datum).localeCompare(String(a.items[0]?.datum)));
+  return `<section style="display:grid;gap:14px">
+    <div class="view-head">${backBtn}${w ? `<button class="primary" data-act="new-stunde">${ICON.plus}Stunden erfassen</button>` : ""}</div>
+    <h2 class="page-title">Baustellen-Stunden</h2>
+    <div class="sums">
+      <div class="sum total"><span class="k">Diese Woche</span><span class="v num">${hStr(woche.reduce((s,e) => s + stdDauer(e), 0))}</span></div>
+      <div class="sum"><span class="k">Noch nicht abgerechnet</span><span class="v num">${eur.format(offen.reduce((s,e) => s + stdBetrag(e), 0))}</span></div>
+    </div>
+    <div class="seg" role="tablist">${[["offen",`Offen (${offen.length})`],["abgerechnet","Abgerechnet"]].map(([k,l]) => `<button role="tab" class="${stdFilter===k?"on":""}" aria-selected="${stdFilter===k}" data-act="std-filter" data-f="${k}">${l}</button>`).join("")}</div>
+    ${groups.length ? groups.map(g => `<div class="hours-group">
+      <div class="hg-head"><h3 style="overflow-wrap:anywhere">${esc(g.k)}</h3><span class="amount">${hStr(g.h)}${g.m ? ` + ${hStr(g.m)} Masch.` : ""}${g.eur ? " · " + eur.format(g.eur) : ""}</span></div>
+      ${g.items.map(e => `<div class="hours-row"><span class="d">${esc(fmtDate(e.datum).slice(0,6))}</span><span class="x"><b>${hStr(stdDauer(e))}</b>${e.von && e.bis ? ` <span class="muted">${esc(e.von)}–${esc(e.bis)}${Number(e.pause) ? ", " + e.pause + " min Pause" : ""}</span>` : ""}${Number(e.maschStd) ? ` · ${hStr(Number(e.maschStd))} ${esc(e.maschine || "Maschine")}` : ""}${e.wer ? ` · ${esc(e.wer)}` : ""}${e.notiz ? `<br><span class="muted">${esc(e.notiz)}</span>` : ""}</span>${w ? `<button class="ghost" style="min-height:34px;padding:4px 10px" data-act="edit" data-id="${e.id}">Ändern</button>` : ""}</div>`).join("")}
+      ${w && stdFilter === "offen" && canWrite("forderungen") ? `<div class="toolbar"><button class="primary" data-act="std-abrechnen" data-k="${esc(g.k)}" ${g.eur > 0 ? "" : "disabled"}>${g.eur > 0 ? `${eur.format(g.eur)} abrechnen` : "Stundensatz fehlt"}</button></div>` : ""}
+    </div>`).join("") : `<div class="empty">${stdFilter === "offen" ? "Keine offenen Stunden. Erfasse deinen ersten Einsatz." : "Noch nichts abgerechnet."}</div>`}
+    ${canWrite("forderungen") ? "" : `<p class="muted" style="margin:0;font-size:.82rem">Zum Abrechnen brauchst du Bearbeiten-Recht für „Offene Beträge“.</p>`}
+  </section>`;
+}
+function formStunde(e = {}){
+  const prev = ofKind("stunde").slice().sort((a,b) => (b.geaendert||0) - (a.geaendert||0));
+  const bauList = [...new Set(prev.map(x => x.baustelle).filter(Boolean))], kundList = [...new Set(prev.map(x => x.kunde).filter(Boolean))], maschList = [...new Set(prev.map(x => x.maschine).filter(Boolean))];
+  const last = e.id ? e : (prev[0] || {});
+  openModal(`<form id="frm" data-kind="stunde" data-id="${e.id||""}" style="display:grid;gap:14px">${head(e.id ? "Stunden ändern" : "Stunden erfassen")}
+    <div class="fields">
+      <label class="f">Kunde<input id="st-kunde" name="kunde" list="stKunden" required value="${esc(e.kunde ?? last.kunde ?? "")}"><datalist id="stKunden">${kundList.map(k => `<option value="${esc(k)}">`).join("")}</datalist></label>
+      <label class="f">Baustelle<input id="st-bau" name="baustelle" list="stBau" required value="${esc(e.baustelle ?? last.baustelle ?? "")}"><datalist id="stBau">${bauList.map(k => `<option value="${esc(k)}">`).join("")}</datalist></label>
+      <label class="f full">Datum<input id="st-datum" name="datum" type="date" required value="${esc(e.datum || iso(today()))}"></label>
+      <label class="f">Von<input id="st-von" name="von" type="time" value="${esc(e.von || "07:00")}"></label>
+      <label class="f">Bis<input id="st-bis" name="bis" type="time" value="${esc(e.bis || "")}"></label>
+      <label class="f">Pause (Min.)<input id="st-pause" name="pause" inputmode="numeric" value="${esc(e.pause ?? 30)}"></label>
+      <label class="f">oder Stunden direkt<input id="st-std" name="stunden" inputmode="decimal" placeholder="z. B. 7,5" value="${Number(e.stunden) ? esc(String(e.stunden).replace(".", ",")) : ""}"></label>
+      <label class="f">Stundensatz (€/h)<input id="st-satz" name="satz" inputmode="decimal" value="${(e.satz ?? last.satz) ? esc(String(e.satz ?? last.satz).replace(".", ",")) : ""}"></label>
+      <label class="f">Wer?<input id="st-wer" name="wer" value="${esc(e.wer ?? last.wer ?? (member?.name || ""))}"></label>
+      <label class="f">Maschine (optional)<input id="st-masch" name="maschine" list="stMasch" placeholder="z. B. Bagger TB235" value="${esc(e.maschine ?? "")}"><datalist id="stMasch">${maschList.map(k => `<option value="${esc(k)}">`).join("")}</datalist></label>
+      <label class="f">Maschinenstunden<input id="st-mstd" name="maschStd" inputmode="decimal" value="${Number(e.maschStd) ? esc(String(e.maschStd).replace(".", ",")) : ""}"></label>
+      <label class="f">Maschinensatz (€/h)<input id="st-msatz" name="maschSatz" inputmode="decimal" value="${(e.maschSatz ?? last.maschSatz) ? esc(String(e.maschSatz ?? last.maschSatz).replace(".", ",")) : ""}"></label>
+      <label class="f full">Notiz<input id="st-notiz" name="notiz" placeholder="Was wurde gemacht?" value="${esc(e.notiz)}"></label>
+    </div>
+    <div class="sheet-foot">${e.id ? `<button class="ghost danger" data-act="del" data-id="${e.id}" style="margin-right:auto">Löschen</button>` : ""}<button class="ghost" data-act="close">Abbrechen</button><button class="primary" type="submit" id="saveBtn">Speichern</button></div></form>`);
+}
+async function stdAbrechnen(key, btn){
+  const items = ofKind("stunde").filter(e => !e.abgerechnet && stdKey(e) === key);
+  if (!items.length) return;
+  const sumEur = items.reduce((s,e) => s + stdBetrag(e), 0), sumH = items.reduce((s,e) => s + stdDauer(e), 0), sumM = items.reduce((s,e) => s + (Number(e.maschStd) || 0), 0);
+  const ds = items.map(e => e.datum).sort();
+  const f = new Date(today()); f.setDate(f.getDate() + 14);
+  btn.disabled = true; btn.textContent = "Wird abgerechnet …";
+  try {
+    await saveItem({ kind: "forderung", kunde: items[0].kunde, baustelle: items[0].baustelle, betrag: Math.round(sumEur * 100) / 100, bezahlt: 0, datum: iso(today()), faellig: iso(f), rechnungsnr: "", notiz: `${hStr(sumH)}${sumM ? " + " + hStr(sumM) + " Maschine" : ""}, ${fmtDate(ds[0])}–${fmtDate(ds[ds.length - 1])}`, bezahltAm: "" });
+    for (const e of items) await sb.from("he_items").update({ tile: "stunden", kind: "stunde", data: { ...cleanItem(e), abgerechnet: iso(today()) } }).eq("id", e.id);
+    await loadItems(); toast(`${eur.format(sumEur)} in „Offene Beträge“ eingetragen`);
+  } catch { btn.disabled = false; toast("Abrechnen hat nicht geklappt."); render(); }
+}
+const cleanItem = it => { const { id, _tile, von: _v, erstellt, geaendert, ...data } = it; return data; };
+
+/* ---------- Essensplan ---------- */
+let essenWoche = 0;
+const MAHL = [["mittag","Mittag"],["abend","Abend"]];
+function viewEssen(){
+  const w = canWrite("essen");
+  const ws = wocheStart(today()); ws.setDate(ws.getDate() + essenWoche * 7);
+  const days = [...Array(7)].map((_, i) => { const d = new Date(ws); d.setDate(d.getDate() + i); return d; });
+  const t0 = +today();
+  const slot = (d, m) => ofKind("essen").find(e => e.datum === iso(d) && (e.mahlzeit || "abend") === m);
+  const end = days[6];
+  return `<section style="display:grid;gap:12px">
+    <div class="view-head">${backBtn}</div>
+    <h2 class="page-title">Essensplan</h2>
+    <div class="week-nav"><button data-act="essen-woche" data-d="-1" aria-label="Vorige Woche">‹</button><b>${essenWoche === 0 ? "Diese Woche" : essenWoche === 1 ? "Nächste Woche" : "KW " + kw(ws)}<br><span class="muted" style="font-weight:500;font-size:.8rem">${ws.toLocaleDateString("de-DE",{day:"numeric",month:"short"})} – ${end.toLocaleDateString("de-DE",{day:"numeric",month:"short"})}</span></b><button data-act="essen-woche" data-d="1" aria-label="Nächste Woche">›</button></div>
+    <div style="display:grid;gap:8px">${days.map(d => `<div class="meal-day ${+d === t0 ? "today" : +d < t0 ? "past" : ""}">
+      <div class="wd">${d.toLocaleDateString("de-DE",{weekday:"short"})}<span>${d.getDate()}.${d.getMonth()+1}.</span></div>
+      <div class="meal-slots">${MAHL.map(([m, l]) => { const e = slot(d, m); return `<button class="meal ${e ? "" : "empty-slot"}" ${w || e ? `data-act="essen-slot" data-d="${iso(d)}" data-m="${m}"` : "disabled"}><span class="lbl">${l}</span><span class="g">${e ? esc(e.gericht) : w ? "+ eintragen" : "–"}</span>${e?.wer ? `<span class="who">${esc(e.wer)}</span>` : ""}</button>`; }).join("")}</div>
+    </div>`).join("")}</div>
+    ${w && canWrite("einkauf") ? `<button data-act="essen-zutaten" style="justify-self:start">${ICON.cart}Zutaten der Woche auf die Einkaufsliste</button>` : ""}
+  </section>`;
+}
+const kw = d => { const x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = x.getUTCDay() || 7; x.setUTCDate(x.getUTCDate() + 4 - day); const y0 = new Date(Date.UTC(x.getUTCFullYear(), 0, 1)); return Math.ceil(((x - y0) / 86400000 + 1) / 7); };
+function formEssen(e){
+  const gerichte = new Map(); ofKind("essen").slice().sort((a,b) => (a.geaendert||0) - (b.geaendert||0)).forEach(x => x.gericht && gerichte.set(x.gericht.toLowerCase(), x));
+  const w = canWrite("essen");
+  openModal(`<form id="frm" data-kind="essen" data-id="${e.id||""}" style="display:grid;gap:14px">${head(`${MAHL.find(m => m[0] === (e.mahlzeit || "abend"))[1]} · ${parseDate(e.datum).toLocaleDateString("de-DE",{weekday:"long",day:"numeric",month:"long"})}`)}
+    <input type="hidden" name="datum" value="${esc(e.datum)}"><input type="hidden" name="mahlzeit" value="${esc(e.mahlzeit || "abend")}">
+    <div class="fields">
+      <label class="f full">Gericht<input id="es-gericht" name="gericht" list="esGerichte" required placeholder="z. B. Käsespätzle" value="${esc(e.gericht)}" ${w ? "" : "readonly"}><datalist id="esGerichte">${[...gerichte.values()].map(x => `<option value="${esc(x.gericht)}">`).join("")}</datalist></label>
+      <label class="f full">Wer kocht?<input id="es-wer" name="wer" value="${esc(e.wer)}" ${w ? "" : "readonly"}></label>
+      <label class="f full">Zutaten (eine pro Zeile)<textarea id="es-zut" name="zutaten" rows="5" placeholder="500 g Spätzle&#10;200 g Bergkäse&#10;2 Zwiebeln" ${w ? "" : "readonly"}>${esc(e.zutaten)}</textarea></label>
+    </div>
+    <div class="sheet-foot">${e.id && w ? `<button class="ghost danger" data-act="del" data-id="${e.id}" style="margin-right:auto">Löschen</button>` : ""}${e.id && e.zutaten && canWrite("einkauf") ? `<button type="button" data-act="essen-zut-eins" data-id="${e.id}">Auf Einkaufsliste</button>` : ""}<button class="ghost" data-act="close">${w ? "Abbrechen" : "Schließen"}</button>${w ? `<button class="primary" type="submit" id="saveBtn">Speichern</button>` : ""}</div></form>`);
+  window.__gerichte = gerichte;
+}
+async function zutatenAufListe(items){
+  const offen = new Set(ekOffen().map(i => (i.name || "").toLowerCase()));
+  const zeilen = items.flatMap(e => String(e.zutaten || "").split(/\n|,/).map(z => z.trim()).filter(Boolean));
+  let n = 0;
+  for (const z of zeilen) {
+    const m = /^([\d.,\/½¼¾]+\s*(?:g|kg|ml|l|el|tl|stk\.?|stück|pck\.?|päckchen|dose|dosen|bund|prise)?)\s+(.+)$/i.exec(z);
+    const name = (m ? m[2] : z).trim(), menge = m ? m[1].trim() : "";
+    if (offen.has(name.toLowerCase())) continue;
+    offen.add(name.toLowerCase()); n++;
+    await sb.from("he_items").insert({ tile: "einkauf", kind: "einkauf", data: { name, menge, erledigt: false } });
+  }
+  await loadItems();
+  toast(n ? `${n} Zutat${n === 1 ? "" : "en"} auf die Einkaufsliste gesetzt` : "Alles schon auf der Liste");
 }
 
 /* ---------- Einkaufsliste ---------- */
@@ -1528,6 +1675,12 @@ async function submitForm(form){
   try {
     let obj;
     if (kind === "fahrzeug") obj = { ...old, kind, kennzeichen: fd.kennzeichen.trim().toUpperCase(), name: fd.name.trim(), tuev: fd.tuev || "", km: fd.km ? parseInt(fd.km.replace(/\D/g,""),10) || "" : "", notiz: fd.notiz.trim() };
+    else if (kind === "stunde") {
+      const num = v => { const n = parseAmount(v); return isFinite(n) ? Math.round(n * 100) / 100 : ""; };
+      obj = { ...old, kind, kunde: fd.kunde.trim(), baustelle: fd.baustelle.trim(), datum: fd.datum, von: fd.von || "", bis: fd.bis || "", pause: parseInt(fd.pause, 10) || 0, stunden: num(fd.stunden), satz: num(fd.satz), wer: fd.wer.trim(), maschine: fd.maschine.trim(), maschStd: num(fd.maschStd), maschSatz: num(fd.maschSatz), notiz: fd.notiz.trim(), abgerechnet: old.abgerechnet || "" };
+      if (!stdDauer(obj) && !Number(obj.maschStd)) { btn.disabled = false; btn.textContent = "Speichern"; toast("Bitte Von/Bis oder die Stunden eintragen."); return; }
+    }
+    else if (kind === "essen") obj = { ...old, kind, datum: fd.datum, mahlzeit: fd.mahlzeit, gericht: fd.gericht.trim(), wer: fd.wer.trim(), zutaten: fd.zutaten.trim() };
     else if (kind === "privtermin") obj = { ...old, kind, titel: fd.titel.trim(), datum: fd.datum, zeit: fd.zeit || "", zeitBis: fd.zeitBis || "", ort: fd.ort.trim(), notiz: fd.notiz.trim() };
     else if (kind === "idee") obj = { ...old, kind, titel: fd.titel.trim(), notiz: fd.notiz.trim(), kategorie: fd.kategorie, status: fd.status, kosten: fd.kosten.trim(), link: fd.link.trim(), fav: !!old.fav };
     else if (kind === "forderung") {
@@ -1568,7 +1721,7 @@ async function submitForm(form){
 
 function confirmDelete(id){
   const it = S.items.find(i => i.id === id); if (!it) return;
-  const what = it.kind === "kalquelle" ? `die Verbindung zu „${it.name || "Handy-Kalender"}“` : it.kind === "privtermin" ? `den Termin „${it.titel}“` : it.kind === "einkauf" ? `„${it.name}“` : it.kind === "idee" ? `die Idee „${it.titel}“` : it.kind === "forderung" ? `den Betrag ${eur.format(it.betrag||0)} von ${it.kunde}` : it.kind === "ausleihe" ? `„${it.gegenstand}“ aus der Ausleihliste` : it.kind === "fix" ? `die Zahlung „${it.name}“` : it.kind === "muell" ? `die Tonne „${it.art}“` : it.kind === "geburtstag" ? `den Geburtstag von ${it.name}` : it.kind === "fahrzeug" ? `das Fahrzeug ${it.kennzeichen}` : it.kind === "termin" ? `den Termin „${it.titel}“` : `die Rechnung von ${it.haendler || "–"} über ${eur.format(it.betrag||0)}`;
+  const what = it.kind === "stunde" ? `den Eintrag ${fmtDate(it.datum)} (${hStr(stdDauer(it))})` : it.kind === "essen" ? `„${it.gericht}“ aus dem Essensplan` : it.kind === "kalquelle" ? `die Verbindung zu „${it.name || "Handy-Kalender"}“` : it.kind === "privtermin" ? `den Termin „${it.titel}“` : it.kind === "einkauf" ? `„${it.name}“` : it.kind === "idee" ? `die Idee „${it.titel}“` : it.kind === "forderung" ? `den Betrag ${eur.format(it.betrag||0)} von ${it.kunde}` : it.kind === "ausleihe" ? `„${it.gegenstand}“ aus der Ausleihliste` : it.kind === "fix" ? `die Zahlung „${it.name}“` : it.kind === "muell" ? `die Tonne „${it.art}“` : it.kind === "geburtstag" ? `den Geburtstag von ${it.name}` : it.kind === "fahrzeug" ? `das Fahrzeug ${it.kennzeichen}` : it.kind === "termin" ? `den Termin „${it.titel}“` : `die Rechnung von ${it.haendler || "–"} über ${eur.format(it.betrag||0)}`;
   openModal(`${head("Löschen?")}<p style="margin:0">Möchtest du ${esc(what)} wirklich löschen? Das lässt sich nicht rückgängig machen.</p>
     <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" style="background:var(--crit);border-color:var(--crit)" data-act="del-yes" data-id="${id}">Löschen</button></div>`);
 }
@@ -1610,6 +1763,13 @@ document.addEventListener("click", e => {
   else if (act === "new-forderung") formForderung();
   else if (act === "new-idee") formIdee();
   else if (act === "new-privtermin") formPriv();
+  else if (act === "new-stunde") formStunde();
+  else if (act === "std-filter") { stdFilter = el.dataset.f; render(); }
+  else if (act === "std-abrechnen") stdAbrechnen(el.dataset.k, el);
+  else if (act === "essen-woche") { essenWoche += Number(el.dataset.d); render(); }
+  else if (act === "essen-slot") { const e = ofKind("essen").find(x => x.datum === el.dataset.d && (x.mahlzeit || "abend") === el.dataset.m); formEssen(e || { datum: el.dataset.d, mahlzeit: el.dataset.m, wer: member?.name || "" }); }
+  else if (act === "essen-zut-eins") { const e = S.items.find(i => i.id === el.dataset.id); if (e) { closeModal(); zutatenAufListe([e]); } }
+  else if (act === "essen-zutaten") { const ws = wocheStart(today()); ws.setDate(ws.getDate() + essenWoche * 7); const we = new Date(ws); we.setDate(we.getDate() + 6); const t0 = today(); const items = ofKind("essen").filter(e => { const d = parseDate(e.datum); return d >= ws && d <= we && d >= t0 && e.zutaten; }); if (!items.length) toast("In dieser Woche sind keine Zutaten eingetragen."); else { el.disabled = true; zutatenAufListe(items).finally(() => { el.disabled = false; }); } }
   else if (act === "copy") { const tx = el.dataset.text; (navigator.clipboard?.writeText(tx) || Promise.reject()).then(() => toast("Link kopiert"), () => { window.prompt?.("Link kopieren:", tx); }); }
   else if (act === "ek-toggle" || act === "ek-again") { const it = S.items.find(i => i.id === el.dataset.id); if (it) { el.disabled = true; const p2 = act === "ek-again" ? saveItem({ kind: "einkauf", name: it.name, menge: it.menge || "", erledigt: false }) : saveItem({ ...it, erledigt: !it.erledigt }); p2.catch(() => toast("Speichern hat nicht geklappt.")); } }
   else if (act === "ek-clear") { if (el.dataset.sure) { const ids = ekDone().map(i => i.id); sb.from("he_items").delete().in("id", ids).then(({ error }) => { if (error) toast("Löschen hat nicht geklappt."); else { toast("Erledigte gelöscht"); loadItems(); } }); } else { el.dataset.sure = "1"; el.textContent = "Wirklich löschen?"; } }
@@ -1635,7 +1795,7 @@ document.addEventListener("click", e => {
   else if (act === "new-geburtstag") formGeburtstag();
   else if (act === "new-beleg") formBeleg();
   else if (act === "new-ablage") formBeleg({}, ABLAGE);
-  else if (act === "edit") { const it = S.items.find(i => i.id === el.dataset.id); if (!it) return; ({fahrzeug:formFahrzeug, termin:formTermin, beleg:formBeleg, muell:formMuell, geburtstag:formGeburtstag, fix:formFix, ausleihe:formAusleihe, forderung:formForderung, idee:formIdee, privtermin:formPriv})[it.kind]?.(it); }
+  else if (act === "edit") { const it = S.items.find(i => i.id === el.dataset.id); if (!it) return; ({fahrzeug:formFahrzeug, termin:formTermin, beleg:formBeleg, muell:formMuell, geburtstag:formGeburtstag, fix:formFix, ausleihe:formAusleihe, forderung:formForderung, idee:formIdee, privtermin:formPriv, stunde:formStunde, essen:formEssen})[it.kind]?.(it); }
   else if (act === "del") confirmDelete(el.dataset.id);
   else if (act === "del-yes") { deleteItem(el.dataset.id).then(() => { closeModal(); toast("Gelöscht"); }, () => toast("Löschen hat nicht geklappt.")); }
   else if (act === "export") exportCsv();
@@ -1685,7 +1845,7 @@ document.addEventListener("submit", async e => {
   }
   submitForm(e.target);
 });
-document.addEventListener("input", e => { if (e.target.id === "ideeQ") { ideeQ = e.target.value; $("#ideeList").innerHTML = ideeRows(); return; } if (e.target.id === "ablageQ") { ablageQ = e.target.value; $("#ablageList").innerHTML = ablageRows(); } });
+document.addEventListener("input", e => { if (e.target.id === "es-gericht") { const x = window.__gerichte?.get(e.target.value.trim().toLowerCase()); const z = $("#es-zut"); if (x && z && !z.value.trim()) z.value = x.zutaten || ""; } if (e.target.id === "ideeQ") { ideeQ = e.target.value; $("#ideeList").innerHTML = ideeRows(); return; } if (e.target.id === "ablageQ") { ablageQ = e.target.value; $("#ablageList").innerHTML = ablageRows(); } });
 document.addEventListener("change", e => {
   if (e.target.id === "bl-foto" && e.target.files[0]) { pending?.ctl?.abort(); onPhoto(e.target.files[0]); }
   if (e.target.id === "bl-bereich") { const k = $("#bl-kat"); if (k) k.innerHTML = katOptions(e.target.value, k.value); const g = $("#bl-gar-wrap"); if (g) g.hidden = e.target.value !== ABLAGE; }
