@@ -528,7 +528,7 @@ const SB_KEY = "sb_publishable_bEARbfjx56Xq7oUg9GQESA_BILmK_Jm";
 const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 const S = { items: [], mode: "db", ready: false, auth: "loading", email: "" };
 let uid = null, member = null, members = [];
-const TILES = [["standdienst","Standdienst"],["chat","Chat"],["aufgaben","Aufgaben"],["termine","Termine & Treffen"],["einkauf","Einkaufsliste"],["material","Material & Deko"],["angebot","Angebot & Preise"],["kasse","Kasse"],["infos","Infos & Kontakte"]];
+const TILES = [["chat","Chat"],["aufgaben","Aufgaben"],["termine","Termine & Treffen"],["einkauf","Einkaufsliste"],["material","Material & Deko"],["angebot","Angebot & Preise"],["kasse","Kasse"],["infos","Infos & Kontakte"],["standdienst","Standdienst"]];
 const LEVEL = { none: "Kein Zugriff", view: "Ansehen", edit: "Bearbeiten" };
 const me = { owner: false };
 const KIND_TILE = { projekt:"projekte", schicht:"standdienst", aufgabe:"aufgaben", termin:"termine", einkauf:"einkauf", material:"material", produkt:"angebot", buchung:"kasse", info:"infos" };
