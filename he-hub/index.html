@@ -441,7 +441,7 @@ const SB_KEY = "sb_publishable_bEARbfjx56Xq7oUg9GQESA_BILmK_Jm";
 const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 const S = { items: [], mode: "db", ready: false, auth: "loading", email: "" };
 let uid = null, member = null, members = [];
-const TILES = [["fahrzeuge","Fahrzeuge"],["termine","Termine"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["muell","Müllplan"],["geburtstage","Geburtstage"],["ausleihe","Ausleihliste"],["forderungen","Offene Beträge"],["ideen","Ideen"],["einkauf","Einkaufsliste"],["privattermine","Private Termine"],["stunden","Baustellen-Stunden"],["essen","Essensplan"]];
+const TILES = [["privattermine","Private Termine"],["essen","Essensplan"],["einkauf","Einkaufsliste"],["muell","Müllplan"],["geburtstage","Geburtstage"],["ausleihe","Ausleihliste"],["ideen","Ideen"],["fahrzeuge","Fahrzeuge"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["forderungen","Offene Beträge"],["stunden","Baustellen-Stunden"]];
 const LEVEL = { none: "Kein Zugriff", view: "Ansehen", edit: "Bearbeiten" };
 const me = { owner: false };
 const tileOf = it => ({ fahrzeug:"fahrzeuge", termin:"termine", fix:"fixkosten", muell:"muell", geburtstag:"geburtstage", ausleihe:"ausleihe", forderung:"forderungen", idee:"ideen", einkauf:"einkauf", privtermin:"privattermine", kalquelle:"privattermine", stunde:"stunden", essen:"essen" })[it.kind] || (it.kind === "beleg" ? (it.bereich === "H&E Tools" ? "belege" : "ablage") : "fahrzeuge");
@@ -672,7 +672,7 @@ const belegeJahr = (y, ber = belegBereich) => ofKind("beleg").filter(b => String
 const sum = arr => arr.reduce((s,b) => s + (Number(b.betrag)||0), 0);
 
 /* ---------- Ansichten ---------- */
-function route(){ const h = location.hash.slice(1); return ["fahrzeuge","termine","belege","muell","geburtstage","fixkosten","ablage","ausleihe","forderungen","ideen","einkauf","privattermine","stunden","essen"].includes(h) ? h : ""; }
+function route(){ const h = location.hash.slice(1); return ["fahrzeuge","belege","muell","geburtstage","fixkosten","ablage","ausleihe","forderungen","ideen","einkauf","privattermine","stunden","essen"].includes(h) ? h : ""; }
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); if (route() === "essen") setTimeout(() => document.querySelector(".meal-day.today")?.scrollIntoView({ block: "center" }), 50); });
 
 function render(){
@@ -1250,7 +1250,7 @@ function viewPriv(){
       </div>`).join("")}</div>`).join("") : `<div class="empty">Keine anstehenden privaten Termine.</div>`}
     <div class="connect">
       <h3>H&amp;E-Termine im Handy-Kalender</h3>
-      <p class="muted" style="margin:0;font-size:.88rem">Deine privaten und die gemeinsamen Termine erscheinen automatisch im Kalender deines Handys und aktualisieren sich von selbst.</p>
+      <p class="muted" style="margin:0;font-size:.88rem">Deine privaten Termine erscheinen automatisch im Kalender deines Handys und aktualisieren sich von selbst.</p>
       ${feed ? `<div class="toolbar"><a class="btn primary" href="webcal://${esc(feed)}">Kalender abonnieren</a><button data-act="copy" data-text="https://${esc(feed)}">Link kopieren</button></div>
       <ol><li><b>iPhone:</b> „Kalender abonnieren“ tippen → „Abonnieren“ → „Hinzufügen“.</li><li><b>Android:</b> Link kopieren → am Computer calendar.google.com → links „Weitere Kalender +“ → „Per URL“ → einfügen.</li></ol>
       <p class="muted" style="margin:0;font-size:.78rem">Der Link ist geheim und gehört nur dir – nicht weitergeben.</p>` : `<span class="muted">Link wird erstellt …</span>`}
