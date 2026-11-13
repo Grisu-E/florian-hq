@@ -1,5 +1,5 @@
 // H&E Hub – Service Worker: App-Hülle offline verfügbar, Daten immer frisch aus Supabase
-const CACHE = "hehub-v12";
+const CACHE = "hehub-v13";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
@@ -16,4 +16,25 @@ self.addEventListener("fetch", e => {
     fetch(e.request).then(r => { const copy = r.clone(); caches.open(CACHE).then(c => c.put(e.request, copy)); return r; })
       .catch(() => caches.match(e.request).then(r => r || caches.match("./index.html")))
   );
+});
+
+// Push-Benachrichtigungen
+self.addEventListener("push", e => {
+  let d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : "" }; }
+  e.waitUntil(self.registration.showNotification(d.title || "H&E Hub", {
+    body: d.body || "",
+    icon: "icons/icon-192.png",
+    badge: "icons/icon-192.png",
+    data: { url: d.url || "./" },
+    tag: "hehub-" + Date.now() + "-" + Math.random().toString(36).slice(2)
+  }));
+});
+self.addEventListener("notificationclick", e => {
+  e.notification.close();
+  const target = new URL((e.notification.data && e.notification.data.url) || "./", self.registration.scope).href;
+  e.waitUntil(clients.matchAll({ type: "window", includeUncontrolled: true }).then(ws => {
+    for (const w of ws) if (w.url.startsWith(self.registration.scope)) { w.navigate(target); return w.focus(); }
+    return clients.openWindow(target);
+  }));
 });

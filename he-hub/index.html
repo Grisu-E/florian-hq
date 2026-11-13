@@ -478,6 +478,7 @@ async function afterLogin(session){
   me.owner = m.role === "admin"; S.auth = "ok";
   await Promise.all([loadItems(), loadMembers()]);
   setTimeout(() => loadKal(true), 50);
+  refreshPush().then(render);
   S.ready = true;
   $("#storeStatus").textContent = (m.name || S.email) + (me.owner ? " · Admin" : "");
   $("#shareBtn").hidden = !me.owner;
@@ -826,9 +827,70 @@ function openMenu(){
     <p class="muted" style="margin:-6px 0 0;font-size:.85rem">${esc(S.email)}${me.owner ? " · Admin" : ""}</p>
     <div class="menu-list">
       ${me.owner ? `<button data-act="share">${ICON.people}Personen &amp; Freigaben</button>` : ""}
+      <button data-act="push-open">${ICON.bell}Benachrichtigungen${PUSH.on ? " · an" : ""}</button>
       <button data-act="set-pw">${ICON.lock}Passwort festlegen</button>
       <button data-act="logout" class="danger">Abmelden</button>
     </div>`);
+}
+
+/* ---------- Push-Benachrichtigungen ---------- */
+const PUSH_CATS = [["muell","Müllabfuhr – am Vorabend","muell"],["einkauf","Neues auf der Einkaufsliste","einkauf"],["essen","Neues im Essensplan","essen"],["privat","Meine privaten Termine – am Vorabend","privattermine"],["geburtstag","Geburtstage – am Vortag","geburtstage"],["ausleihe","Ausleihe: Rückgabe morgen / überfällig","ausleihe"],["geld","Überfällige Zahlungen","forderungen"],["fixkosten","Miete & Versicherungen – 3 Tage vorher","fixkosten"],["tuev","TÜV – am 1. und 15. des Monats","fahrzeuge"],["neu","Neue Einträge von anderen (übrige Kacheln)",null]];
+const PUSH = { on: false, row: null, endpoint: null };
+const pushSupported = () => ("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window);
+const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+const isStandalone = () => matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+const b64ToBytes = b64 => { const pad = "=".repeat((4 - b64.length % 4) % 4); const raw = atob((b64 + pad).replace(/-/g, "+").replace(/_/g, "/")); return Uint8Array.from(raw, c => c.charCodeAt(0)); };
+async function refreshPush(){
+  if (!pushSupported()) return;
+  try {
+    const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription();
+    PUSH.endpoint = sub ? sub.endpoint : null;
+    if (PUSH.endpoint) { const { data } = await sb.from("he_push_subs").select("*").eq("endpoint", PUSH.endpoint).maybeSingle(); PUSH.row = data; PUSH.on = !!data; }
+    else { PUSH.row = null; PUSH.on = false; }
+  } catch { PUSH.on = false; }
+}
+async function enablePush(btn){
+  if (!pushSupported()) return toast("Dieses Gerät unterstützt hier keine Benachrichtigungen.");
+  if (btn) { btn.disabled = true; btn.textContent = "Wird eingeschaltet …"; }
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== "granted") { toast("Benachrichtigungen wurden nicht erlaubt. Das lässt sich in den Handy-Einstellungen ändern."); return; }
+    const r = await fetch(SB_URL + "/functions/v1/he-push", { headers: { apikey: SB_KEY } });
+    const { publicKey } = await r.json();
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(publicKey) });
+    const j = sub.toJSON();
+    const prefs = Object.fromEntries(PUSH_CATS.map(([k]) => [k, true]));
+    const { error } = await sb.from("he_push_subs").upsert({ user_id: uid, endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, prefs: { ...(PUSH.row?.prefs || {}), ...prefs, ...(PUSH.row?.prefs || {}) } }, { onConflict: "endpoint" });
+    if (error) throw error;
+    await refreshPush(); toast("Benachrichtigungen sind an"); openPush();
+  } catch (e) { console.warn(e); toast("Einschalten hat nicht geklappt. Bitte nochmal versuchen."); }
+  finally { if (btn && document.body.contains(btn)) { btn.disabled = false; btn.textContent = "Benachrichtigungen einschalten"; } }
+}
+async function disablePush(){
+  try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) { await sb.from("he_push_subs").delete().eq("endpoint", sub.endpoint); await sub.unsubscribe(); } } catch (e) { console.warn(e); }
+  await refreshPush(); toast("Benachrichtigungen sind aus"); openPush(); render();
+}
+function openPush(){
+  let body;
+  if (!pushSupported()) {
+    body = isIOS() && !isStandalone()
+      ? `<div class="scan-status warn">Auf dem iPhone gehen Benachrichtigungen nur in der installierten App.</div><ol class="muted" style="margin:0;padding-left:20px;display:grid;gap:4px;font-size:.9rem"><li>In Safari unten auf <b>Teilen</b> tippen → <b>„Zum Home-Bildschirm“</b>.</li><li>H&amp;E Hub über das neue Icon öffnen.</li><li>Dort im Menü <b>Benachrichtigungen</b> einschalten.</li></ol>`
+      : `<div class="scan-status warn">Dieser Browser unterstützt leider keine Benachrichtigungen. Nimm auf dem iPhone Safari (iOS 16.4 oder neuer), auf Android Chrome.</div>`;
+  } else if (!PUSH.on) {
+    body = `<p class="muted" style="margin:0">Du bekommst Nachrichten aufs Handy, z. B. „Morgen Gelber Sack“, wenn dein Partner etwas auf die Einkaufsliste setzt oder eine Zahlung überfällig ist – nur für Kacheln, die du sehen darfst.</p>
+      <button class="primary" data-act="push-on">Benachrichtigungen einschalten</button>
+      <p class="muted" style="margin:0;font-size:.8rem">Gilt für dieses Gerät. Auf weiteren Geräten einfach dort auch einschalten.</p>`;
+  } else {
+    const prefs = PUSH.row?.prefs || {};
+    const cats = PUSH_CATS.filter(([,, t]) => !t || visible(t));
+    body = `<div class="scan-status ok">Benachrichtigungen sind auf diesem Gerät an.</div>
+      <div class="menu-list">${cats.map(([k, l]) => `<label class="check" style="justify-content:space-between;padding:10px 12px;border-radius:12px;background:var(--sunken);color:var(--ink)"><span>${esc(l)}</span><input type="checkbox" data-pushcat="${k}" ${prefs[k] !== false ? "checked" : ""} style="width:22px;height:22px"></label>`).join("")}</div>
+      <div class="toolbar"><button data-act="push-test">Testnachricht senden</button><button class="ghost danger" data-act="push-off">Ausschalten</button></div>
+      <p class="muted" style="margin:0;font-size:.8rem">Die Erinnerungen am Vorabend kommen gegen 18 Uhr.</p>`;
+  }
+  openModal(`${head("Benachrichtigungen")}${body}`);
 }
 
 /* ---------- Hinweise / Benachrichtigungen ---------- */
@@ -845,6 +907,7 @@ function hinweise(){
   if (visible("privattermine")) { const h0 = iso(today()); const heute = privAlle().filter(e => e.datum === h0); if (heute.length) out.push({ cls: "info", icon: ICON.priv, href: "#privattermine", text: `<b>Heute privat:</b> ${esc(heute.slice(0, 3).map(e => (e.zeit ? e.zeit + " " : "") + e.titel).join(" · "))}` }); }
   if (visible("forderungen")) { const ue = offeneFord().filter(f => fordStatus(f).cls === "crit"); if (ue.length) out.push({ cls: "crit", icon: ICON.money, href: "#forderungen", text: `<b>${ue.length} Zahlung${ue.length === 1 ? "" : "en"} überfällig:</b> ${esc([...new Set(ue.map(f => f.kunde))].join(", "))} – ${eur.format(ue.reduce((s,f) => s + offenBetrag(f), 0))}` }); }
   if (visible("ausleihe")) for (const a of offenAus()) { const s = ausStatus(a); if (s.cls === "crit" || s.cls === "warn") out.push({ cls: s.cls, icon: ICON.lend, href: "#ausleihe", text: `<b>${esc(a.gegenstand)}</b> ${esc(ausWer(a))}: ${esc(s.txt)}` }); }
+  if (!PUSH.on && pushSupported() && (() => { try { return !localStorage.getItem("hehub-push-hint"); } catch { return true; } })()) out.push({ cls: "info", icon: ICON.bell, href: "#", act: "push-open", text: `<b>Benachrichtigungen einschalten</b> – Müll, Einkauf & Co. direkt aufs Handy` });
   if (me.owner) { const p = members.filter(m => m.status === "pending").length; if (p) out.push({ cls: "warn", icon: ICON.people, href: "#", act: "share", text: `<b>${p} ${p === 1 ? "Person wartet" : "Personen warten"} auf Freigabe</b> – jetzt Kacheln freigeben` }); }
   if (visible("fahrzeuge")) {
     for (const f of ofKind("fahrzeug")) {
@@ -1786,6 +1849,10 @@ document.addEventListener("click", e => {
   else if (act === "aus-zurueck" || act === "aus-offen") { const it = S.items.find(i => i.id === el.dataset.id); if (it) { el.disabled = true; saveItem({ ...it, zurueckAm: act === "aus-zurueck" ? iso(today()) : "" }).then(() => toast(act === "aus-zurueck" ? "Als zurückgegeben markiert" : "Wieder offen"), () => { el.disabled = false; toast("Speichern hat nicht geklappt."); }); } }
   else if (act === "home") { closeModal(); if (location.hash && location.hash !== "#") location.hash = ""; else render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
   else if (act === "menu") openMenu();
+  else if (act === "push-open") { try { localStorage.setItem("hehub-push-hint", "1"); } catch {} closeModal(); openPush(); render(); }
+  else if (act === "push-on") enablePush(el);
+  else if (act === "push-off") disablePush();
+  else if (act === "push-test") { el.disabled = true; sb.functions.invoke("he-push", { body: { test: true } }).then(({ data, error }) => { el.disabled = false; toast(error ? "Testnachricht hat nicht geklappt." : data?.sent ? "Testnachricht verschickt" : "Kein Gerät gefunden – bitte aus- und wieder einschalten."); }); }
   else if (act === "share") { closeModal(); openShare(); }
   else if (act === "logout") sb.auth.signOut();
   else if (act === "set-pw") { closeModal(); openPassword(); }
@@ -1850,6 +1917,7 @@ document.addEventListener("submit", async e => {
 });
 document.addEventListener("input", e => { if (e.target.id === "es-gericht") { const x = window.__gerichte?.get(e.target.value.trim().toLowerCase()); const z = $("#es-zut"); if (x && z && !z.value.trim()) z.value = x.zutaten || ""; } if (e.target.id === "ideeQ") { ideeQ = e.target.value; $("#ideeList").innerHTML = ideeRows(); return; } if (e.target.id === "ablageQ") { ablageQ = e.target.value; $("#ablageList").innerHTML = ablageRows(); } });
 document.addEventListener("change", e => {
+  if (e.target.dataset && e.target.dataset.pushcat && PUSH.row) { const prefs = { ...(PUSH.row.prefs || {}), [e.target.dataset.pushcat]: e.target.checked }; sb.from("he_push_subs").update({ prefs }).eq("id", PUSH.row.id).then(({ error }) => { if (error) toast("Speichern hat nicht geklappt."); else { PUSH.row.prefs = prefs; toast(e.target.checked ? "Eingeschaltet" : "Ausgeschaltet"); } }); }
   if (e.target.id === "bl-foto" && e.target.files[0]) { pending?.ctl?.abort(); onPhoto(e.target.files[0]); }
   if (e.target.id === "bl-bereich") { const k = $("#bl-kat"); if (k) k.innerHTML = katOptions(e.target.value, k.value); const g = $("#bl-gar-wrap"); if (g) g.hidden = e.target.value !== ABLAGE; }
   if (e.target.id === "ablageKat") { ablageKat = e.target.value; $("#ablageList").innerHTML = ablageRows(); }
