@@ -454,7 +454,9 @@ textarea{resize:vertical;min-height:64px}
 .msg.me .time{text-align:right}
 .msg.cont .who{display:none}
 .chat-day{justify-self:center;font-size:.72rem;font-weight:800;color:var(--muted);background:var(--sunken);border-radius:999px;padding:3px 10px;margin:10px 0 4px}
-.chat-form{position:sticky;bottom:calc(76px + env(safe-area-inset-bottom,0px));display:grid;grid-template-columns:1fr auto;gap:8px;background:var(--bg);padding:8px 0;z-index:5}
+.chat-form{position:fixed;left:0;right:0;bottom:0;z-index:45;display:grid;grid-template-columns:1fr auto;gap:8px;background:var(--bg);border-top:1px solid var(--line);padding:10px max(16px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));max-width:1100px;margin:0 auto}
+body.chat-open{padding-bottom:calc(84px + env(safe-area-inset-bottom,0px))}
+body.chat-open .homebar{display:none}
 .chat-form textarea{min-height:46px;max-height:140px;resize:none;border-radius:22px;padding:12px 16px;background:var(--surface);border:1px solid var(--line)}
 .chat-form button{width:48px;height:48px;padding:0;border-radius:50%;align-self:end;background:var(--accent);border-color:var(--accent);color:#fff}
 .quick{display:flex;gap:6px;flex-wrap:wrap}
@@ -998,6 +1000,7 @@ function render(){
   const hb = $("#homeBtn"); if (hb) { hb.classList.toggle("on", !r); hb.closest(".homebar").hidden = S.auth !== "ok"; }
   const ct = $("#chat-text"), draft = ct?.value || "", foc = document.activeElement === ct;
   app.innerHTML = r ? VIEWS[r]() : viewHome();
+  document.body.classList.toggle("chat-open", r === "chat");
   const ct2 = $("#chat-text"); if (ct2 && draft) { ct2.value = draft; } if (ct2 && foc) ct2.focus();
 }
 
