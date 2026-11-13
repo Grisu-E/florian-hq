@@ -378,10 +378,38 @@ textarea{resize:vertical;min-height:64px}
 .hero .v{font-size:1.5rem;font-weight:800;letter-spacing:-.02em;line-height:1.15}
 .hero .s{font-size:.9rem;opacity:.92}
 .hero .flakes{position:absolute;right:-6px;top:-8px;font-size:4.6rem;opacity:.16;line-height:1;pointer-events:none}
-.hero .snow{position:absolute;inset:0;pointer-events:none;overflow:hidden}
-.hero .snow i{position:absolute;top:-14px;color:#fff;font-style:normal;line-height:1;opacity:0;text-shadow:0 0 6px rgba(255,255,255,.6);animation:snowfall linear infinite}
-@keyframes snowfall{0%{transform:translate(0,0) rotate(0);opacity:0}10%{opacity:.9}50%{transform:translate(14px,90px) rotate(180deg)}90%{opacity:.8}100%{transform:translate(-6px,190px) rotate(360deg);opacity:0}}
-.hero > span:not(.snow):not(.flakes){position:relative}
+.hero .fx{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.hero .fx i{position:absolute;font-style:normal;line-height:1}
+.hero .fx .fall{top:-24px;opacity:0;animation:fall linear infinite}
+.hero .fx .snow{color:#fff;text-shadow:0 0 6px rgba(255,255,255,.6)}
+.hero .fx .leaf{animation-name:leaf}
+@keyframes fall{0%{transform:translate(0,0) rotate(0);opacity:0}10%{opacity:.9}50%{transform:translate(14px,95px) rotate(180deg)}90%{opacity:.8}100%{transform:translate(-6px,200px) rotate(360deg);opacity:0}}
+@keyframes leaf{0%{transform:translate(0,0) rotate(-20deg);opacity:0}10%{opacity:1}30%{transform:translate(28px,60px) rotate(40deg)}55%{transform:translate(-14px,115px) rotate(-30deg)}80%{transform:translate(22px,170px) rotate(50deg);opacity:.9}100%{transform:translate(0,215px) rotate(0);opacity:0}}
+.hero .fx .walk{bottom:4px;right:-60px;font-size:34px;animation:walk 16s linear infinite}
+.hero .fx .walk b{display:inline-block;animation:bob .5s ease-in-out infinite alternate}
+@keyframes walk{0%{transform:translateX(0)}100%{transform:translateX(calc(-100vw - 160px))}}
+@keyframes bob{from{transform:translateY(0) rotate(-4deg)}to{transform:translateY(-4px) rotate(4deg)}}
+.hero .fx .sleigh{top:6px;right:-140px;font-size:24px;white-space:nowrap;animation:fly 13s linear infinite}
+.hero .fx .angel{top:40%;left:-60px;font-size:28px;animation:angel 15s ease-in-out infinite;animation-delay:-6s}
+.hero .fx .angel::after{content:"✨";font-size:16px;position:absolute;left:-14px;top:10px;animation:twinkle .8s ease-in-out infinite alternate}
+@keyframes fly{0%{transform:translate(0,0)}25%{transform:translate(-30vw,14px)}50%{transform:translate(-60vw,-2px)}75%{transform:translate(-90vw,12px)}100%{transform:translate(calc(-100vw - 300px),0)}}
+@keyframes angel{0%{transform:translate(0,0)}25%{transform:translate(28vw,-22px)}50%{transform:translate(56vw,8px)}75%{transform:translate(84vw,-18px)}100%{transform:translate(calc(100vw + 160px),0)}}
+@keyframes twinkle{from{opacity:.3;transform:scale(.7)}to{opacity:1;transform:scale(1.1)}}
+.hero .fx .flower{bottom:-2px;transform-origin:bottom center;animation:grow 9s ease-in-out infinite}
+@keyframes grow{0%{transform:scale(0) rotate(0)}18%{transform:scale(1) rotate(-6deg)}50%{transform:scale(1) rotate(6deg)}80%{transform:scale(1) rotate(-4deg);opacity:1}100%{transform:scale(1) rotate(0);opacity:0}}
+.hero .fx .butterfly{top:30%;left:-40px;font-size:20px;animation:angel 18s ease-in-out infinite}
+.hero .fx .sun{top:-14px;right:-14px;font-size:64px;animation:spin 30s linear infinite;opacity:.95}
+@keyframes spin{to{transform:rotate(360deg)}}
+.hero .fx .waves{left:0;right:0;bottom:0;height:22px;background:radial-gradient(circle at 12px -4px,transparent 13px,rgba(120,200,255,.55) 14px) repeat-x;background-size:24px 22px;animation:wave 4s linear infinite}
+.hero .fx .waves.w2{height:16px;opacity:.6;background-size:30px 16px;animation-duration:6s;animation-direction:reverse}
+@keyframes wave{to{background-position:48px 0}}
+.hero .fx .swim{bottom:6px;right:-50px;font-size:26px;animation:walk 20s linear infinite}
+.hero .fx .swim b{display:inline-block;animation:bob 1s ease-in-out infinite alternate}
+.hero .fx .ball{bottom:20px;left:-30px;font-size:20px;animation:angel 11s ease-in-out infinite;animation-delay:-3s}
+.hero.summer{background:linear-gradient(135deg,#0E7FB8,#2BB3D9 55%,#F2C14E)}
+.hero.spring{background:linear-gradient(135deg,#1F7A4D,#4CAF7A 55%,#E58FB4)}
+.hero.autumn{background:linear-gradient(135deg,#8A2E0E,#C9572A 55%,#A0761C)}
+.hero > span:not(.fx):not(.flakes){position:relative}
 .shift{display:grid;gap:10px;padding:14px;border-radius:16px;background:var(--surface);border:1px solid var(--line);box-shadow:var(--shadow);min-width:0}
 .shift.full{box-shadow:none}
 .shift.mine{border-color:var(--green);box-shadow:0 0 0 2px var(--green-soft)}
@@ -964,17 +992,39 @@ function openPassword(){
     <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" type="submit" id="pwSave">Speichern</button></div></form>`);
 }
 
-const SNOW = Array.from({ length: 18 }, (_, i) => { const r = n => ((Math.sin(i * 97.13 + n * 13.7) + 1) / 2); return `<i style="left:${(r(1) * 100).toFixed(1)}%;font-size:${(8 + r(2) * 12).toFixed(0)}px;animation-duration:${(5 + r(3) * 6).toFixed(1)}s;animation-delay:-${(r(4) * 10).toFixed(1)}s">${i % 3 ? "❄" : "•"}</i>`; }).join("");
+/* Jahreszeiten im Banner: Herbst Blätter, Winter Schnee, Nikolaus, Weihnachten, Frühling Blumen, Sommer Badesaison. Test: ?saison=herbst|winter|nikolaus|weihnachten|fruehling|sommer */
+const rnd = (i, n) => (Math.sin(i * 97.13 + n * 13.7) + 1) / 2;
+const fallers = (count, glyphs, cls, size = [8, 20], dur = [5, 11]) => Array.from({ length: count }, (_, i) => `<i class="fall ${cls}" style="left:${(rnd(i,1) * 100).toFixed(1)}%;font-size:${(size[0] + rnd(i,2) * (size[1] - size[0])).toFixed(0)}px;animation-duration:${(dur[0] + rnd(i,3) * (dur[1] - dur[0])).toFixed(1)}s;animation-delay:-${(rnd(i,4) * 10).toFixed(1)}s">${glyphs[i % glyphs.length]}</i>`).join("");
+function saison(){
+  const q = new URLSearchParams(location.search).get("saison"); if (q) return q;
+  const d = new Date(), m = d.getMonth() + 1, t = d.getDate();
+  if (m === 12 && (t === 5 || t === 6)) return "nikolaus";
+  if (m === 12 && t >= 24 && t <= 26) return "weihnachten";
+  if (m === 12 || m <= 2) return "winter";
+  if (m <= 5) return "fruehling";
+  if (m <= 8) return "sommer";
+  return "herbst";
+}
+const SAISON = { herbst: ["autumn", "🍁"], winter: ["", "❄"], nikolaus: ["", "❄"], weihnachten: ["", "⭐"], fruehling: ["spring", "🌸"], sommer: ["summer", ""] };
+function saisonFx(){
+  const z = saison(); const snow = fallers(16, ["❄","•","❄"], "snow");
+  if (z === "herbst") return fallers(12, ["🍂","🍁","🍂","🍃"], "leaf", [18, 30], [7, 12]);
+  if (z === "nikolaus") return fallers(10, ["❄","•"], "snow") + `<i class="walk"><b>🎅</b><b style="animation-delay:.25s">🎁</b></i>`;
+  if (z === "weihnachten") return fallers(10, ["❄","•","✨"], "snow") + `<i class="sleigh">🦌🦌🛷🎅</i><i class="angel">👼</i>`;
+  if (z === "fruehling") return Array.from({ length: 9 }, (_, i) => `<i class="flower" style="left:${(4 + i * 11 + rnd(i,1) * 5).toFixed(0)}%;font-size:${(18 + rnd(i,2) * 10).toFixed(0)}px;animation-delay:-${(rnd(i,3) * 9).toFixed(1)}s">${["🌷","🌼","🌸","🌱","🌻"][i % 5]}</i>`).join("") + `<i class="butterfly">🦋</i>`;
+  if (z === "sommer") return `<i class="sun">☀️</i><i class="waves w2"></i><i class="waves"></i><i class="swim"><b>🏊‍♀️</b></i><i class="ball">🏐</i>`;
+  return snow;
+}
 function heroHtml(){
   if (!visible("termine") && !visible("standdienst")) return "";
   const mt = visible("termine") ? markttage() : [];
   const meine = visible("standdienst") ? schichtZukunft().filter(isMine) : [];
-  let k = "Weihnachtsmarkt " + new Date().getFullYear(), v = "", s = "";
+  const z = saison(); let k = z === "sommer" ? "Badesaison eröffnet! 🏖️" : z === "fruehling" ? "Der Frühling ist da 🌷" : z === "nikolaus" ? "Der Nikolaus kommt 🎅" : z === "weihnachten" ? "Frohe Weihnachten 🎄" : "Weihnachtsmarkt " + new Date().getFullYear(), v = "", s = "";
   if (mt.length) { const n = Math.round((parseDate(mt[0].datum) - today())/86400000); v = n === 0 ? "Heute ist Markttag! 🎄" : n === 1 ? "Morgen geht's los!" : `Noch ${n} Tage`; s = `${wd(mt[0].datum)}${mt[0].zeit ? " · ab " + mt[0].zeit + " Uhr" : ""}${mt[0].ort ? " · " + mt[0].ort : ""}${mt.length > 1 ? ` · ${mt.length} Markttage` : ""}`; }
   else v = "Gemeinsam organisiert";
   if (meine.length) s += (s ? "<br>" : "") + `Deine nächste Schicht: <b>${esc(wd(meine[0].datum))} ${esc(zeitStr(meine[0]))}</b> · ${esc(meine[0].aufgabe || "")}`;
   else if (visible("standdienst") && schichtZukunft().length) s += (s ? "<br>" : "") + "Du bist noch für keine Schicht eingetragen.";
-  return `<a class="hero" href="${meine.length || schichtZukunft().length ? "#standdienst" : "#termine"}" style="text-decoration:none"><span class="flakes" aria-hidden="true">❄</span><span class="snow" aria-hidden="true">${SNOW}</span><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>${s ? `<span class="s">${s.replace(/\n/g, "")}</span>` : ""}</a>`;
+  return `<a class="hero ${SAISON[saison()]?.[0] || ""}" href="${meine.length || schichtZukunft().length ? "#standdienst" : "#termine"}" style="text-decoration:none"><span class="flakes" aria-hidden="true">${SAISON[saison()]?.[1] ?? "❄"}</span><span class="fx" aria-hidden="true">${saisonFx()}</span><span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>${s ? `<span class="s">${s.replace(/\n/g, "")}</span>` : ""}</a>`;
 }
 function homeTile(k){
   let chip, title = Object.fromEntries(TILES)[k], main = "", sub = "", st = "", num = false;
