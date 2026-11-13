@@ -1555,6 +1555,15 @@ document.addEventListener("change", e => {
 document.addEventListener("input", e => { if (e.target.id === "chat-text") { e.target.style.height = "auto"; e.target.style.height = Math.min(140, e.target.scrollHeight) + "px"; } });
 document.addEventListener("keydown", e => { if (e.target.id === "chat-text" && e.key === "Enter" && !e.shiftKey && !matchMedia("(pointer: coarse)").matches) { e.preventDefault(); e.target.form.requestSubmit(); return; } if (e.key === "Escape" && $("#modalRoot").innerHTML) closeModal(); });
 
+/* Neue Version automatisch laden, sobald die App wieder geöffnet wird */
+const BUILD = "20261114000424";
+let lastCheck = 0;
+async function checkUpdate(){
+  if (Date.now() - lastCheck < 30000) return; lastCheck = Date.now();
+  try { const r = await fetch("./?v=" + Date.now(), { cache: "no-store" }); const t = await r.text(); const m = /const BUILD = "([^"]+)"/.exec(t); if (m && m[1] !== BUILD && !$("#modalRoot").innerHTML && !$("#chat-text")?.value) location.reload(); } catch {}
+}
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") checkUpdate(); });
+setTimeout(checkUpdate, 4000);
 render();
 initStore();
 })();
