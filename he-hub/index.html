@@ -158,6 +158,9 @@ header.top .toolbar{flex:none}
 .chip.bill{background:var(--c-bill-soft);color:var(--c-bill)}
 .chip.bin{background:var(--c-bin-soft);color:var(--c-bin)}
 .chip.bday{background:var(--c-bday-soft);color:var(--c-bday)}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.row3 input,.row2 input{padding-left:8px;padding-right:8px}
 .chip.hours{background:var(--c-bill-soft);color:var(--c-bill)}
 .chip.food{background:var(--c-cal-soft);color:var(--c-cal)}
 .week-nav{display:flex;align-items:center;justify-content:space-between;gap:8px}
@@ -670,7 +673,7 @@ const sum = arr => arr.reduce((s,b) => s + (Number(b.betrag)||0), 0);
 
 /* ---------- Ansichten ---------- */
 function route(){ const h = location.hash.slice(1); return ["fahrzeuge","termine","belege","muell","geburtstage","fixkosten","ablage","ausleihe","forderungen","ideen","einkauf","privattermine","stunden","essen"].includes(h) ? h : ""; }
-window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); });
+window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); if (route() === "essen") setTimeout(() => document.querySelector(".meal-day.today")?.scrollIntoView({ block: "center" }), 50); });
 
 function render(){
   const app = $("#app");
@@ -1102,15 +1105,15 @@ function formStunde(e = {}){
       <label class="f">Kunde<input id="st-kunde" name="kunde" list="stKunden" required value="${esc(e.kunde ?? last.kunde ?? "")}"><datalist id="stKunden">${kundList.map(k => `<option value="${esc(k)}">`).join("")}</datalist></label>
       <label class="f">Baustelle<input id="st-bau" name="baustelle" list="stBau" required value="${esc(e.baustelle ?? last.baustelle ?? "")}"><datalist id="stBau">${bauList.map(k => `<option value="${esc(k)}">`).join("")}</datalist></label>
       <label class="f full">Datum<input id="st-datum" name="datum" type="date" required value="${esc(e.datum || iso(today()))}"></label>
-      <label class="f">Von<input id="st-von" name="von" type="time" value="${esc(e.von || "07:00")}"></label>
+      <div class="full row3"><label class="f">Von<input id="st-von" name="von" type="time" value="${esc(e.von || "07:00")}"></label>
       <label class="f">Bis<input id="st-bis" name="bis" type="time" value="${esc(e.bis || "")}"></label>
-      <label class="f">Pause (Min.)<input id="st-pause" name="pause" inputmode="numeric" value="${esc(e.pause ?? 30)}"></label>
-      <label class="f">oder Stunden direkt<input id="st-std" name="stunden" inputmode="decimal" placeholder="z. B. 7,5" value="${Number(e.stunden) ? esc(String(e.stunden).replace(".", ",")) : ""}"></label>
-      <label class="f">Stundensatz (€/h)<input id="st-satz" name="satz" inputmode="decimal" value="${(e.satz ?? last.satz) ? esc(String(e.satz ?? last.satz).replace(".", ",")) : ""}"></label>
+      <label class="f">Pause (Min.)<input id="st-pause" name="pause" inputmode="numeric" value="${esc(e.pause ?? 30)}"></label></div>
+      <div class="full row2"><label class="f">oder Stunden direkt<input id="st-std" name="stunden" inputmode="decimal" placeholder="z. B. 7,5" value="${Number(e.stunden) ? esc(String(e.stunden).replace(".", ",")) : ""}"></label>
+      <label class="f">Stundensatz (€/h)<input id="st-satz" name="satz" inputmode="decimal" value="${(e.satz ?? last.satz) ? esc(String(e.satz ?? last.satz).replace(".", ",")) : ""}"></label></div>
       <label class="f">Wer?<input id="st-wer" name="wer" value="${esc(e.wer ?? last.wer ?? (member?.name || ""))}"></label>
       <label class="f">Maschine (optional)<input id="st-masch" name="maschine" list="stMasch" placeholder="z. B. Bagger TB235" value="${esc(e.maschine ?? "")}"><datalist id="stMasch">${maschList.map(k => `<option value="${esc(k)}">`).join("")}</datalist></label>
-      <label class="f">Maschinenstunden<input id="st-mstd" name="maschStd" inputmode="decimal" value="${Number(e.maschStd) ? esc(String(e.maschStd).replace(".", ",")) : ""}"></label>
-      <label class="f">Maschinensatz (€/h)<input id="st-msatz" name="maschSatz" inputmode="decimal" value="${(e.maschSatz ?? last.maschSatz) ? esc(String(e.maschSatz ?? last.maschSatz).replace(".", ",")) : ""}"></label>
+      <div class="full row2"><label class="f">Maschinenstunden<input id="st-mstd" name="maschStd" inputmode="decimal" value="${Number(e.maschStd) ? esc(String(e.maschStd).replace(".", ",")) : ""}"></label>
+      <label class="f">Maschinensatz (€/h)<input id="st-msatz" name="maschSatz" inputmode="decimal" value="${(e.maschSatz ?? last.maschSatz) ? esc(String(e.maschSatz ?? last.maschSatz).replace(".", ",")) : ""}"></label></div>
       <label class="f full">Notiz<input id="st-notiz" name="notiz" placeholder="Was wurde gemacht?" value="${esc(e.notiz)}"></label>
     </div>
     <div class="sheet-foot">${e.id ? `<button class="ghost danger" data-act="del" data-id="${e.id}" style="margin-right:auto">Löschen</button>` : ""}<button class="ghost" data-act="close">Abbrechen</button><button class="primary" type="submit" id="saveBtn">Speichern</button></div></form>`);
@@ -1766,7 +1769,7 @@ document.addEventListener("click", e => {
   else if (act === "new-stunde") formStunde();
   else if (act === "std-filter") { stdFilter = el.dataset.f; render(); }
   else if (act === "std-abrechnen") stdAbrechnen(el.dataset.k, el);
-  else if (act === "essen-woche") { essenWoche += Number(el.dataset.d); render(); }
+  else if (act === "essen-woche") { essenWoche += Number(el.dataset.d); render(); if (essenWoche === 0) setTimeout(() => document.querySelector(".meal-day.today")?.scrollIntoView({ block: "center" }), 50); }
   else if (act === "essen-slot") { const e = ofKind("essen").find(x => x.datum === el.dataset.d && (x.mahlzeit || "abend") === el.dataset.m); formEssen(e || { datum: el.dataset.d, mahlzeit: el.dataset.m, wer: member?.name || "" }); }
   else if (act === "essen-zut-eins") { const e = S.items.find(i => i.id === el.dataset.id); if (e) { closeModal(); zutatenAufListe([e]); } }
   else if (act === "essen-zutaten") { const ws = wocheStart(today()); ws.setDate(ws.getDate() + essenWoche * 7); const we = new Date(ws); we.setDate(we.getDate() + 6); const t0 = today(); const items = ofKind("essen").filter(e => { const d = parseDate(e.datum); return d >= ws && d <= we && d >= t0 && e.zutaten; }); if (!items.length) toast("In dieser Woche sind keine Zutaten eingetragen."); else { el.disabled = true; zutatenAufListe(items).finally(() => { el.disabled = false; }); } }
