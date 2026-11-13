@@ -746,6 +746,22 @@ const TERMIN_ART = ["Treffen","Markttag","Aufbau","Abbau","Einkauf","Sonstiges"]
 const sortedTermine = () => ofKind("termin").slice().sort((a,b) => (a.datum+(a.zeit||"")).localeCompare(b.datum+(b.zeit||"")));
 const upcoming = () => sortedTermine().filter(t => (parseDate(t.datum)||0) >= today());
 const markttage = () => upcoming().filter(t => t.art === "Markttag");
+const RSVP = [["ja","✅","Komme"],["vielleicht","❓","Vielleicht"],["nein","❌","Kann nicht"]];
+const rsvpOf = t => Object.entries(t.rsvp || {}).map(([u, v]) => ({ uid: u, ...v }));
+function rsvpHtml(t, isPast){
+  const list = rsvpOf(t), mine = (t.rsvp || {})[uid]?.s;
+  const cnt = k => list.filter(x => x.s === k).length;
+  const sum = `<button class="ghost" data-act="rsvp-list" data-id="${t.id}" style="min-height:34px;padding:4px 10px;font-size:.82rem;justify-content:flex-start">${RSVP.map(([k, e]) => `${e} ${cnt(k)}`).join(" · ")} <span class="muted" style="font-weight:600">– wer kommt?</span></button>`;
+  if (isPast) return list.length ? `<div>${sum}</div>` : "";
+  return `<div style="display:grid;gap:6px;margin-top:4px"><div class="chips-row">${RSVP.map(([k, e, l]) => `<button class="${mine === k ? "on" : ""}" data-act="rsvp" data-id="${t.id}" data-s="${k}" aria-pressed="${mine === k}">${e} ${l}</button>`).join("")}</div>${sum}</div>`;
+}
+function openRsvp(t){
+  const list = rsvpOf(t).sort((a,b) => String(a.name).localeCompare(String(b.name), "de"));
+  const offen = Object.entries(names).filter(([u, n]) => n && !(t.rsvp || {})[u]).map(([, n]) => n).sort((a,b) => a.localeCompare(b, "de"));
+  openModal(`${head(esc(t.titel))}<p class="muted" style="margin:-6px 0 0">${wd(t.datum)}${t.zeit ? " · " + esc(t.zeit) + (t.zeitBis ? "–" + esc(t.zeitBis) : "") + " Uhr" : ""}${t.ort ? " · " + esc(t.ort) : ""}</p>
+    ${RSVP.map(([k, e, l]) => { const n = list.filter(x => x.s === k); return `<div style="display:grid;gap:6px"><div class="eyebrow">${e} ${l} (${n.length})</div>${n.length ? `<div class="helpers">${n.map(x => `<span class="helper" style="${k === "nein" ? "background:var(--crit-soft);color:var(--crit)" : k === "vielleicht" ? "background:var(--warn-soft);color:var(--warn)" : ""}">${esc(x.name || "?")}</span>`).join("")}</div>` : `<span class="muted" style="font-size:.85rem">–</span>`}</div>`; }).join("")}
+    ${offen.length ? `<div style="display:grid;gap:6px"><div class="eyebrow">Noch keine Antwort (${offen.length})</div><div class="helpers">${offen.map(n => `<span class="helper free">${esc(n)}</span>`).join("")}</div></div>` : ""}`);
+}
 function viewTermine(){
   const w = canWrite("termine"); const all = sortedTermine(); const t0 = today();
   const fut = all.filter(t => (parseDate(t.datum)||0) >= t0), past = all.filter(t => (parseDate(t.datum)||0) < t0).reverse();
@@ -753,7 +769,8 @@ function viewTermine(){
     <div class="row ${isPast?"past":""}"><div class="date-block" style="${mt ? "background:var(--red-soft);color:var(--red)" : ""}"><div class="d">${d.getDate()}</div><div class="m">${MONATE[d.getMonth()]}</div></div>
       <div class="main"><span class="t">${mt ? "🎄 " : ""}${esc(t.titel)}</span>
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">${t.art ? `<span class="pill ${mt ? "crit" : "neutral"}">${esc(t.art)}</span>` : ""}<span class="muted" style="font-size:.88rem">${wd(t.datum)}${t.zeit?" · "+esc(t.zeit)+(t.zeitBis ? "–" + esc(t.zeitBis) : "")+" Uhr":""} · ${dayLabel(t.datum)}${t.ort?" · "+esc(t.ort):""}</span></div>
-      ${t.notiz?`<span class="muted" style="font-size:.9rem;white-space:pre-line;overflow-wrap:anywhere">${esc(t.notiz)}</span>`:""}</div>
+      ${t.notiz?`<span class="muted" style="font-size:.9rem;white-space:pre-line;overflow-wrap:anywhere">${esc(t.notiz)}</span>`:""}
+      ${rsvpHtml(t, isPast)}</div>
       ${w ? `<div class="acts"><button data-act="edit" data-id="${t.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${t.id}">Löschen</button></div>` : ""}</div>`; };
   return `<section style="display:grid;gap:16px">
     <div class="view-head">${backBtn}${w ? `<button class="primary" data-act="new-termin">${ICON.plus}Termin</button>` : ""}</div>
@@ -1408,6 +1425,8 @@ document.addEventListener("click", e => {
   else if (act === "reload") refreshAll();
   else if (act === "member-del") { const u = el.dataset.uid; if (el.dataset.sure) { sb.from("fm_members").delete().eq("user_id", u).then(({ error }) => { if (error) toast("Entfernen hat nicht geklappt."); else { closeModal(); toast("Person entfernt"); loadMembers().then(render); } }); } else { el.dataset.sure = "1"; el.textContent = "Wirklich entfernen?"; } }
   else if (act === "seen") markSeen();
+  else if (act === "rsvp" && it) { const s0 = (it.rsvp || {})[uid]?.s; const s = s0 === el.dataset.s ? null : el.dataset.s; el.disabled = true; sb.rpc("fm_termin_rsvp", { item: it.id, s }).then(({ error }) => { if (error) { el.disabled = false; toast("Speichern hat nicht geklappt."); } else { toast(s === "ja" ? "Du kommst ✅" : s === "nein" ? "Abgesagt" : s === "vielleicht" ? "Vielleicht ❓" : "Antwort zurückgenommen"); loadItems(); } }); }
+  else if (act === "rsvp-list" && it) openRsvp(it);
   else if (act === "chat-push" && PUSH.row) { el.disabled = true; const prefs = { ...(PUSH.row.prefs || {}), chat: PUSH.row.prefs?.chat === false }; sb.from("fm_push_subs").update({ prefs }).eq("id", PUSH.row.id).then(({ error }) => { el.disabled = false; if (error) toast("Speichern hat nicht geklappt."); else { PUSH.row.prefs = prefs; toast(prefs.chat ? "Chat-Benachrichtigungen an" : "Chat-Benachrichtigungen aus"); render(); } }); }
   else if (act === "push-all") { if (PUSH.on) { el.disabled = true; (async () => { try { const reg = await navigator.serviceWorker.ready; const sub = await reg.pushManager.getSubscription(); if (sub) { await sb.from("fm_push_subs").delete().eq("endpoint", sub.endpoint); await sub.unsubscribe(); } } catch {} await refreshPush(); toast("Alle Benachrichtigungen aus"); render(); })(); } else enablePush(el).then(render); }
   else if (act === "chat-menu") { const m = chat.find(x => x.id === el.dataset.id); if (m) openModal(`${head("Nachricht")}<p style="margin:0;white-space:pre-wrap;overflow-wrap:anywhere">${esc(m.text)}</p><div class="sheet-foot"><button data-act="chat-copy" data-id="${m.id}">Kopieren</button><button class="primary" style="background:var(--crit);border-color:var(--crit)" data-act="chat-del" data-id="${m.id}">Löschen</button></div>`); }
