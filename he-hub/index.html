@@ -443,7 +443,7 @@ const SB_KEY = "sb_publishable_bEARbfjx56Xq7oUg9GQESA_BILmK_Jm";
 const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 const S = { items: [], mode: "db", ready: false, auth: "loading", email: "" };
 let uid = null, member = null, members = [];
-const TILES = [["privattermine","Private Termine"],["essen","Essensplan"],["einkauf","Einkaufsliste"],["muell","Müllplan"],["geburtstage","Geburtstage"],["ausleihe","Ausleihliste"],["ideen","Ideen"],["fahrzeuge","Fahrzeuge"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["forderungen","Offene Beträge"],["stunden","Baustellen-Stunden"]];
+const TILES = [["privattermine","Private Termine"],["essen","Essensplan"],["einkauf","Einkaufen"],["muell","Müllplan"],["geburtstage","Geburtstage"],["ausleihe","Ausleihliste"],["ideen","Ideen"],["fahrzeuge","Fahrzeuge"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["forderungen","Offene Beträge"],["stunden","Baustellen-Stunden"]];
 const LEVEL = { none: "Kein Zugriff", view: "Ansehen", edit: "Bearbeiten" };
 const me = { owner: false };
 const tileOf = it => ({ fahrzeug:"fahrzeuge", termin:"termine", fix:"fixkosten", muell:"muell", geburtstag:"geburtstage", ausleihe:"ausleihe", forderung:"forderungen", idee:"ideen", einkauf:"einkauf", privtermin:"privattermine", kalquelle:"privattermine", stunde:"stunden", essen:"essen" })[it.kind] || (it.kind === "beleg" ? (it.bereich === "H&E Tools" ? "belege" : "ablage") : "fahrzeuge");
@@ -780,7 +780,7 @@ function homeTile(k){
     if (ab || mi) { main = (ab || mi).gericht; sub = "Heute " + (ab ? "Abend" : "Mittag") + ((ab || mi).wer ? " · kocht " + (ab || mi).wer : ""); }
     else { const m2 = new Date(t); m2.setDate(m2.getDate() + 1); const mo = ofKind("essen").find(e => e.datum === iso(m2)); main = "Heute offen"; sub = mo ? "Morgen: " + mo.gericht : "Was gibt's diese Woche?"; }
   } else if (k === "einkauf") {
-    const o = ekOffen(); chip = ["cart", ICON.cart]; title = "Einkaufsliste";
+    const o = ekOffen(); chip = ["cart", ICON.cart]; title = "Einkaufen";
     if (o.length) { main = `${o.length} Artikel`; sub = o.slice(0, 3).map(i => i.name).join(", ") + (o.length > 3 ? " …" : ""); }
     else { main = "Alles da"; sub = "Liste ist leer"; }
   } else if (k === "privattermine") {
@@ -836,7 +836,7 @@ function openMenu(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
-const PUSH_CATS = [["muell","Müllabfuhr – am Vorabend","muell"],["einkauf","Neues auf der Einkaufsliste","einkauf"],["essen","Neues im Essensplan","essen"],["privat","Meine privaten Termine – am Vorabend","privattermine"],["geburtstag","Geburtstage – am Vortag","geburtstage"],["ausleihe","Ausleihe: Rückgabe morgen / überfällig","ausleihe"],["geld","Überfällige Zahlungen","forderungen"],["fixkosten","Miete & Versicherungen – 3 Tage vorher","fixkosten"],["tuev","TÜV – am 1. und 15. des Monats","fahrzeuge"],["neu","Neue Einträge von anderen (übrige Kacheln)",null]];
+const PUSH_CATS = [["muell","Müllabfuhr – am Vorabend","muell"],["einkauf","Neues bei Einkaufen","einkauf"],["essen","Neues im Essensplan","essen"],["privat","Meine privaten Termine – am Vorabend","privattermine"],["geburtstag","Geburtstage – am Vortag","geburtstage"],["ausleihe","Ausleihe: Rückgabe morgen / überfällig","ausleihe"],["geld","Überfällige Zahlungen","forderungen"],["fixkosten","Miete & Versicherungen – 3 Tage vorher","fixkosten"],["tuev","TÜV – am 1. und 15. des Monats","fahrzeuge"],["neu","Neue Einträge von anderen (übrige Kacheln)",null]];
 const PUSH = { on: false, row: null, endpoint: null };
 const pushSupported = () => ("serviceWorker" in navigator) && ("PushManager" in window) && ("Notification" in window);
 const isIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
@@ -881,7 +881,7 @@ function openPush(){
       ? `<div class="scan-status warn">Auf dem iPhone gehen Benachrichtigungen nur in der installierten App.</div><ol class="muted" style="margin:0;padding-left:20px;display:grid;gap:4px;font-size:.9rem"><li>In Safari unten auf <b>Teilen</b> tippen → <b>„Zum Home-Bildschirm“</b>.</li><li>H&amp;E Hub über das neue Icon öffnen.</li><li>Dort im Menü <b>Benachrichtigungen</b> einschalten.</li></ol>`
       : `<div class="scan-status warn">Dieser Browser unterstützt leider keine Benachrichtigungen. Nimm auf dem iPhone Safari (iOS 16.4 oder neuer), auf Android Chrome.</div>`;
   } else if (!PUSH.on) {
-    body = `<p class="muted" style="margin:0">Du bekommst Nachrichten aufs Handy, z. B. „Morgen Gelber Sack“, wenn dein Partner etwas auf die Einkaufsliste setzt oder eine Zahlung überfällig ist – nur für Kacheln, die du sehen darfst.</p>
+    body = `<p class="muted" style="margin:0">Du bekommst Nachrichten aufs Handy, z. B. „Morgen Gelber Sack“, wenn dein Partner etwas bei Einkaufen einträgt oder eine Zahlung überfällig ist – nur für Kacheln, die du sehen darfst.</p>
       <button class="primary" data-act="push-on">Benachrichtigungen einschalten</button>
       <p class="muted" style="margin:0;font-size:.8rem">Gilt für dieses Gerät. Auf weiteren Geräten einfach dort auch einschalten.</p>`;
   } else {
@@ -1216,7 +1216,7 @@ function viewEssen(){
       <div class="wd">${d.toLocaleDateString("de-DE",{weekday:"short"})}<span>${d.getDate()}.${d.getMonth()+1}.</span></div>
       <div class="meal-slots">${MAHL.map(([m, l]) => { const e = slot(d, m); return `<button class="meal ${e ? "" : "empty-slot"}" ${w || e ? `data-act="essen-slot" data-d="${iso(d)}" data-m="${m}"` : "disabled"}><span class="lbl">${l}</span><span class="g">${e ? esc(e.gericht) : w ? "+ eintragen" : "–"}</span>${e?.wer ? `<span class="who">${esc(e.wer)}</span>` : ""}</button>`; }).join("")}</div>
     </div>`).join("")}</div>
-    ${w && canWrite("einkauf") ? `<button data-act="essen-zutaten" style="justify-self:start">${ICON.cart}Zutaten der Woche auf die Einkaufsliste</button>` : ""}
+    ${w && canWrite("einkauf") ? `<button data-act="essen-zutaten" style="justify-self:start">${ICON.cart}Zutaten der Woche zu Einkaufen</button>` : ""}
   </section>`;
 }
 const kw = d => { const x = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())); const day = x.getUTCDay() || 7; x.setUTCDate(x.getUTCDate() + 4 - day); const y0 = new Date(Date.UTC(x.getUTCFullYear(), 0, 1)); return Math.ceil(((x - y0) / 86400000 + 1) / 7); };
@@ -1230,7 +1230,7 @@ function formEssen(e){
       <label class="f full">Wer kocht?<input id="es-wer" name="wer" value="${esc(e.wer)}" ${w ? "" : "readonly"}></label>
       <label class="f full">Zutaten (eine pro Zeile)<textarea id="es-zut" name="zutaten" rows="5" placeholder="500 g Spätzle&#10;200 g Bergkäse&#10;2 Zwiebeln" ${w ? "" : "readonly"}>${esc(e.zutaten)}</textarea></label>
     </div>
-    <div class="sheet-foot">${e.id && w ? `<button class="ghost danger" data-act="del" data-id="${e.id}" style="margin-right:auto">Löschen</button>` : ""}${e.id && e.zutaten && canWrite("einkauf") ? `<button type="button" data-act="essen-zut-eins" data-id="${e.id}">Auf Einkaufsliste</button>` : ""}<button class="ghost" data-act="close">${w ? "Abbrechen" : "Schließen"}</button>${w ? `<button class="primary" type="submit" id="saveBtn">Speichern</button>` : ""}</div></form>`);
+    <div class="sheet-foot">${e.id && w ? `<button class="ghost danger" data-act="del" data-id="${e.id}" style="margin-right:auto">Löschen</button>` : ""}${e.id && e.zutaten && canWrite("einkauf") ? `<button type="button" data-act="essen-zut-eins" data-id="${e.id}">Zu Einkaufen</button>` : ""}<button class="ghost" data-act="close">${w ? "Abbrechen" : "Schließen"}</button>${w ? `<button class="primary" type="submit" id="saveBtn">Speichern</button>` : ""}</div></form>`);
   window.__gerichte = gerichte;
 }
 async function zutatenAufListe(items){
@@ -1245,7 +1245,7 @@ async function zutatenAufListe(items){
     await sb.from("he_items").insert({ tile: "einkauf", kind: "einkauf", data: { name, menge, erledigt: false } });
   }
   await loadItems();
-  toast(n ? `${n} Zutat${n === 1 ? "" : "en"} auf die Einkaufsliste gesetzt` : "Alles schon auf der Liste");
+  toast(n ? `${n} Zutat${n === 1 ? "" : "en"} zu Einkaufen hinzugefügt` : "Alles steht schon bei Einkaufen");
 }
 
 /* ---------- Einkaufsliste ---------- */
@@ -1258,7 +1258,7 @@ function viewEinkauf(){
   const item = i => `<div class="shop-item ${i.erledigt ? "done" : ""}">${w ? `<button class="check" data-act="ek-toggle" data-id="${i.id}" aria-label="${i.erledigt ? "Wieder auf die Liste" : "Abhaken"}"></button>` : ""}<span class="t">${esc(i.name)}</span>${i.menge ? `<span class="m">${esc(i.menge)}</span>` : ""}</div>`;
   return `<section style="display:grid;gap:12px">
     <div class="view-head">${backBtn}${w && done.length ? `<button class="ghost danger" data-act="ek-clear">Erledigte löschen (${done.length})</button>` : ""}</div>
-    <h2 class="page-title">Einkaufsliste</h2>
+    <h2 class="page-title">Einkaufen</h2>
     ${w ? `<form id="einkaufFrm" class="shop-add"><input id="ek-name" name="name" placeholder="Was fehlt?" autocomplete="off" enterkeyhint="done" required><input id="ek-menge" name="menge" placeholder="Menge" autocomplete="off"><button class="primary" type="submit" aria-label="Hinzufügen">+</button></form>` : ""}
     ${w && vorschlag.length ? `<div class="chips-row">${vorschlag.map(i => `<button data-act="ek-again" data-id="${i.id}">+ ${esc(i.name)}</button>`).join("")}</div>` : ""}
     ${offen.length ? `<div class="shop-list">${offen.map(item).join("")}</div>` : `<div class="empty">Die Liste ist leer – alles da.</div>`}
