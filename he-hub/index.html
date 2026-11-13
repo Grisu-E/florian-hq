@@ -131,6 +131,9 @@ header.top{display:flex;justify-content:space-between;align-items:center;gap:12p
 .chip.bill{background:var(--c-bill-soft);color:var(--c-bill)}
 .chip.bin{background:var(--c-bin-soft);color:var(--c-bin)}
 .chip.bday{background:var(--c-bday-soft);color:var(--c-bday)}
+.chip.money{background:var(--ok-soft);color:var(--ok)}
+.debtor{display:grid;gap:10px}
+.debtor-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap;padding:0 4px}
 .chip.lend{background:var(--c-car-soft);color:var(--c-car)}
 .tag-tracker{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:700;color:var(--muted);background:var(--sunken);border-radius:999px;padding:3px 9px}
 .tag-tracker svg.i{width:13px;height:13px}
@@ -327,6 +330,7 @@ const ICON = {
   plus:'<svg class="i" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>',
   back:'<svg class="i" viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>',
   bin:'<svg class="i" viewBox="0 0 24 24"><path d="M4 7h16M10 4h4a1 1 0 0 1 1 1v2H9V5a1 1 0 0 1 1-1zM6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M10 11v6M14 11v6"/></svg>',
+  money:'<svg class="i" viewBox="0 0 24 24"><rect x="3" y="6" width="18" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6.5 9.5v.01M17.5 14.5v.01"/></svg>',
   lend:'<svg class="i" viewBox="0 0 24 24"><path d="M3 8l9-4 9 4-9 4z"/><path d="M3 8v8l9 4 9-4V8M12 12v8"/></svg>',
   tag:'<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.5"/></svg>',
   cake:'<svg class="i" viewBox="0 0 24 24"><path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7M5 16c1.5 1 3 1 4.5 0s3-1 4.5 0 3 1 5 0M12 12V8M12 5.5c.8-.6 1-1.4 0-2.5-1 1.1-.8 1.9 0 2.5z"/></svg>',
@@ -356,10 +360,10 @@ const SB_KEY = "sb_publishable_bEARbfjx56Xq7oUg9GQESA_BILmK_Jm";
 const sb = window.supabase.createClient(SB_URL, SB_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 const S = { items: [], mode: "db", ready: false, auth: "loading", email: "" };
 let uid = null, member = null, members = [];
-const TILES = [["fahrzeuge","Fahrzeuge"],["termine","Termine"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["muell","Müllplan"],["geburtstage","Geburtstage"],["ausleihe","Ausleihliste"]];
+const TILES = [["fahrzeuge","Fahrzeuge"],["termine","Termine"],["belege","Rechnungen H&E Tools"],["ablage","Wichtige Rechnungen"],["fixkosten","Miete & Versicherungen"],["muell","Müllplan"],["geburtstage","Geburtstage"],["ausleihe","Ausleihliste"],["forderungen","Offene Beträge"]];
 const LEVEL = { none: "Kein Zugriff", view: "Ansehen", edit: "Bearbeiten" };
 const me = { owner: false };
-const tileOf = it => ({ fahrzeug:"fahrzeuge", termin:"termine", fix:"fixkosten", muell:"muell", geburtstag:"geburtstage", ausleihe:"ausleihe" })[it.kind] || (it.kind === "beleg" ? (it.bereich === "H&E Tools" ? "belege" : "ablage") : "fahrzeuge");
+const tileOf = it => ({ fahrzeug:"fahrzeuge", termin:"termine", fix:"fixkosten", muell:"muell", geburtstag:"geburtstage", ausleihe:"ausleihe", forderung:"forderungen" })[it.kind] || (it.kind === "beleg" ? (it.bereich === "H&E Tools" ? "belege" : "ablage") : "fahrzeuge");
 const lvl = t => me.owner ? "edit" : ((member?.tiles || {})[t] || "none");
 const visible = t => lvl(t) !== "none";
 const canWrite = t => lvl(t) === "edit";
@@ -586,7 +590,7 @@ const belegeJahr = (y, ber = belegBereich) => ofKind("beleg").filter(b => String
 const sum = arr => arr.reduce((s,b) => s + (Number(b.betrag)||0), 0);
 
 /* ---------- Ansichten ---------- */
-function route(){ const h = location.hash.slice(1); return ["fahrzeuge","termine","belege","muell","geburtstage","fixkosten","ablage","ausleihe"].includes(h) ? h : ""; }
+function route(){ const h = location.hash.slice(1); return ["fahrzeuge","termine","belege","muell","geburtstage","fixkosten","ablage","ausleihe","forderungen"].includes(h) ? h : ""; }
 window.addEventListener("hashchange", () => { render(); window.scrollTo(0,0); });
 
 function render(){
@@ -596,7 +600,7 @@ function render(){
   if (!S.ready) { app.innerHTML = `<div class="empty">H&amp;E Hub wird geladen …</div>`; return; }
   let r = route(); if (r && !visible(r)) r = "";
   const hb = $("#homeBtn"); if (hb) { hb.classList.toggle("on", !r); hb.closest(".homebar").hidden = S.auth !== "ok"; }
-  app.innerHTML = r === "fahrzeuge" ? viewFahrzeuge() : r === "termine" ? viewTermine() : r === "belege" ? viewBelege() : r === "muell" ? viewMuell() : r === "geburtstage" ? viewGeburtstage() : r === "fixkosten" ? viewFix() : r === "ablage" ? viewAblage() : r === "ausleihe" ? viewAusleihe() : viewHome();
+  app.innerHTML = r === "fahrzeuge" ? viewFahrzeuge() : r === "termine" ? viewTermine() : r === "belege" ? viewBelege() : r === "muell" ? viewMuell() : r === "geburtstage" ? viewGeburtstage() : r === "fixkosten" ? viewFix() : r === "ablage" ? viewAblage() : r === "ausleihe" ? viewAusleihe() : r === "forderungen" ? viewForderungen() : viewHome();
 }
 
 const urlErr = (() => { const h = new URLSearchParams(location.hash.slice(1)); return h.get("error_code") || h.get("error") || ""; })();
@@ -681,6 +685,13 @@ function homeTile(k){
     if (nx.length) { const d0 = nx[0].d; const arts = [...new Set(nx.filter(x => +x.d === +d0).map(x => x.m.label || x.m.art))]; const n = Math.round((d0 - t)/86400000);
       main = arts.join(" + "); sub = `${dayLabelD(d0)} · ${d0.toLocaleDateString("de-DE",{ weekday:"short" })} ${dd(d0)}`; st = n === 0 ? "warn" : n === 1 ? "crit" : ""; }
     else { main = "Keine Termine"; sub = "Kalender " + (+AWA.bis.slice(0,4) + 1) + " fehlt"; }
+  } else if (k === "forderungen") {
+    const o = offeneFord(); chip = ["money", ICON.money]; title = "Offene Beträge";
+    if (o.length) { const ueber = o.filter(f => fordStatus(f).cls === "crit"); const wer = new Set(o.map(f => f.kunde)).size;
+      main = eur.format(o.reduce((s,f) => s + offenBetrag(f), 0)); num = true;
+      sub = ueber.length ? `${ueber.length} überfällig · ${wer} Schuldner` : `${wer} Schuldner · ${o.length} Rechnung${o.length === 1 ? "" : "en"}`;
+      st = ueber.length ? "crit" : o.some(f => fordStatus(f).cls === "warn") ? "warn" : ""; }
+    else { main = "Alles bezahlt"; sub = "Baustellen-Beträge"; }
   } else if (k === "ausleihe") {
     const o = offenAus(); chip = ["lend", ICON.lend]; title = "Ausleihliste";
     if (o.length) { const s0 = ausStatus(o[0]); const ueber = o.filter(a => ausStatus(a).cls === "crit").length;
@@ -726,6 +737,7 @@ function hinweise(){
     if (heute.length) out.push({ cls: "warn", icon: ICON.bin, href: "#muell", text: `<b>Heute Abfuhr:</b> ${esc([...new Set(heute)].join(" + "))} – bis 6 Uhr bereitstellen` });
     if (morgen.length) out.push({ cls: "crit", icon: ICON.bin, href: "#muell", text: `<b>Morgen Abfuhr:</b> ${esc([...new Set(morgen)].join(" + "))} – heute Abend rausstellen` });
   }
+  if (visible("forderungen")) { const ue = offeneFord().filter(f => fordStatus(f).cls === "crit"); if (ue.length) out.push({ cls: "crit", icon: ICON.money, href: "#forderungen", text: `<b>${ue.length} Zahlung${ue.length === 1 ? "" : "en"} überfällig:</b> ${esc([...new Set(ue.map(f => f.kunde))].join(", "))} – ${eur.format(ue.reduce((s,f) => s + offenBetrag(f), 0))}` }); }
   if (visible("ausleihe")) for (const a of offenAus()) { const s = ausStatus(a); if (s.cls === "crit" || s.cls === "warn") out.push({ cls: s.cls, icon: ICON.lend, href: "#ausleihe", text: `<b>${esc(a.gegenstand)}</b> ${esc(ausWer(a))}: ${esc(s.txt)}` }); }
   if (me.owner) { const p = members.filter(m => m.status === "pending").length; if (p) out.push({ cls: "warn", icon: ICON.people, href: "#", act: "share", text: `<b>${p} ${p === 1 ? "Person wartet" : "Personen warten"} auf Freigabe</b> – jetzt Kacheln freigeben` }); }
   if (visible("fahrzeuge")) {
@@ -748,7 +760,7 @@ async function loadNames(ids){
   need.forEach(i => { if (!(i in names)) names[i] = ""; });
   namesPending = false; render();
 }
-const itemTitle = it => it.kind === "fahrzeug" ? (it.kennzeichen || it.name) : it.kind === "termin" ? it.titel : it.kind === "beleg" ? (it.haendler || "Rechnung") : it.kind === "fix" ? it.name : it.kind === "muell" ? it.art : it.kind === "geburtstag" ? it.name : it.kind === "ausleihe" ? it.gegenstand : "Eintrag";
+const itemTitle = it => it.kind === "fahrzeug" ? (it.kennzeichen || it.name) : it.kind === "termin" ? it.titel : it.kind === "beleg" ? (it.haendler || "Rechnung") : it.kind === "fix" ? it.name : it.kind === "muell" ? it.art : it.kind === "geburtstag" ? it.name : it.kind === "ausleihe" ? it.gegenstand : it.kind === "forderung" ? `${it.kunde} – ${it.baustelle}` : "Eintrag";
 function neuigkeiten(){
   if (S.mode !== "db") return { tiles: [], changes: [] };
   const vis = TILES.map(([k]) => k).filter(visible);
@@ -947,6 +959,77 @@ function viewMuell(){
       </div>`).join("")}</div>`
       : `<div class="empty">Für zusätzliche Abholungen, z. B. Sperrmüll nach Anmeldung.</div>`}
   </section>`;
+}
+
+/* ---------- Offene Beträge (Baustellen) ---------- */
+const offenBetrag = f => Math.max(0, Math.round(((Number(f.betrag) || 0) - (Number(f.bezahlt) || 0)) * 100) / 100);
+const offeneFord = () => ofKind("forderung").filter(f => offenBetrag(f) > 0).sort((a,b) => String(a.faellig || a.datum || "9999").localeCompare(String(b.faellig || b.datum || "9999")));
+function fordStatus(f){
+  if (offenBetrag(f) <= 0) return { cls: "neutral", txt: f.bezahltAm ? `Bezahlt am ${fmtDate(f.bezahltAm)}` : "Bezahlt" };
+  const d = parseDate(f.faellig); if (!d) return { cls: "ok", txt: "Ohne Fälligkeit" };
+  const n = Math.round((d - today())/86400000);
+  if (n < 0) return { cls: "crit", txt: `Überfällig seit ${-n} Tag${n === -1 ? "" : "en"}` };
+  if (n <= 7) return { cls: "warn", txt: n === 0 ? "Heute fällig" : `Fällig in ${n} Tag${n === 1 ? "" : "en"}` };
+  return { cls: "ok", txt: `Fällig am ${fmtDate(f.faellig)}` };
+}
+let fordFilter = "offen";
+function viewForderungen(){
+  const w = canWrite("forderungen");
+  const offen = offeneFord();
+  const summe = offen.reduce((s,f) => s + offenBetrag(f), 0);
+  const ueber = offen.filter(f => fordStatus(f).cls === "crit");
+  const row = f => { const st = fordStatus(f); const rest = offenBetrag(f); return `
+    <div class="row ${rest > 0 ? "ampel-row " + st.cls : "past"}" style="grid-template-columns:1fr auto">
+      <div class="main"><span class="t">${esc(f.baustelle || "Baustelle")}${f.rechnungsnr ? ` <span class="muted" style="font-weight:500">· Nr. ${esc(f.rechnungsnr)}</span>` : ""}</span>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><span class="pill ${st.cls}">${esc(st.txt)}</span>${Number(f.bezahlt) > 0 && rest > 0 ? `<span class="muted" style="font-size:.85rem">${eur.format(f.bezahlt)} von ${eur.format(f.betrag)} bezahlt</span>` : ""}</div>
+        <span class="muted" style="font-size:.85rem">Rechnung vom ${fmtDate(f.datum)}${f.notiz ? " · " + esc(f.notiz) : ""}</span>
+        ${w ? `<div class="toolbar" style="margin-top:4px">${rest > 0 ? `<button class="primary" data-act="ford-zahlung" data-id="${f.id}">Zahlung erfassen</button>` : `<button data-act="ford-offen" data-id="${f.id}">Wieder öffnen</button>`}<button data-act="edit" data-id="${f.id}">Bearbeiten</button><button class="ghost danger" data-act="del" data-id="${f.id}">Löschen</button></div>` : ""}
+      </div>
+      <span class="amount" style="align-self:start;font-size:1.05rem">${eur.format(rest > 0 ? rest : f.betrag)}</span>
+    </div>`; };
+  let body;
+  if (fordFilter === "offen") {
+    const wer = [...new Set(offen.map(f => f.kunde || "Ohne Namen"))].map(k => ({ k, items: offen.filter(f => (f.kunde || "Ohne Namen") === k) })).map(g => ({ ...g, sum: g.items.reduce((s,f) => s + offenBetrag(f), 0) })).sort((a,b) => b.sum - a.sum);
+    body = wer.length ? wer.map(g => `<div class="debtor"><div class="debtor-head"><h3>${esc(g.k)}</h3><span class="amount" style="color:var(--crit)">${eur.format(g.sum)}</span></div><div class="list">${g.items.map(row).join("")}</div></div>`).join("")
+      : `<div class="empty">Niemand schuldet dir gerade Geld.</div>`;
+  } else {
+    const bez = ofKind("forderung").filter(f => offenBetrag(f) <= 0).sort((a,b) => String(b.bezahltAm || "").localeCompare(String(a.bezahltAm || "")));
+    body = bez.length ? `<div class="list">${bez.map(f => row(f).replace('<span class="t">', `<span class="t">${esc(f.kunde || "")} · `)).join("")}</div>` : `<div class="empty">Noch nichts bezahlt.</div>`;
+  }
+  return `<section style="display:grid;gap:16px">
+    <div class="view-head">${backBtn}${w ? `<button class="primary" data-act="new-forderung">${ICON.plus}Betrag eintragen</button>` : ""}</div>
+    <h2 class="page-title">Offene Beträge</h2>
+    <div class="sums">
+      <div class="sum total"><span class="k">Noch offen</span><span class="v num">${eur.format(summe)}</span></div>
+      <div class="sum"><span class="k">Schuldner</span><span class="v num">${new Set(offen.map(f => f.kunde || "")).size}</span></div>
+      <div class="sum" ${ueber.length ? 'style="border-color:var(--crit)"' : ""}><span class="k">Überfällig</span><span class="v num" ${ueber.length ? 'style="color:var(--crit)"' : ""}>${eur.format(ueber.reduce((s,f) => s + offenBetrag(f), 0))}</span></div>
+    </div>
+    <div class="seg" role="tablist">${[["offen",`Offen (${offen.length})`],["bezahlt","Bezahlt"]].map(([k,l]) => `<button role="tab" class="${fordFilter===k?"on":""}" aria-selected="${fordFilter===k}" data-act="ford-filter" data-f="${k}">${l}</button>`).join("")}</div>
+    ${body}
+  </section>`;
+}
+function formForderung(f = {}){
+  const kunden = [...new Set(ofKind("forderung").map(x => x.kunde).filter(Boolean))];
+  openModal(`<form id="frm" data-kind="forderung" data-id="${f.id||""}" style="display:grid;gap:14px">${head(f.id ? "Betrag bearbeiten" : "Offenen Betrag eintragen")}
+    <div class="fields">
+      <label class="f">Wer schuldet?<input id="fo-kunde" name="kunde" list="kundenList" required placeholder="Kunde / Name" value="${esc(f.kunde)}"><datalist id="kundenList">${kunden.map(k => `<option value="${esc(k)}">`).join("")}</datalist></label>
+      <label class="f">Baustelle / Auftrag<input id="fo-bau" name="baustelle" required placeholder="z. B. Aushub Garage Müller" value="${esc(f.baustelle)}"></label>
+      <label class="f">Betrag (€)<input id="fo-betrag" name="betrag" inputmode="decimal" required placeholder="0,00" value="${f.betrag != null ? esc(String(f.betrag).replace(".", ",")) : ""}"></label>
+      <label class="f">Schon bezahlt (€)<input id="fo-bez" name="bezahlt" inputmode="decimal" placeholder="0,00" value="${Number(f.bezahlt) ? esc(String(f.bezahlt).replace(".", ",")) : ""}"></label>
+      <label class="f">Rechnungsdatum<input id="fo-datum" name="datum" type="date" required value="${esc(f.datum || iso(today()))}"></label>
+      <label class="f">Fällig am<input id="fo-faellig" name="faellig" type="date" value="${esc(f.faellig || (() => { const d = parseDate(f.datum) || today(); d.setDate(d.getDate() + 14); return iso(d); })())}"></label>
+      <label class="f">Rechnungsnummer (optional)<input id="fo-nr" name="rechnungsnr" value="${esc(f.rechnungsnr)}"></label>
+      <label class="f">Notiz<input id="fo-notiz" name="notiz" placeholder="Mahnung, Absprache …" value="${esc(f.notiz)}"></label>
+    </div>${foot()}</form>`);
+}
+function formZahlung(f){
+  openModal(`<form id="zahlFrm" data-id="${f.id}" style="display:grid;gap:14px">${head("Zahlung erfassen")}
+    <p class="muted" style="margin:0">${esc(f.kunde)} · ${esc(f.baustelle)} – noch offen: <b>${eur.format(offenBetrag(f))}</b></p>
+    <div class="fields">
+      <label class="f">Betrag (€)<input id="za-betrag" name="betrag" inputmode="decimal" required value="${esc(String(offenBetrag(f)).replace(".", ","))}"></label>
+      <label class="f">Bezahlt am<input id="za-datum" name="datum" type="date" required value="${iso(today())}"></label>
+    </div>
+    <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" type="submit" id="zaSave">Speichern</button></div></form>`);
 }
 
 /* ---------- Ausleihliste ---------- */
@@ -1236,6 +1319,12 @@ async function submitForm(form){
   try {
     let obj;
     if (kind === "fahrzeug") obj = { ...old, kind, kennzeichen: fd.kennzeichen.trim().toUpperCase(), name: fd.name.trim(), tuev: fd.tuev || "", km: fd.km ? parseInt(fd.km.replace(/\D/g,""),10) || "" : "", notiz: fd.notiz.trim() };
+    else if (kind === "forderung") {
+      const betrag = parseAmount(fd.betrag), bez = fd.bezahlt ? parseAmount(fd.bezahlt) : 0;
+      if (!isFinite(betrag)) { btn.disabled = false; btn.textContent = "Speichern"; $("#fo-betrag").focus(); toast("Bitte einen gültigen Betrag eingeben, z. B. 1.250,00"); return; }
+      const bezahlt = isFinite(bez) ? Math.round(bez*100)/100 : 0;
+      obj = { ...old, kind, kunde: fd.kunde.trim(), baustelle: fd.baustelle.trim(), betrag: Math.round(betrag*100)/100, bezahlt, datum: fd.datum, faellig: fd.faellig || "", rechnungsnr: fd.rechnungsnr.trim(), notiz: fd.notiz.trim(), bezahltAm: bezahlt >= betrag ? (old.bezahltAm || iso(today())) : "" };
+    }
     else if (kind === "ausleihe") obj = { ...old, kind, gegenstand: fd.gegenstand.trim(), richtung: fd.richtung, person: fd.person.trim(), seit: fd.seit, bis: fd.bis || "", tracker: fd.tracker.trim(), notiz: fd.notiz.trim(), zurueckAm: old.zurueckAm || "" };
     else if (kind === "fix") {
       const betrag = parseAmount(fd.betrag);
@@ -1268,7 +1357,7 @@ async function submitForm(form){
 
 function confirmDelete(id){
   const it = S.items.find(i => i.id === id); if (!it) return;
-  const what = it.kind === "ausleihe" ? `„${it.gegenstand}“ aus der Ausleihliste` : it.kind === "fix" ? `die Zahlung „${it.name}“` : it.kind === "muell" ? `die Tonne „${it.art}“` : it.kind === "geburtstag" ? `den Geburtstag von ${it.name}` : it.kind === "fahrzeug" ? `das Fahrzeug ${it.kennzeichen}` : it.kind === "termin" ? `den Termin „${it.titel}“` : `die Rechnung von ${it.haendler || "–"} über ${eur.format(it.betrag||0)}`;
+  const what = it.kind === "forderung" ? `den Betrag ${eur.format(it.betrag||0)} von ${it.kunde}` : it.kind === "ausleihe" ? `„${it.gegenstand}“ aus der Ausleihliste` : it.kind === "fix" ? `die Zahlung „${it.name}“` : it.kind === "muell" ? `die Tonne „${it.art}“` : it.kind === "geburtstag" ? `den Geburtstag von ${it.name}` : it.kind === "fahrzeug" ? `das Fahrzeug ${it.kennzeichen}` : it.kind === "termin" ? `den Termin „${it.titel}“` : `die Rechnung von ${it.haendler || "–"} über ${eur.format(it.betrag||0)}`;
   openModal(`${head("Löschen?")}<p style="margin:0">Möchtest du ${esc(what)} wirklich löschen? Das lässt sich nicht rückgängig machen.</p>
     <div class="sheet-foot"><button class="ghost" data-act="close">Abbrechen</button><button class="primary" style="background:var(--crit);border-color:var(--crit)" data-act="del-yes" data-id="${id}">Löschen</button></div>`);
 }
@@ -1307,6 +1396,10 @@ document.addEventListener("click", e => {
   else if (act === "new-termin") formTermin();
   else if (act === "new-muell") formMuell();
   else if (act === "new-ausleihe") formAusleihe();
+  else if (act === "new-forderung") formForderung();
+  else if (act === "ford-filter") { fordFilter = el.dataset.f; render(); }
+  else if (act === "ford-zahlung") { const it = S.items.find(i => i.id === el.dataset.id); if (it) formZahlung(it); }
+  else if (act === "ford-offen") { const it = S.items.find(i => i.id === el.dataset.id); if (it) saveItem({ ...it, bezahlt: 0, bezahltAm: "" }).then(() => toast("Wieder offen"), () => toast("Speichern hat nicht geklappt.")); }
   else if (act === "aus-filter") { ausFilter = el.dataset.f; render(); }
   else if (act === "aus-zurueck" || act === "aus-offen") { const it = S.items.find(i => i.id === el.dataset.id); if (it) { el.disabled = true; saveItem({ ...it, zurueckAm: act === "aus-zurueck" ? iso(today()) : "" }).then(() => toast(act === "aus-zurueck" ? "Als zurückgegeben markiert" : "Wieder offen"), () => { el.disabled = false; toast("Speichern hat nicht geklappt."); }); } }
   else if (act === "home") { closeModal(); if (location.hash && location.hash !== "#") location.hash = ""; else render(); window.scrollTo({ top: 0, behavior: "smooth" }); }
@@ -1323,7 +1416,7 @@ document.addEventListener("click", e => {
   else if (act === "new-geburtstag") formGeburtstag();
   else if (act === "new-beleg") formBeleg();
   else if (act === "new-ablage") formBeleg({}, ABLAGE);
-  else if (act === "edit") { const it = S.items.find(i => i.id === el.dataset.id); if (!it) return; ({fahrzeug:formFahrzeug, termin:formTermin, beleg:formBeleg, muell:formMuell, geburtstag:formGeburtstag, fix:formFix, ausleihe:formAusleihe})[it.kind]?.(it); }
+  else if (act === "edit") { const it = S.items.find(i => i.id === el.dataset.id); if (!it) return; ({fahrzeug:formFahrzeug, termin:formTermin, beleg:formBeleg, muell:formMuell, geburtstag:formGeburtstag, fix:formFix, ausleihe:formAusleihe, forderung:formForderung})[it.kind]?.(it); }
   else if (act === "del") confirmDelete(el.dataset.id);
   else if (act === "del-yes") { deleteItem(el.dataset.id).then(() => { closeModal(); toast("Gelöscht"); }, () => toast("Löschen hat nicht geklappt.")); }
   else if (act === "export") exportCsv();
@@ -1333,6 +1426,18 @@ document.addEventListener("click", e => {
 document.addEventListener("submit", async e => {
   e.preventDefault();
   if (e.target.id === "loginFrm") return sendLink(e.target, e.submitter);
+  if (e.target.id === "zahlFrm") {
+    const it = S.items.find(i => i.id === e.target.dataset.id); if (!it) return closeModal();
+    const fd = new FormData(e.target); const z = parseAmount(fd.get("betrag"));
+    if (!isFinite(z) || z <= 0) return toast("Bitte einen gültigen Betrag eingeben.");
+    const bezahlt = Math.round(((Number(it.bezahlt) || 0) + z) * 100) / 100;
+    const voll = bezahlt >= (Number(it.betrag) || 0) - 0.004;
+    const notiz = [it.notiz, `${fmtDate(String(fd.get("datum")))}: ${eur.format(z)} erhalten`].filter(Boolean).join(" · ");
+    $("#zaSave").disabled = true;
+    try { await saveItem({ ...it, bezahlt, bezahltAm: voll ? String(fd.get("datum")) : "", notiz }); closeModal(); toast(voll ? "Vollständig bezahlt" : "Teilzahlung gespeichert"); }
+    catch { $("#zaSave").disabled = false; toast("Speichern hat nicht geklappt."); }
+    return;
+  }
   if (e.target.id === "pwFrm") {
     const fd = new FormData(e.target);
     if (fd.get("pw1") !== fd.get("pw2")) return toast("Die Passwörter stimmen nicht überein.");
