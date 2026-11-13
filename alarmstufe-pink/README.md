@@ -1,4 +1,4 @@
-# Glut & Glitzer – App der Feuerwehrmädels
+# Alarmstufe Pink – App der Feuerwehrmädels
 
 Weihnachtsmarkt-Orga für die Feuerwehrmädels: Standdienst zum Selbst-Eintragen, Aufgaben, Termine & Treffen, Einkaufsliste, Material & Deko, Angebot & Preise, Kasse, Infos & Kontakte.
 

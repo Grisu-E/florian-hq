@@ -1,5 +1,5 @@
-// Glut & Glitzer – Service Worker: App-Hülle offline verfügbar, Daten immer frisch aus Supabase
-const CACHE = "glitzer-v4";
+// Alarmstufe Pink – Service Worker: App-Hülle offline verfügbar, Daten immer frisch aus Supabase
+const CACHE = "pink-v1";
 const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icons/icon-192.png", "./icons/icon-512.png", "./icons/apple-touch-icon.png"];
 
 self.addEventListener("install", e => {
@@ -22,7 +22,7 @@ self.addEventListener("fetch", e => {
 self.addEventListener("push", e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch (_) { d = { body: e.data ? e.data.text() : "" }; }
-  e.waitUntil(self.registration.showNotification(d.title || "Glut & Glitzer", {
+  e.waitUntil(self.registration.showNotification(d.title || "Alarmstufe Pink", {
     body: d.body || "",
     icon: "icons/icon-192.png",
     badge: "icons/icon-192.png",
