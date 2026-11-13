@@ -122,7 +122,9 @@ header.top .toolbar{flex:none}
 .t2-top{display:flex;align-items:center;gap:8px;min-width:0}
 .t2 .chip{width:34px;height:34px;border-radius:11px;flex:none}
 .t2 .chip svg.i{width:18px;height:18px}
-.t2-title{font-weight:800;font-size:.95rem;letter-spacing:-.01em;line-height:1.15;min-width:0;overflow-wrap:anywhere}
+.t2-title{font-weight:800;font-size:.92rem;letter-spacing:-.01em;line-height:1.15;min-width:0;overflow-wrap:normal;word-break:normal;-webkit-hyphens:auto;hyphens:auto}
+.t2-main,.t2-sub{overflow-wrap:break-word;-webkit-hyphens:auto;hyphens:auto}
+@media (max-width:380px){.t2 .chip{width:30px;height:30px}.t2-top{gap:7px}}
 .t2-body{display:grid;align-content:end;gap:2px;min-width:0}
 .t2-main{font-weight:700;font-size:1.02rem;line-height:1.25;overflow-wrap:anywhere}
 .t2-main.num{font-size:1.25rem}
