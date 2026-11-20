@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Stallwache</title>
+<meta name="theme-color" content="#16140f">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#16140f; --bg2:#1f1c16; --card:#26221b; --card2:#2f2a21; --line:#3a3428;
+  --text:#f4efe4; --muted:#a99f8c; --yolk:#f2b33d; --yolk2:#ffcf6e; --comb:#e0533f;
+  --ok:#5cb874; --warn:#f2b33d; --bad:#e0533f; --blue:#6aa7e0;
+  --r:16px; --sh:0 6px 24px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-tap-highlight-color:transparent}
+body{min-height:100vh;padding-bottom:env(safe-area-inset-bottom)}
+a{color:var(--yolk2)}
+button,input,select,textarea{font:inherit;color:inherit}
+.wrap{max-width:860px;margin:0 auto;padding:0 16px 40px}
+header.top{position:sticky;top:0;z-index:20;background:rgba(22,20,15,.92);backdrop-filter:blur(10px);border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
+header.top .in{max-width:860px;margin:0 auto;display:flex;align-items:center;gap:12px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;font-size:20px;letter-spacing:.2px;cursor:pointer}
+.brand img{width:36px;height:36px}
+.brand small{display:block;font-weight:500;font-size:12px;color:var(--muted);letter-spacing:0}
+.sp{flex:1}
+.iconbtn{background:var(--card);border:1px solid var(--line);border-radius:12px;width:40px;height:40px;display:grid;place-items:center;cursor:pointer;font-size:18px}
+.back{background:none;border:none;color:var(--yolk2);font-weight:600;cursor:pointer;padding:6px 0;font-size:15px}
+h1{font-size:24px;margin:18px 0 6px}
+h2{font-size:18px;margin:22px 0 10px}
+h3{font-size:16px;margin:0 0 6px}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:16px;box-shadow:var(--sh)}
+.card+.card{margin-top:12px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
+.tile{background:linear-gradient(160deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:var(--r);padding:16px;min-height:118px;cursor:pointer;display:flex;flex-direction:column;gap:6px;transition:transform .12s,border-color .12s;position:relative}
+.tile:hover{transform:translateY(-2px);border-color:#5a5040}
+.tile .ic{font-size:30px}
+.tile .t{font-weight:700}
+.tile .s{font-size:13px;color:var(--muted)}
+.tile .badge{position:absolute;top:12px;right:12px}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--card2);border-radius:12px;padding:10px 16px;cursor:pointer;font-weight:600}
+.btn:hover{border-color:#5a5040}
+.btn.pri{background:var(--yolk);border-color:var(--yolk);color:#231a05}
+.btn.pri:hover{background:var(--yolk2)}
+.btn.bad{background:transparent;border-color:#6b2d24;color:#ff8f7d}
+.btn.big{padding:16px 20px;font-size:18px;border-radius:14px;flex:1}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.col{display:flex;flex-direction:column;gap:10px}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:700;border:1px solid var(--line);background:var(--bg2)}
+.dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:var(--muted)}
+.dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok)} .dot.warn{background:var(--warn)} .dot.bad{background:var(--bad);box-shadow:0 0 8px var(--bad)}
+.hero{display:flex;gap:16px;align-items:center}
+.door{width:92px;height:92px;flex:none}
+.hero .state{font-size:28px;font-weight:800;line-height:1.1}
+.kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin-top:14px}
+.kv div{background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:10px 12px}
+.kv b{display:block;font-size:18px}
+.kv span{font-size:12px;color:var(--muted)}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted);flex:1;min-width:140px}
+input,select,textarea{background:var(--bg2);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:16px;width:100%}
+textarea{min-height:80px;resize:vertical}
+input:focus,select:focus,textarea:focus{outline:2px solid var(--yolk);outline-offset:-1px}
+.list{display:flex;flex-direction:column;gap:8px}
+.li{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;display:flex;gap:12px;align-items:center}
+.li .m{flex:1;min-width:0}
+.li .m .a{font-weight:600}
+.li .m .b{font-size:13px;color:var(--muted)}
+.ev{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)}
+.ev:last-child{border:none}
+.ev .e{width:26px;text-align:center}
+.ev .tm{color:var(--muted);font-size:13px;white-space:nowrap}
+.cam{position:relative;border-radius:14px;overflow:hidden;background:#000;border:1px solid var(--line);aspect-ratio:16/9;display:grid;place-items:center}
+.cam img{width:100%;height:100%;object-fit:contain;display:block}
+.cam .ov{position:absolute;left:10px;top:10px;display:flex;gap:6px}
+.cam .ov2{position:absolute;right:10px;bottom:10px}
+.thumbs{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:8px}
+.thumbs figure{margin:0;cursor:pointer}
+.thumbs img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:8px;border:1px solid var(--line);background:#000}
+.thumbs figcaption{font-size:11px;color:var(--muted);text-align:center}
+.bars{display:flex;align-items:flex-end;gap:3px;height:120px;padding-top:8px}
+.bars div{flex:1;background:var(--yolk);border-radius:4px 4px 0 0;min-height:2px;position:relative}
+.bars div.z{background:var(--line)}
+.bars div:hover::after{content:attr(data-t);position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#000;padding:2px 6px;border-radius:6px;font-size:11px;white-space:nowrap}
+.counter{display:flex;align-items:center;gap:14px;justify-content:center;margin:8px 0}
+.counter button{width:64px;height:64px;border-radius:50%;font-size:30px;font-weight:800}
+.counter .n{font-size:56px;font-weight:800;min-width:90px;text-align:center}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.seg button{background:var(--bg2);border:none;padding:9px 14px;cursor:pointer;font-weight:600}
+.seg button.on{background:var(--yolk);color:#231a05}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:50}
+.modal .box{background:var(--bg2);border:1px solid var(--line);border-radius:20px 20px 0 0;width:100%;max-width:560px;max-height:92vh;overflow:auto;padding:20px 18px calc(20px + env(safe-area-inset-bottom))}
+@media(min-width:640px){.modal{align-items:center}.modal .box{border-radius:20px}}
+.toast{position:fixed;left:50%;bottom:calc(24px + env(safe-area-inset-bottom));transform:translateX(-50%);background:#000;border:1px solid var(--line);padding:12px 18px;border-radius:12px;z-index:60;box-shadow:var(--sh);max-width:90vw}
+.center{min-height:80vh;display:grid;place-items:center;text-align:center}
+.login{max-width:380px;width:100%}
+.login img{width:96px;height:96px}
+.warnbox{background:#3a1d17;border:1px solid #6b2d24;color:#ffc1b6;border-radius:12px;padding:12px 14px}
+.infobox{background:#2b2617;border:1px solid #5a4a20;border-radius:12px;padding:12px 14px}
+.spin{width:18px;height:18px;border:3px solid rgba(255,255,255,.25);border-top-color:var(--yolk);border-radius:50%;animation:sp 1s linear infinite;display:inline-block}
+@keyframes sp{to{transform:rotate(360deg)}}
+.big-img{position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:70;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px}
+.big-img img{max-width:100%;max-height:85vh;border-radius:10px}
+table.mem{width:100%;border-collapse:collapse}
+table.mem td{padding:6px 4px;border-bottom:1px solid var(--line);font-size:14px}
+table.mem select{padding:6px 8px;font-size:14px}
+.chk{display:flex;align-items:center;gap:10px;padding:8px 0}
+.chk input{width:22px;height:22px;accent-color:var(--yolk)}
+</style>
+</head>
+<body>
+<header class="top" id="hdr" hidden>
+  <div class="in">
+    <div class="brand" onclick="go('')"><img src="icon.svg" alt=""><div>Stallwache<small id="hdrSub">Hühnerstall</small></div></div>
+    <div class="sp"></div>
+    <span id="hdrConn" class="pill"><span class="dot"></span><span>…</span></span>
+    <button class="iconbtn" title="Einstellungen" onclick="go('profil')">⚙️</button>
+  </div>
+</header>
+<main class="wrap" id="app"><div class="center"><div class="spin"></div></div></main>
+
+<script>
+/* ═════════ Konfiguration ═════════ */
+const SUPABASE_URL = 'https://kdqtfbhwjqymfbaunkwg.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_bEARbfjx56Xq7oUg9GQESA_BILmK_Jm';
+const FN = SUPABASE_URL + '/functions/v1';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
+
+const TILES = [
+  { key: 'klappe',     icon: '🚪', name: 'Klappe',     desc: 'Status, auf/zu, Zeiten, Protokoll' },
+  { key: 'kamera',     icon: '📷', name: 'Kamera',     desc: 'Bilder aus dem Stall' },
+  { key: 'eier',       icon: '🥚', name: 'Eier',       desc: 'Legeleistung zählen' },
+  { key: 'pflege',     icon: '🧹', name: 'Pflege',     desc: 'Futter, Wasser, Ausmisten' },
+  { key: 'herde',      icon: '🐔', name: 'Herde',      desc: 'Unsere Hühner' },
+  { key: 'gesundheit', icon: '🩺', name: 'Gesundheit', desc: 'Behandlungen & Tierarzt' },
+];
+const DOOR = {
+  offen:     { t: 'Klappe offen',     c: 'ok',   e: '🐔' },
+  zu:        { t: 'Klappe zu',        c: 'ok',   e: '🌙' },
+  oeffnet:   { t: 'Klappe öffnet …',  c: 'warn', e: '⬆️' },
+  schliesst: { t: 'Klappe schließt …',c: 'warn', e: '⬇️' },
+  zwischen:  { t: 'Zwischenstellung', c: 'warn', e: '↕️' },
+  stoerung:  { t: 'Störung',          c: 'bad',  e: '⚠️' },
+  unbekannt: { t: 'Status unbekannt', c: '',     e: '❔' },
+};
+const EVI = { auf: '🐔', zu: '🌙', befehl: '👆', alarm: '🚨', fehler: '⚠️', offline: '📡', online: '📡', info: 'ℹ️', start: '🔌' };
+
+/* ═════════ Zustand ═════════ */
+let me = null, member = null, cfg = null, st = null, names = {};
+let pollT = null, liveT = null, liveOn = false, camUrls = {}, camSnapSeen = {};
+
+/* ═════════ Helfer ═════════ */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const level = (t) => !member ? 'none' : member.role === 'admin' ? 'edit' : (member.tiles?.[t] || 'none');
+const canView = (t) => ['view', 'edit'].includes(level(t));
+const canEdit = (t) => level(t) === 'edit';
+const pad = (n) => String(n).padStart(2, '0');
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`; };
+const isoOf = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+const fmtD = (iso) => { if (!iso) return ''; const [y, m, d] = iso.split('-'); return `${d}.${m}.${y}`; };
+const fmtDT = (ts) => { const d = new Date(ts); return d.toLocaleString('de-DE', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); };
+const fmtT = (ts) => new Date(ts).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' });
+const daysSince = (iso) => Math.round((new Date(todayISO()) - new Date(iso)) / 86400000);
+function ago(ts) {
+  if (!ts) return 'nie';
+  const s = Math.round((Date.now() - new Date(ts)) / 1000);
+  if (s < 60) return 'gerade eben'; if (s < 3600) return `vor ${Math.round(s / 60)} Min.`;
+  if (s < 86400) return `vor ${Math.round(s / 3600)} Std.`; return `vor ${Math.round(s / 86400)} Tagen`;
+}
+function toast(t, ms = 2600) { const d = document.createElement('div'); d.className = 'toast'; d.textContent = t; document.body.appendChild(d); setTimeout(() => d.remove(), ms); }
+function modal(html, onMount) {
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="box">${html}</div>`;
+  m.addEventListener('click', (e) => { if (e.target === m) m.remove(); });
+  document.body.appendChild(m); onMount?.(m); return m;
+}
+function confirmBox(text, yes = 'Ja') {
+  return new Promise((res) => {
+    const m = modal(`<h3>${esc(text)}</h3><div class="row" style="margin-top:16px;justify-content:flex-end"><button class="btn" data-n>Abbrechen</button><button class="btn pri" data-y>${esc(yes)}</button></div>`);
+    m.querySelector('[data-n]').onclick = () => { m.remove(); res(false); };
+    m.querySelector('[data-y]').onclick = () => { m.remove(); res(true); };
+  });
+}
+function err(e) { console.error(e); toast('Fehler: ' + (e?.message || e)); }
+
+/* ═════════ Sonnenzeiten (NOAA, wie auf dem Pi) ═════════ */
+function sunTimes(date, lat, lon) {
+  const rad = Math.PI / 180, day = Math.floor((Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) - Date.UTC(date.getFullYear(), 0, 0)) / 86400000);
+  const g = 2 * Math.PI / 365 * (day - 1);
+  const eq = 229.18 * (0.000075 + 0.001868 * Math.cos(g) - 0.032077 * Math.sin(g) - 0.014615 * Math.cos(2 * g) - 0.040849 * Math.sin(2 * g));
+  const dec = 0.006918 - 0.399912 * Math.cos(g) + 0.070257 * Math.sin(g) - 0.006758 * Math.cos(2 * g) + 0.000907 * Math.sin(2 * g) - 0.002697 * Math.cos(3 * g) + 0.00148 * Math.sin(3 * g);
+  const cosH = (Math.cos(90.833 * rad) / (Math.cos(lat * rad) * Math.cos(dec))) - Math.tan(lat * rad) * Math.tan(dec);
+  if (cosH > 1 || cosH < -1) return null;
+  const ha = Math.acos(cosH) / rad;
+  const mk = (min) => new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) + min * 60000);
+  return { rise: mk(720 - 4 * (lon + ha) - eq), set: mk(720 - 4 * (lon - ha) - eq) };
+}
+const hm = (d) => d ? `${pad(d.getHours())}:${pad(d.getMinutes())}` : '–';
+function planToday(c) {
+  if (!c) return {};
+  const d = new Date(), s = sunTimes(d, +c.lat || 47.67, +c.lon || 9.59);
+  const at = (t) => { const [h, m] = String(t || '00:00').split(':').map(Number); const x = new Date(d); x.setHours(h, m, 0, 0); return x; };
+  let auf, zu;
+  if (c.zeitart === 'fix') { auf = at(c.auf_fix); zu = at(c.zu_fix); }
+  else {
+    auf = new Date(s.rise.getTime() + (+c.auf_offset || 0) * 60000);
+    zu = new Date(s.set.getTime() + (+c.zu_offset || 0) * 60000);
+    if (c.auf_frueheste && auf < at(c.auf_frueheste)) auf = at(c.auf_frueheste);
+    if (c.zu_spaeteste && zu > at(c.zu_spaeteste)) zu = at(c.zu_spaeteste);
+  }
+  return { rise: s?.rise, set: s?.set, auf, zu, alarm: new Date(zu.getTime() + (+c.alarm_min || 30) * 60000) };
+}
+
+/* ═════════ Verbindung zum Stall ═════════ */
+function conn() {
+  if (!st?.last_seen) return { c: 'bad', t: 'Stall noch nie verbunden' };
+  const s = (Date.now() - new Date(st.last_seen)) / 1000;
+  if (s < 120) return { c: 'ok', t: 'Stall online' };
+  if (s < 600) return { c: 'warn', t: 'Stall verzögert' };
+  return { c: 'bad', t: 'Stall offline' };
+}
+function paintConn() {
+  const c = conn(); const el = $('#hdrConn');
+  if (!el) return;
+  el.hidden = !(canView('klappe') || canView('kamera'));
+  el.innerHTML = `<span class="dot ${c.c}"></span><span>${c.t.replace('Stall ', '')}</span>`;
+  el.title = c.t + (st?.last_seen ? ' – letzte Meldung ' + ago(st.last_seen) : '');
+}
+async function loadState() {
+  if (!(canView('klappe') || canView('kamera'))) return;
+  const { data } = await sb.from('hs_state').select('*').eq('id', 1).maybeSingle();
+  if (data) st = data;
+  paintConn();
+}
+async function loadCfg() {
+  if (!(canView('klappe') || canView('pflege'))) return;
+  const { data } = await sb.from('hs_config').select('data').eq('id', 1).maybeSingle();
+  cfg = data?.data || {};
+}
+
+/* ═════════ Auth ═════════ */
+let booting = null;
+function boot() { if (!booting) booting = bootInner().finally(() => { booting = null; }); return booting; }
+async function bootInner() {
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) return showLogin();
+  me = session.user;
+  let { data: m } = await sb.from('hs_members').select('*').eq('user_id', me.id).maybeSingle();
+  if (!m) {
+    const r = await sb.from('hs_members').insert({ user_id: me.id }).select().maybeSingle();
+    if (r.error) return err(r.error);
+    m = r.data;
+  }
+  member = m;
+  if (m.status !== 'approved') return showPending();
+  $('#hdr').hidden = false;
+  await Promise.all([loadState(), loadCfg(), sb.rpc('hs_names').then(({ data }) => (data || []).forEach((x) => (names[x.user_id] = x.name)))]);
+  route();
+  clearInterval(pollT);
+  pollT = setInterval(async () => { if (document.hidden) return; await loadState(); if (location.hash === '' || location.hash === '#') paintHome(); if (location.hash === '#klappe') paintKlappe(true); }, 10000);
+}
+function showLogin() {
+  $('#hdr').hidden = true;
+  let mode = 'pw';
+  const draw = () => {
+    $('#app').innerHTML = `<div class="center"><div class="login col">
+      <img src="icon.svg" alt="" style="margin:0 auto"><h1 style="margin:6px 0 0">Stallwache</h1>
+      <p class="muted" style="margin:0 0 10px">Hühnerstall im Blick – Klappe, Kamera, Tagebuch.</p>
+      <div class="seg" style="align-self:center"><button data-m="pw" class="${mode === 'pw' ? 'on' : ''}">Passwort</button><button data-m="link" class="${mode === 'link' ? 'on' : ''}">Link per E-Mail</button><button data-m="neu" class="${mode === 'neu' ? 'on' : ''}">Registrieren</button></div>
+      ${mode === 'neu' ? '<input id="nm" placeholder="Dein Name" autocomplete="name">' : ''}
+      <input id="em" type="email" placeholder="E-Mail-Adresse" autocomplete="email">
+      ${mode !== 'link' ? `<input id="pw" type="password" placeholder="Passwort${mode === 'neu' ? ' (mind. 8 Zeichen)' : ''}" autocomplete="${mode === 'neu' ? 'new-password' : 'current-password'}">` : ''}
+      <button class="btn pri" id="go">${{ pw: 'Anmelden', link: 'Anmelde-Link schicken', neu: 'Konto anlegen' }[mode]}</button>
+      <div id="msg" class="small"></div>
+      <p class="small muted">Gleiches Konto wie Florian HQ / H&amp;E Hub. Neue Personen werden vom Admin freigeschaltet.</p></div></div>`;
+    document.querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => { mode = b.dataset.m; draw(); }));
+    const msg = (t, bad) => { $('#msg').innerHTML = `<div class="${bad ? 'warnbox' : 'infobox'}">${t}</div>`; };
+    const goBtn = $('#go');
+    const submit = async () => {
+      const email = $('#em').value.trim(), password = $('#pw')?.value || '';
+      if (!email) return msg('Bitte E-Mail eingeben.', true);
+      goBtn.disabled = true;
+      try {
+        if (mode === 'link') {
+          const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+          if (error) return msg(/rate|limit/i.test(error.message) ? 'Gerade zu viele Mails verschickt – bitte später nochmal oder mit Passwort anmelden.' : esc(error.message), true);
+          msg(`📬 Link ist unterwegs an <b>${esc(email)}</b>. Mail auf diesem Gerät öffnen und auf den Link tippen.`);
+        } else if (mode === 'neu') {
+          if (password.length < 8) return msg('Passwort braucht mindestens 8 Zeichen.', true);
+          const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname, data: { app: 'stallwache', name: ($('#nm')?.value || '').trim() } } });
+          if (error) return msg(/registered|exists/i.test(error.message) ? 'Diese E-Mail hat schon ein Konto – einfach mit Passwort anmelden.' : esc(error.message), true);
+          if (!data.session) msg('Fast fertig: Bestätige die E-Mail, die du gerade bekommen hast, und melde dich dann hier an.');
+          else boot();
+        } else {
+          const { error } = await sb.auth.signInWithPassword({ email, password });
+          if (error) return msg(/confirm/i.test(error.message) ? 'Bitte zuerst die Bestätigungs-E-Mail öffnen.' : 'E-Mail oder Passwort stimmt nicht. Noch kein Passwort? Einmal per „Link per E-Mail“ anmelden und dann unter ⚙️ eins festlegen.', true);
+          boot();
+        }
+      } finally { goBtn.disabled = false; }
+    };
+    goBtn.onclick = submit;
+    document.querySelectorAll('.login input').forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); }));
+  };
+  draw();
+}
+function showPending() {
+  $('#hdr').hidden = true;
+  $('#app').innerHTML = `<div class="center"><div class="login col"><img src="icon.svg" alt="" style="margin:0 auto">
+    <h2>Fast geschafft 🐣</h2><p class="muted">Dein Zugang (${esc(me.email)}) wartet auf Freigabe durch den Admin. Schau später nochmal rein.</p>
+    <button class="btn" onclick="location.reload()">Neu laden</button><button class="btn" onclick="logout()">Abmelden</button></div></div>`;
+}
+async function logout() { await sb.auth.signOut(); location.hash = ''; location.reload(); }
+sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' && !member) boot(); });
+
+/* ═════════ Routing ═════════ */
+function go(h) { location.hash = h ? '#' + h : ''; }
+window.addEventListener('hashchange', route);
+function route() {
+  if (!member || member.status !== 'approved') return;
+  stopLive();
+  const h = location.hash.replace('#', '');
+  window.scrollTo(0, 0);
+  const views = { '': paintHome, klappe: paintKlappe, kamera: paintKamera, eier: paintEier, pflege: paintPflege, herde: paintHerde, gesundheit: paintGesundheit, mitglieder: paintMitglieder, profil: paintProfil };
+  const tileKey = TILES.find((t) => t.key === h)?.key;
+  if (tileKey && !canView(tileKey)) return go('');
+  if (h === 'mitglieder' && member.role !== 'admin') return go('');
+  (views[h] || paintHome)();
+}
+const backBtn = () => `<button class="back" onclick="go('')">‹ Übersicht</button>`;
+
+/* ═════════ Startseite ═════════ */
+function doorSvg(state) {
+  const open = state === 'offen', mid = ['oeffnet', 'schliesst', 'zwischen'].includes(state);
+  const y = open ? 8 : mid ? 34 : 60;
+  const col = DOOR[state]?.c === 'bad' ? '#e0533f' : '#f2b33d';
+  return `<svg class="door" viewBox="0 0 100 100" aria-hidden="true">
+    <path d="M10 44 L50 12 L90 44 Z" fill="#7a3b26"/><rect x="18" y="42" width="64" height="52" rx="4" fill="#3b2f20" stroke="#5a4a32" stroke-width="2"/>
+    <rect x="34" y="52" width="32" height="42" fill="#0d0b08"/>
+    <rect x="34" y="${y}" width="32" height="34" rx="2" fill="${col}" opacity=".95" style="transition:y .4s"/>
+    ${open ? '<circle cx="50" cy="80" r="7" fill="#f4efe4"/><path d="M46 73 q4 -6 8 0" fill="#e0533f"/><path d="M57 80 l5 1 -5 2z" fill="#f2b33d"/>' : ''}
+  </svg>`;
+}
+function heroCard() {
+  if (!canView('klappe')) return '';
+  const d = DOOR[st?.door] || DOOR.unbekannt, c = conn(), p = planToday(cfg), now = new Date();
+  const spaetOffen = st?.door !== 'zu' && p.zu && now > p.zu && (now.getHours() >= 12);
+  const next = spaetOffen ? '' : p.auf && now < p.auf ? `Öffnet ca. ${hm(p.auf)}` : p.zu && now < p.zu ? `Schließt ca. ${hm(p.zu)}` : p.auf ? `Öffnet morgen früh` : '';
+  return `<div class="card" style="margin-top:16px;cursor:pointer" onclick="go('klappe')">
+    <div class="hero">${doorSvg(st?.door)}<div style="flex:1">
+      <div class="state">${d.t}</div>
+      <div class="muted small" style="margin-top:4px">${st?.changed_at ? 'seit ' + fmtDT(st.changed_at) : ''}</div>
+      <div class="row" style="margin-top:8px"><span class="pill"><span class="dot ${c.c}"></span>${c.t}</span>${next ? `<span class="pill">⏱ ${next}</span>` : ''}${st?.info?.temp != null ? `<span class="pill">🌡 ${esc(String(st.info.temp).replace('.', ','))} °C</span>` : ''}</div>
+      ${spaetOffen ? `<div class="warnbox small" style="margin-top:10px">Sollte seit ca. ${hm(p.zu)} zu sein!</div>` : ''}
+    </div></div></div>`;
+}
+function paintHome() {
+  if (location.hash && location.hash !== '#') return;
+  const tiles = TILES.filter((t) => canView(t.key));
+  if (member.role === 'admin') tiles.push({ key: 'mitglieder', icon: '👥', name: 'Mitglieder', desc: 'Freigaben verwalten' });
+  const pend = member.role === 'admin' ? `<span class="badge pill" id="pendBadge" hidden></span>` : '';
+  $('#app').innerHTML = `${heroCard()}
+    <h2>Bereiche</h2>
+    <div class="grid">${tiles.map((t) => `<div class="tile" onclick="go('${t.key}')"><div class="ic">${t.icon}</div><div class="t">${t.name}</div><div class="s">${t.desc}</div>${t.key === 'mitglieder' ? pend : ''}</div>`).join('')}</div>
+    ${tiles.length === 0 ? '<p class="muted">Dir wurden noch keine Bereiche freigegeben.</p>' : ''}`;
+  if (member.role === 'admin') sb.from('hs_members').select('user_id', { count: 'exact', head: true }).eq('status', 'pending').then(({ count }) => { const b = $('#pendBadge'); if (b && count) { b.hidden = false; b.textContent = count + ' neu'; } });
+}
+
+/* ═════════ Klappe ═════════ */
+let cmdWatch = null;
+async function paintKlappe(soft) {
+  if (soft && $('#klHero')) { $('#klHero').innerHTML = klHero(); return; }
+  $('#app').innerHTML = `${backBtn()}<h1>🚪 Klappe</h1><div id="klHero">${klHero()}</div>
+    <h2>Heute</h2><div class="card" id="klPlan"></div>
+    <h2>Protokoll</h2><div class="card" id="klEv"><div class="spin"></div></div>
+    ${canEdit('klappe') ? `<h2>Zeiten & Alarm</h2><div class="card" id="klCfg"></div>` : ''}`;
+  paintPlan(); paintEvents(); if (canEdit('klappe')) paintCfgForm();
+}
+function klHero() {
+  const d = DOOR[st?.door] || DOOR.unbekannt, c = conn(), io = st?.io || {};
+  const ed = canEdit('klappe');
+  return `<div class="card"><div class="hero">${doorSvg(st?.door)}<div style="flex:1">
+      <div class="state">${d.e} ${d.t}</div>
+      <div class="muted small">${st?.changed_at ? 'seit ' + fmtDT(st.changed_at) : ''} · letzte Meldung ${ago(st?.last_seen)}</div>
+      <div class="row" style="margin-top:8px"><span class="pill"><span class="dot ${c.c}"></span>${c.t}</span>
+      <span class="pill">Steuerung: ${cfg?.steuerung === 'app' ? 'Pi/App-Zeiten' : 'LOGO-Astro'}</span></div>
+    </div></div>
+    ${ed ? `<div class="row" style="margin-top:16px">
+      <button class="btn big pri" onclick="cmd('open')" ${c.c === 'bad' ? 'disabled' : ''}>⬆️ Öffnen</button>
+      <button class="btn big" onclick="cmd('close')" ${c.c === 'bad' ? 'disabled' : ''}>⬇️ Schließen</button></div>
+      <div id="cmdStat" class="small muted" style="margin-top:8px"></div>` : ''}
+    ${c.c === 'bad' ? `<div class="warnbox small" style="margin-top:12px">Keine Verbindung zum Stall – Befehle sind gesperrt. Prüfe Pi, Richtfunk und LOGO.</div>` : ''}
+    <details style="margin-top:12px"><summary class="small muted" style="cursor:pointer">Signale der LOGO</summary>
+      <div class="kv">${Object.entries(io).map(([k, v]) => `<div><b>${typeof v === 'boolean' ? (v ? '● an' : '○ aus') : esc(v)}</b><span>${esc(k)}</span></div>`).join('') || '<span class="muted small">noch keine Daten</span>'}</div>
+    </details></div>`;
+}
+async function cmd(c) {
+  if (!(await confirmBox(c === 'open' ? 'Klappe jetzt öffnen?' : 'Klappe jetzt schließen?', c === 'open' ? 'Öffnen' : 'Schließen'))) return;
+  const { data: id, error } = await sb.rpc('hs_command', { c });
+  if (error) return err(error);
+  const s = $('#cmdStat'); if (s) s.innerHTML = '<span class="spin" style="width:12px;height:12px;border-width:2px"></span> Befehl gesendet, warte auf den Stall …';
+  clearInterval(cmdWatch); let n = 0;
+  cmdWatch = setInterval(async () => {
+    n++;
+    const { data } = await sb.from('hs_commands').select('status,result').eq('id', id).maybeSingle();
+    await loadState(); if ($('#klHero')) { $('#klHero').innerHTML = klHero(); }
+    const el = $('#cmdStat'); if (!el || !data) return;
+    const txt = { pending: '⏳ wartet auf den Stall …', running: '⚙️ Klappe fährt …', done: '✅ ' + (data.result || 'erledigt'), failed: '❌ ' + (data.result || 'fehlgeschlagen'), expired: '⌛ Stall hat nicht reagiert (Befehl verfallen)', replaced: 'ersetzt durch neueren Befehl' }[data.status] || data.status;
+    el.innerHTML = txt;
+    if (['done', 'failed', 'expired', 'replaced'].includes(data.status) || n > 60) { clearInterval(cmdWatch); paintEvents(); }
+  }, 2000);
+}
+function paintPlan() {
+  const p = planToday(cfg), i = st?.info || {};
+  $('#klPlan').innerHTML = `<div class="kv" style="margin-top:0">
+    <div><b>${i.sunrise || hm(p.rise)}</b><span>☀️ Sonnenaufgang</span></div>
+    <div><b>${i.sunset || hm(p.set)}</b><span>🌇 Sonnenuntergang</span></div>
+    <div><b>${i.plan_auf || hm(p.auf)}</b><span>⬆️ erwartet offen</span></div>
+    <div><b>${i.plan_zu || hm(p.zu)}</b><span>⬇️ erwartet zu</span></div>
+    <div><b>${i.alarm_ab || hm(p.alarm)}</b><span>🚨 Alarm, wenn noch offen</span></div></div>
+    <p class="small muted" style="margin:10px 0 0">${cfg?.steuerung === 'app'
+      ? 'Der Pi fährt die Klappe zu diesen Zeiten. Die Astro-Uhr der LOGO sollte dann deaktiviert sein.'
+      : 'Die LOGO fährt die Klappe mit ihrer Astro-Uhr. Die Zeiten hier dienen zur Überwachung – stimme sie grob auf die LOGO ab.'}</p>`;
+}
+async function paintEvents() {
+  const { data, error } = await sb.from('hs_events').select('*').order('ts', { ascending: false }).limit(60);
+  if (error) return err(error);
+  const el = $('#klEv'); if (!el) return;
+  el.innerHTML = (data || []).map((e) => `<div class="ev"><div class="e">${EVI[e.kind] || '•'}</div><div style="flex:1">${esc(e.text || e.kind)}</div><div class="tm">${fmtDT(e.ts)}</div></div>`).join('') || '<span class="muted">Noch keine Einträge.</span>';
+}
+function paintCfgForm() {
+  const c = cfg || {};
+  $('#klCfg').innerHTML = `<div class="col">
+    <div><div class="small muted" style="margin-bottom:6px">Wer fährt die Klappe nach Zeit?</div>
+      <div class="seg" id="cfSt"><button data-v="logo">LOGO-Astro</button><button data-v="app">Pi / App</button></div></div>
+    <div><div class="small muted" style="margin-bottom:6px">Zeiten</div>
+      <div class="seg" id="cfZa"><button data-v="sonne">nach Sonne</button><button data-v="fix">feste Uhrzeit</button></div></div>
+    <div class="row" id="cfSonne">
+      <label class="f">Öffnen: Min. nach Sonnenaufgang<input type="number" id="cfAo" value="${esc(c.auf_offset ?? 30)}"></label>
+      <label class="f">Schließen: Min. nach Sonnenuntergang<input type="number" id="cfZo" value="${esc(c.zu_offset ?? 20)}"></label>
+      <label class="f">frühestens öffnen<input type="time" id="cfAf" value="${esc(c.auf_frueheste || '')}"></label>
+      <label class="f">spätestens schließen<input type="time" id="cfZs" value="${esc(c.zu_spaeteste || '')}"></label></div>
+    <div class="row" id="cfFix">
+      <label class="f">Öffnen um<input type="time" id="cfAx" value="${esc(c.auf_fix || '07:00')}"></label>
+      <label class="f">Schließen um<input type="time" id="cfZx" value="${esc(c.zu_fix || '20:00')}"></label></div>
+    <div class="row">
+      <label class="f">Alarm, wenn X Min. nach Schließzeit noch offen<input type="number" id="cfAl" min="5" value="${esc(c.alarm_min ?? 30)}"></label>
+      <label class="f">Breitengrad<input type="number" step="0.0001" id="cfLa" value="${esc(c.lat ?? 47.67)}"></label>
+      <label class="f">Längengrad<input type="number" step="0.0001" id="cfLo" value="${esc(c.lon ?? 9.59)}"></label></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn pri" id="cfSave">Speichern</button></div></div>`;
+  const seg = (id, val) => { $(id).querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === val); b.onclick = () => { seg(id, b.dataset.v); vis(); }; }); };
+  const vis = () => { const za = $('#cfZa .on')?.dataset.v; $('#cfSonne').hidden = za !== 'sonne'; $('#cfFix').hidden = za !== 'fix'; };
+  seg('#cfSt', c.steuerung || 'logo'); seg('#cfZa', c.zeitart || 'sonne'); vis();
+  $('#cfSave').onclick = async () => {
+    const n = { ...cfg, steuerung: $('#cfSt .on').dataset.v, zeitart: $('#cfZa .on').dataset.v,
+      auf_offset: +$('#cfAo').value || 0, zu_offset: +$('#cfZo').value || 0, auf_frueheste: $('#cfAf').value, zu_spaeteste: $('#cfZs').value,
+      auf_fix: $('#cfAx').value, zu_fix: $('#cfZx').value, alarm_min: Math.max(5, +$('#cfAl').value || 30), lat: +$('#cfLa').value, lon: +$('#cfLo').value };
+    if (n.steuerung === 'app' && cfg.steuerung !== 'app' && !(await confirmBox('Pi/App fährt dann die Klappe nach Zeit. Astro-Uhr in der LOGO abschalten, sonst fahren beide. Fortfahren?', 'Ja, umstellen'))) return;
+    const { error } = await sb.from('hs_config').update({ data: n }).eq('id', 1);
+    if (error) return err(error);
+    cfg = n; toast('Gespeichert ✅'); paintPlan(); $('#klHero').innerHTML = klHero();
+  };
+}
+
+/* ═════════ Kamera ═════════ */
+function camList() { const n = st?.info?.cams; return Array.isArray(n) && n.length ? n : ['Kamera 1', 'Kamera 2']; }
+async function signed(path, sec = 300) { const { data } = await sb.storage.from('hs-cam').createSignedUrl(path, sec); return data?.signedUrl; }
+async function paintKamera() {
+  const cams = camList();
+  $('#app').innerHTML = `${backBtn()}<h1>📷 Kamera</h1>
+    <div class="row" style="margin-bottom:12px"><button class="btn pri" id="liveBtn">▶️ Live-Bild</button><button class="btn" id="refBtn">🔄 Aktuelles Bild holen</button><span class="small muted" id="liveInfo"></span></div>
+    ${cams.map((n, i) => `<div class="card" style="padding:10px"><div class="cam" id="cam${i}"><span class="muted small">Noch kein Bild</span></div>
+      <div class="row small muted" style="margin:8px 4px 0"><b style="color:var(--text)">${esc(n)}</b><span class="sp"></span><span id="camT${i}"></span></div></div>`).join('')}
+    <h2>Verlauf (letzte 14 Tage)</h2><p class="small muted" style="margin-top:-6px">Bilder beim Öffnen und Schließen der Klappe.</p><div class="thumbs" id="arch"><div class="spin"></div></div>
+    <p class="small muted" style="margin-top:18px">Für flüssiges Video mit Ton nutzt du weiter die Kamera-App. Die Bilder hier kommen über den Pi.</p>`;
+  $('#liveBtn').onclick = () => (liveOn ? stopLive() : startLive());
+  $('#refBtn').onclick = async () => { const { error } = await sb.rpc('hs_live', { sek: 8 }); if (error) return err(error); toast('Bild wird geholt …'); burst(10); };
+  await loadState(); await paintCams(true); paintArchive();
+}
+async function paintCams(force) {
+  const cams = camList();
+  for (let i = 0; i < cams.length; i++) {
+    const ts = st?.snaps?.['cam' + i]; const box = $('#cam' + i); if (!box) return;
+    $('#camT' + i).textContent = ts ? fmtDT(ts) + ' · ' + ago(ts) : '';
+    if (!ts) continue;
+    if (!force && camSnapSeen[i] === ts) continue;
+    camSnapSeen[i] = ts;
+    const url = await signed(`cam${i}/latest.jpg`, 120);
+    if (!url) continue;
+    const img = new Image(); img.onload = () => { box.innerHTML = ''; box.appendChild(img); if (liveOn) box.insertAdjacentHTML('beforeend', '<div class="ov"><span class="pill" style="background:#7a1d12;border-color:#a33">● LIVE</span></div>'); };
+    img.src = url + '&t=' + encodeURIComponent(ts); img.alt = cams[i]; img.onclick = () => bigImg(img.src, cams[i]);
+  }
+}
+let burstT = null;
+function burst(n) { clearInterval(burstT); let k = 0; burstT = setInterval(async () => { k++; await loadState(); await paintCams(); if (k >= n) clearInterval(burstT); }, 2000); }
+async function startLive() {
+  if (conn().c === 'bad') return toast('Stall ist offline – kein Live-Bild möglich.');
+  liveOn = true; $('#liveBtn').textContent = '⏹ Live beenden'; $('#liveInfo').textContent = 'Bild alle paar Sekunden …';
+  const ping = () => sb.rpc('hs_live', { sek: 45 });
+  await ping();
+  let k = 0;
+  liveT = setInterval(async () => { if (document.hidden) return; k++; if (k % 15 === 0) ping(); await loadState(); await paintCams(); if (k > 300) stopLive(); }, 2000);
+}
+function stopLive() {
+  clearInterval(liveT); clearInterval(burstT); liveT = null;
+  if (liveOn) { liveOn = false; const b = $('#liveBtn'); if (b) b.textContent = '▶️ Live-Bild'; const i = $('#liveInfo'); if (i) i.textContent = ''; }
+}
+async function paintArchive() {
+  const { data, error } = await sb.storage.from('hs-cam').list('archiv', { limit: 60, sortBy: { column: 'name', order: 'desc' } });
+  const el = $('#arch'); if (!el) return;
+  if (error || !data?.length) { el.innerHTML = '<span class="muted small">Noch keine Bilder.</span>'; return; }
+  const files = data.filter((f) => f.name.endsWith('.jpg')).slice(0, 40);
+  const { data: urls } = await sb.storage.from('hs-cam').createSignedUrls(files.map((f) => 'archiv/' + f.name), 600);
+  const cams = camList();
+  el.innerHTML = files.map((f, i) => {
+    const m = f.name.match(/^(\d{4})-(\d{2})-(\d{2})_(\d{2})(\d{2})\d{2}_cam(\d)(?:_(\w+))?/);
+    const cap = m ? `${m[3]}.${m[2]}. ${m[4]}:${m[5]} ${m[7] === 'zu' ? '🌙' : m[7] === 'auf' ? '🐔' : ''} ${esc(cams[+m[6]] || '')}` : esc(f.name);
+    return `<figure data-u="${esc(urls?.[i]?.signedUrl || '')}" data-c="${cap}"><img loading="lazy" src="${esc(urls?.[i]?.signedUrl || '')}" alt=""><figcaption>${cap}</figcaption></figure>`;
+  }).join('');
+  el.querySelectorAll('figure').forEach((f) => (f.onclick = () => bigImg(f.dataset.u, f.dataset.c)));
+}
+function bigImg(src, cap) {
+  const d = document.createElement('div'); d.className = 'big-img';
+  d.innerHTML = `<img src="${esc(src)}" alt=""><div class="muted small" style="margin-top:10px">${cap}</div><button class="btn" style="margin-top:12px">Schließen</button>`;
+  d.onclick = () => d.remove(); document.body.appendChild(d);
+}
+
+/* ═════════ Tagebuch: gemeinsame Funktionen ═════════ */
+async function items(tile) {
+  const { data, error } = await sb.from('hs_items').select('*').eq('tile', tile).order('created_at', { ascending: false }).limit(2000);
+  if (error) { err(error); return []; }
+  return data || [];
+}
+async function saveItem(tile, kind, data, id) {
+  const q = id ? sb.from('hs_items').update({ data }).eq('id', id) : sb.from('hs_items').insert({ tile, kind, data });
+  const { error } = await q; if (error) { err(error); return false; } return true;
+}
+async function delItem(id) {
+  if (!(await confirmBox('Eintrag wirklich löschen?', 'Löschen'))) return false;
+  const { error } = await sb.from('hs_items').delete().eq('id', id); if (error) { err(error); return false; } return true;
+}
+
+/* ═════════ Eier ═════════ */
+async function paintEier() {
+  const ed = canEdit('eier');
+  $('#app').innerHTML = `${backBtn()}<h1>🥚 Eier</h1>
+    ${ed ? `<div class="card"><div class="row"><label class="f" style="max-width:180px">Tag<input type="date" id="eiD" value="${todayISO()}"></label><span class="sp"></span><span class="small muted" id="eiHint"></span></div>
+      <div class="counter"><button class="btn" id="eiM">−</button><div class="n" id="eiN">0</div><button class="btn pri" id="eiP">+</button></div>
+      <div class="row"><input id="eiNote" placeholder="Notiz (optional, z. B. 1 Windei)"><button class="btn pri" id="eiS">Speichern</button></div></div>` : ''}
+    <div class="kv" id="eiStats"></div>
+    <h2>Letzte 30 Tage</h2><div class="card"><div class="bars" id="eiBars"></div><div class="row small muted" style="justify-content:space-between;margin-top:6px"><span id="eiB0"></span><span>heute</span></div></div>
+    <h2>Monate</h2><div class="card" id="eiMon"></div>
+    <h2>Einträge</h2><div class="list" id="eiList"></div>`;
+  let all = await items('eier');
+  const byDay = () => { const m = {}; all.forEach((x) => { const d = x.data?.datum; if (d) m[d] = x; }); return m; };
+  let n = 0, cur = null;
+  const loadDay = () => { if (!ed) return; const d = $('#eiD').value; cur = byDay()[d] || null; n = cur ? +cur.data.anzahl || 0 : 0; $('#eiN').textContent = n; $('#eiNote').value = cur?.data?.notiz || ''; $('#eiHint').textContent = cur ? 'schon eingetragen – wird überschrieben' : ''; };
+  const stats = () => {
+    const m = byDay(), t = new Date(); let w = 0, mo = 0, all30 = [], best = 0;
+    for (let i = 29; i >= 0; i--) { const d = new Date(t); d.setDate(t.getDate() - i); const k = isoOf(d); const v = m[k] ? +m[k].data.anzahl || 0 : null; all30.push([k, v]); if (i < 7 && v) w += v; if (v) mo += v; if (v > best) best = v; }
+    const tag = m[todayISO()] ? +m[todayISO()].data.anzahl : 0;
+    const ges = Object.values(m).reduce((a, x) => a + (+x.data.anzahl || 0), 0);
+    const herde = window._herdeCount;
+    $('#eiStats').innerHTML = `<div><b>${tag}</b><span>heute</span></div><div><b>${w}</b><span>letzte 7 Tage</span></div><div><b>${mo}</b><span>letzte 30 Tage</span></div><div><b>${(mo / 30).toFixed(1).replace('.', ',')}</b><span>Ø pro Tag (30 T.)</span></div><div><b>${ges}</b><span>gesamt</span></div>${herde ? `<div><b>${Math.round(mo / 30 / herde * 100)} %</b><span>Legequote (${herde} Hennen)</span></div>` : ''}`;
+    const mx = Math.max(1, best);
+    $('#eiBars').innerHTML = all30.map(([k, v]) => `<div class="${v ? '' : 'z'}" style="height:${v ? (v / mx) * 100 : 2}%" data-t="${fmtD(k).slice(0, 6)}: ${v ?? '–'}"></div>`).join('');
+    $('#eiB0').textContent = fmtD(all30[0][0]).slice(0, 6);
+    const mons = {}; Object.values(m).forEach((x) => { const k = x.data.datum.slice(0, 7); mons[k] = (mons[k] || 0) + (+x.data.anzahl || 0); });
+    $('#eiMon').innerHTML = Object.entries(mons).sort().reverse().slice(0, 12).map(([k, v]) => `<div class="ev"><div style="flex:1">${new Date(k + '-01').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })}</div><b>${v} 🥚</b></div>`).join('') || '<span class="muted">Noch keine Daten.</span>';
+    $('#eiList').innerHTML = Object.values(m).sort((a, b) => b.data.datum.localeCompare(a.data.datum)).slice(0, 14).map((x) => `<div class="li"><div class="m"><div class="a">${fmtD(x.data.datum)} · ${x.data.anzahl} 🥚</div>${x.data.notiz ? `<div class="b">${esc(x.data.notiz)}</div>` : ''}</div>${ed ? `<button class="iconbtn" data-del="${x.id}">🗑</button>` : ''}</div>`).join('');
+    $('#eiList').querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => { if (await delItem(b.dataset.del)) { all = await items('eier'); stats(); loadDay(); } }));
+  };
+  if (canView('herde') && window._herdeCount == null) { const h = await items('herde'); window._herdeCount = h.filter((x) => (x.data.status || 'aktiv') === 'aktiv' && x.data.geschlecht !== 'hahn').length || null; }
+  stats();
+  if (ed) {
+    loadDay();
+    $('#eiD').onchange = loadDay;
+    $('#eiM').onclick = () => { n = Math.max(0, n - 1); $('#eiN').textContent = n; };
+    $('#eiP').onclick = () => { n++; $('#eiN').textContent = n; };
+    $('#eiS').onclick = async () => {
+      const data = { datum: $('#eiD').value, anzahl: n, notiz: $('#eiNote').value.trim() };
+      if (await saveItem('eier', 'eier', data, cur?.id)) { toast(`${n} Eier gespeichert 🥚`); all = await items('eier'); stats(); loadDay(); }
+    };
+  }
+}
+
+/* ═════════ Pflege ═════════ */
+async function paintPflege() {
+  const ed = canEdit('pflege');
+  const arten = (cfg?.pflege?.length ? cfg.pflege : [{ key: 'futter', name: 'Futter nachfüllen', tage: 7 }, { key: 'wasser', name: 'Wasser wechseln', tage: 2 }, { key: 'ausmisten', name: 'Ausmisten', tage: 14 }]);
+  $('#app').innerHTML = `${backBtn()}<h1>🧹 Pflege</h1><div class="list" id="pfCards"></div>
+    <h2>Verlauf</h2><div class="card" id="pfHist"></div>
+    ${canEdit('klappe') ? `<h2>Aufgaben & Intervalle</h2><div class="card" id="pfCfg"></div>` : ''}`;
+  let all = await items('pflege');
+  const paint = () => {
+    $('#pfCards').innerHTML = arten.map((a) => {
+      const last = all.filter((x) => x.data.art === a.key).map((x) => x.data.datum).sort().pop();
+      const d = last ? daysSince(last) : null, t = +a.tage || 0;
+      const c = d == null ? '' : !t ? 'ok' : d >= t ? 'bad' : d >= t * 0.75 ? 'warn' : 'ok';
+      return `<div class="li"><span class="dot ${c}"></span><div class="m"><div class="a">${esc(a.name)}</div>
+        <div class="b">${last ? `zuletzt ${fmtD(last)} (${d === 0 ? 'heute' : d === 1 ? 'gestern' : `vor ${d} Tagen`})` : 'noch nie eingetragen'}${t ? ` · alle ${t} Tage` : ''}</div></div>
+        ${ed ? `<button class="btn ${c === 'bad' ? 'pri' : ''}" data-done="${esc(a.key)}">✓ Erledigt</button>` : ''}</div>`;
+    }).join('');
+    const nm = Object.fromEntries(arten.map((a) => [a.key, a.name]));
+    $('#pfHist').innerHTML = all.slice().sort((a, b) => (b.data.datum || '').localeCompare(a.data.datum || '') || b.created_at.localeCompare(a.created_at)).slice(0, 50)
+      .map((x) => `<div class="ev"><div style="flex:1"><b>${esc(nm[x.data.art] || x.data.art)}</b>${x.data.notiz ? ` – ${esc(x.data.notiz)}` : ''}<div class="small muted">${esc(names[x.created_by] || '')}</div></div><div class="tm">${fmtD(x.data.datum)}</div>${ed ? `<button class="iconbtn" style="width:32px;height:32px;margin-left:8px" data-del="${x.id}">🗑</button>` : ''}</div>`).join('') || '<span class="muted">Noch nichts eingetragen.</span>';
+    $('#pfCards').querySelectorAll('[data-done]').forEach((b) => (b.onclick = () => {
+      const a = arten.find((x) => x.key === b.dataset.done);
+      const m = modal(`<h3>✓ ${esc(a.name)}</h3><div class="col" style="margin-top:12px"><label class="f">Datum<input type="date" id="pdD" value="${todayISO()}"></label><label class="f">Notiz<input id="pdN" placeholder="optional"></label>
+        <div class="row" style="justify-content:flex-end"><button class="btn" data-x>Abbrechen</button><button class="btn pri" data-s>Speichern</button></div></div>`);
+      m.querySelector('[data-x]').onclick = () => m.remove();
+      m.querySelector('[data-s]').onclick = async () => { if (await saveItem('pflege', 'pflege', { art: a.key, datum: m.querySelector('#pdD').value, notiz: m.querySelector('#pdN').value.trim() })) { m.remove(); toast('Eingetragen ✅'); all = await items('pflege'); paint(); } };
+    }));
+    $('#pfHist').querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => { if (await delItem(b.dataset.del)) { all = await items('pflege'); paint(); } }));
+  };
+  paint();
+  if (canEdit('klappe')) {
+    const draw = () => {
+      $('#pfCfg').innerHTML = `<div class="col" id="pfRows">${arten.map((a, i) => `<div class="row"><input style="flex:2" data-n="${i}" value="${esc(a.name)}"><input style="flex:1;max-width:110px" type="number" min="0" data-t="${i}" value="${esc(a.tage)}" title="Tage"><span class="small muted">Tage</span><button class="iconbtn" data-r="${i}">✕</button></div>`).join('')}</div>
+        <p class="small muted">0 Tage = keine Erinnerung. Erinnerungen kommen täglich um ca. 17 Uhr per Push.</p>
+        <div class="row" style="justify-content:space-between"><button class="btn" id="pfAdd">＋ Aufgabe</button><button class="btn pri" id="pfSave">Speichern</button></div>`;
+      const read = () => arten.forEach((a, i) => { a.name = $(`[data-n="${i}"]`).value.trim() || a.name; a.tage = +$(`[data-t="${i}"]`).value || 0; });
+      $('#pfCfg').querySelectorAll('[data-r]').forEach((b) => (b.onclick = () => { read(); arten.splice(+b.dataset.r, 1); draw(); }));
+      $('#pfAdd').onclick = () => { read(); arten.push({ key: 'p' + Date.now().toString(36), name: 'Neue Aufgabe', tage: 7 }); draw(); };
+      $('#pfSave').onclick = async () => { read(); const n = { ...cfg, pflege: arten }; const { error } = await sb.from('hs_config').update({ data: n }).eq('id', 1); if (error) return err(error); cfg = n; toast('Gespeichert ✅'); paint(); };
+    };
+    draw();
+  }
+}
+
+/* ═════════ Herde ═════════ */
+async function paintHerde() {
+  const ed = canEdit('herde');
+  $('#app').innerHTML = `${backBtn()}<div class="row"><h1 style="flex:1">🐔 Herde</h1>${ed ? '<button class="btn pri" id="hAdd">＋ Huhn</button>' : ''}</div>
+    <div class="kv" id="hStats" style="margin-top:4px"></div><h2>Aktiv</h2><div class="list" id="hAct"></div><h2 id="hOldH">Ehemalige</h2><div class="list" id="hOld"></div>`;
+  let all = await items('herde');
+  const paint = () => {
+    const act = all.filter((x) => (x.data.status || 'aktiv') === 'aktiv'), old = all.filter((x) => (x.data.status || 'aktiv') !== 'aktiv');
+    window._herdeCount = act.filter((x) => x.data.geschlecht !== 'hahn').length || null;
+    const row = (x) => { const d = x.data; const alt = d.schlupf ? Math.floor((new Date() - new Date(d.schlupf)) / (365.25 * 86400000) * 10) / 10 : null;
+      return `<div class="li" data-id="${x.id}" style="cursor:${ed ? 'pointer' : 'default'}"><div style="font-size:28px">${d.geschlecht === 'hahn' ? '🐓' : '🐔'}</div><div class="m"><div class="a">${esc(d.name || 'ohne Namen')}${d.ring ? ` <span class="pill">${esc(d.ring)}</span>` : ''}</div>
+      <div class="b">${[d.rasse, d.farbe, alt != null ? `${String(alt).replace('.', ',')} Jahre` : '', d.status && d.status !== 'aktiv' ? d.status + (d.bis ? ' ' + fmtD(d.bis) : '') : ''].filter(Boolean).map(esc).join(' · ')}</div>
+      ${d.notiz ? `<div class="b">${esc(d.notiz)}</div>` : ''}</div></div>`; };
+    $('#hAct').innerHTML = act.sort((a, b) => (a.data.name || '').localeCompare(b.data.name || '')).map(row).join('') || '<span class="muted">Noch keine Hühner eingetragen.</span>';
+    $('#hOld').innerHTML = old.map(row).join(''); $('#hOldH').hidden = !old.length;
+    const hennen = act.filter((x) => x.data.geschlecht !== 'hahn').length;
+    $('#hStats').innerHTML = `<div><b>${act.length}</b><span>Tiere aktiv</span></div><div><b>${hennen}</b><span>Hennen</span></div><div><b>${act.length - hennen}</b><span>Hähne</span></div>`;
+    if (ed) document.querySelectorAll('.li[data-id]').forEach((el) => (el.onclick = () => edit(all.find((x) => x.id === el.dataset.id))));
+  };
+  const edit = (x) => {
+    const d = x?.data || { status: 'aktiv', geschlecht: 'henne' };
+    const m = modal(`<h3>${x ? 'Huhn bearbeiten' : 'Neues Huhn'}</h3><div class="col" style="margin-top:12px">
+      <div class="row"><label class="f">Name<input id="hN" value="${esc(d.name || '')}"></label><label class="f">Fußring / Nr.<input id="hR" value="${esc(d.ring || '')}"></label></div>
+      <div class="row"><label class="f">Rasse<input id="hRa" value="${esc(d.rasse || '')}"></label><label class="f">Farbe / Merkmal<input id="hF" value="${esc(d.farbe || '')}"></label></div>
+      <div class="row"><label class="f">Geschlecht<select id="hG"><option value="henne">Henne</option><option value="hahn">Hahn</option></select></label><label class="f">Schlupf (ca.)<input type="date" id="hS" value="${esc(d.schlupf || '')}"></label><label class="f">bei uns seit<input type="date" id="hSe" value="${esc(d.seit || '')}"></label></div>
+      <div class="row"><label class="f">Status<select id="hSt"><option value="aktiv">aktiv</option><option value="verstorben">verstorben</option><option value="abgegeben">abgegeben</option><option value="geschlachtet">geschlachtet</option></select></label><label class="f">am<input type="date" id="hB" value="${esc(d.bis || '')}"></label></div>
+      <label class="f">Notiz<textarea id="hNo">${esc(d.notiz || '')}</textarea></label>
+      <div class="row" style="justify-content:space-between">${x ? '<button class="btn bad" data-d>Löschen</button>' : '<span></span>'}<div class="row"><button class="btn" data-x>Abbrechen</button><button class="btn pri" data-s>Speichern</button></div></div></div>`);
+    m.querySelector('#hG').value = d.geschlecht || 'henne'; m.querySelector('#hSt').value = d.status || 'aktiv';
+    m.querySelector('[data-x]').onclick = () => m.remove();
+    m.querySelector('[data-d]') && (m.querySelector('[data-d]').onclick = async () => { if (await delItem(x.id)) { m.remove(); all = await items('herde'); paint(); } });
+    m.querySelector('[data-s]').onclick = async () => {
+      const v = (id) => m.querySelector(id).value.trim();
+      const nd = { name: v('#hN'), ring: v('#hR'), rasse: v('#hRa'), farbe: v('#hF'), geschlecht: v('#hG'), schlupf: v('#hS'), seit: v('#hSe'), status: v('#hSt'), bis: v('#hB'), notiz: v('#hNo') };
+      if (await saveItem('herde', 'huhn', nd, x?.id)) { m.remove(); all = await items('herde'); paint(); }
+    };
+  };
+  paint(); if (ed) $('#hAdd').onclick = () => edit(null);
+}
+
+/* ═════════ Gesundheit ═════════ */
+async function paintGesundheit() {
+  const ed = canEdit('gesundheit');
+  $('#app').innerHTML = `${backBtn()}<div class="row"><h1 style="flex:1">🩺 Gesundheit</h1>${ed ? '<button class="btn pri" id="gAdd">＋ Eintrag</button>' : ''}</div>
+    <div id="gDue"></div><div class="list" id="gList" style="margin-top:12px"></div>`;
+  let all = await items('gesundheit');
+  const herde = canView('herde') ? (await items('herde')).filter((x) => (x.data.status || 'aktiv') === 'aktiv').map((x) => x.data.name).filter(Boolean).sort() : [];
+  const ART = { kontrolle: '🔍 Kontrolle', behandlung: '💊 Behandlung', tierarzt: '🏥 Tierarzt', impfung: '💉 Impfung', wurmkur: '🪱 Wurmkur', parasiten: '🕷 Milben/Läuse', sonstiges: '📝 Sonstiges' };
+  const paint = () => {
+    const due = all.filter((x) => x.data.wiedervorlage && x.data.wiedervorlage <= isoOf(new Date(Date.now() + 3 * 86400000)) && !x.data.erledigt);
+    $('#gDue').innerHTML = due.length ? `<div class="infobox">⏰ Wiedervorlage: ${due.map((x) => `<b>${esc(x.data.titel)}</b> (${fmtD(x.data.wiedervorlage)})`).join(', ')}</div>` : '';
+    $('#gList').innerHTML = all.slice().sort((a, b) => (b.data.datum || '').localeCompare(a.data.datum || '')).map((x) => { const d = x.data;
+      return `<div class="li" data-id="${x.id}" style="cursor:${ed ? 'pointer' : 'default'}"><div class="m"><div class="a">${esc(d.titel || 'Eintrag')}</div>
+      <div class="b">${fmtD(d.datum)} · ${esc(ART[d.art] || d.art || '')} · ${esc(d.huhn || 'Alle')}${d.wiedervorlage ? ` · ⏰ ${fmtD(d.wiedervorlage)}${d.erledigt ? ' ✓' : ''}` : ''}</div>
+      ${d.notiz ? `<div class="b" style="white-space:pre-wrap">${esc(d.notiz)}</div>` : ''}</div></div>`; }).join('') || '<span class="muted">Keine Einträge – hoffentlich bleibt das so 🐔💪</span>';
+    if (ed) $('#gList').querySelectorAll('.li').forEach((el) => (el.onclick = () => edit(all.find((x) => x.id === el.dataset.id))));
+  };
+  const edit = (x) => {
+    const d = x?.data || { datum: todayISO(), art: 'kontrolle' };
+    const m = modal(`<h3>${x ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}</h3><div class="col" style="margin-top:12px">
+      <div class="row"><label class="f">Datum<input type="date" id="gD" value="${esc(d.datum || todayISO())}"></label><label class="f">Art<select id="gA">${Object.entries(ART).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
+      <label class="f">Huhn<input id="gH" list="gHl" value="${esc(d.huhn || '')}" placeholder="leer = ganze Herde"><datalist id="gHl">${herde.map((n) => `<option value="${esc(n)}">`).join('')}</datalist></label>
+      <label class="f">Titel<input id="gT" value="${esc(d.titel || '')}" placeholder="z. B. Kalkbeine behandelt"></label>
+      <label class="f">Details / Mittel / Dosierung laut Tierarzt<textarea id="gN">${esc(d.notiz || '')}</textarea></label>
+      <div class="row"><label class="f">Wiedervorlage<input type="date" id="gW" value="${esc(d.wiedervorlage || '')}"></label><label class="chk" style="flex:1"><input type="checkbox" id="gE" ${d.erledigt ? 'checked' : ''}> erledigt</label></div>
+      <div class="row" style="justify-content:space-between">${x ? '<button class="btn bad" data-d>Löschen</button>' : '<span></span>'}<div class="row"><button class="btn" data-x>Abbrechen</button><button class="btn pri" data-s>Speichern</button></div></div></div>`);
+    m.querySelector('#gA').value = d.art || 'kontrolle';
+    m.querySelector('[data-x]').onclick = () => m.remove();
+    m.querySelector('[data-d]') && (m.querySelector('[data-d]').onclick = async () => { if (await delItem(x.id)) { m.remove(); all = await items('gesundheit'); paint(); } });
+    m.querySelector('[data-s]').onclick = async () => {
+      const v = (id) => m.querySelector(id).value.trim();
+      const nd = { datum: v('#gD'), art: v('#gA'), huhn: v('#gH'), titel: v('#gT') || 'Eintrag', notiz: v('#gN'), wiedervorlage: v('#gW'), erledigt: m.querySelector('#gE').checked };
+      if (await saveItem('gesundheit', 'eintrag', nd, x?.id)) { m.remove(); all = await items('gesundheit'); paint(); }
+    };
+  };
+  paint(); if (ed) $('#gAdd').onclick = () => edit(null);
+}
+
+/* ═════════ Mitglieder (Admin) ═════════ */
+async function paintMitglieder() {
+  const { data, error } = await sb.from('hs_members').select('*').order('created_at');
+  if (error) return err(error);
+  const lv = (u, t) => `<select data-u="${u.user_id}" data-t="${t.key}"><option value="none">–</option><option value="view">sehen</option><option value="edit">bearbeiten</option></select>`;
+  $('#app').innerHTML = `${backBtn()}<h1>👥 Mitglieder</h1><p class="muted small">Neue Personen melden sich mit ihrer E-Mail an und erscheinen hier. Freigeben, dann je Bereich „sehen“ oder „bearbeiten“ wählen.</p>
+    ${data.map((u) => `<div class="card"><div class="row"><div style="flex:1"><input data-name="${u.user_id}" value="${esc(u.name || '')}" placeholder="Name"><div class="small muted" style="margin-top:4px">${esc(u.email)} · ${u.role === 'admin' ? '👑 Admin' : u.status === 'approved' ? '✅ freigegeben' : '⏳ wartet'}</div></div></div>
+      ${u.role === 'admin' ? '' : `<table class="mem" style="margin-top:10px">${TILES.map((t) => `<tr><td>${t.icon} ${t.name}</td><td style="text-align:right">${lv(u, t)}</td></tr>`).join('')}</table>
+      <div class="row" style="margin-top:10px;justify-content:space-between"><button class="btn bad" data-del="${u.user_id}">Entfernen</button>
+        <div class="row"><button class="btn" data-all="${u.user_id}">Alles sehen</button>${u.status === 'approved' ? `<button class="btn" data-st="${u.user_id}" data-v="pending">Sperren</button>` : `<button class="btn pri" data-st="${u.user_id}" data-v="approved">Freigeben</button>`}</div></div>`}</div>`).join('')}`;
+  const byId = Object.fromEntries(data.map((u) => [u.user_id, u]));
+  const up = async (uid, patch) => { const { error } = await sb.from('hs_members').update(patch).eq('user_id', uid); if (error) return err(error); Object.assign(byId[uid], patch); toast('Gespeichert ✅'); };
+  document.querySelectorAll('select[data-u]').forEach((s) => { s.value = byId[s.dataset.u].tiles?.[s.dataset.t] || 'none'; s.onchange = () => up(s.dataset.u, { tiles: { ...byId[s.dataset.u].tiles, [s.dataset.t]: s.value } }); });
+  document.querySelectorAll('[data-name]').forEach((i) => (i.onchange = () => up(i.dataset.name, { name: i.value.trim() })));
+  document.querySelectorAll('[data-st]').forEach((b) => (b.onclick = async () => { await up(b.dataset.st, { status: b.dataset.v }); paintMitglieder(); }));
+  document.querySelectorAll('[data-all]').forEach((b) => (b.onclick = async () => { await up(b.dataset.all, { tiles: Object.fromEntries(TILES.map((t) => [t.key, 'view'])) }); paintMitglieder(); }));
+  document.querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => { if (!(await confirmBox('Person wirklich entfernen?', 'Entfernen'))) return; const { error } = await sb.from('hs_members').delete().eq('user_id', b.dataset.del); if (error) return err(error); paintMitglieder(); }));
+}
+
+/* ═════════ Profil & Push ═════════ */
+const PUSHCAT = [
+  { k: 'alarm', t: '🚨 Alarme', d: 'Klappe abends noch offen, Störung, Stall offline' },
+  { k: 'klappe', t: '🚪 Klappe auf/zu', d: 'jedes Öffnen und Schließen' },
+  { k: 'pflege', t: '🧹 Pflege fällig', d: 'tägliche Erinnerung ca. 17 Uhr' },
+  { k: 'neu', t: '🩺 Neue Gesundheits-Einträge', d: '' },
+];
+async function paintProfil() {
+  $('#app').innerHTML = `${backBtn()}<h1>⚙️ Einstellungen</h1>
+    <div class="card"><div class="row"><div style="flex:1"><b>${esc(member.name || me.email)}</b><div class="small muted">${esc(me.email)} · ${member.role === 'admin' ? 'Admin' : 'Mitglied'}</div></div><button class="btn" id="pwSet">🔑 Passwort festlegen</button></div></div>
+    <h2>Benachrichtigungen auf diesem Gerät</h2><div class="card" id="pushBox"><div class="spin"></div></div>
+    <div class="row" style="margin-top:24px"><button class="btn" onclick="logout()">Abmelden</button><span class="sp"></span><span class="small muted">Stallwache 1.0</span></div>`;
+  paintPush();
+  $('#pwSet').onclick = () => {
+    const m = modal(`<h3>🔑 Passwort festlegen</h3><p class="small muted">Gilt für dein ganzes Konto – also auch für Florian HQ und H&amp;E Hub.</p><div class="col">
+      <input type="password" id="p1" placeholder="Neues Passwort (mind. 8 Zeichen)" autocomplete="new-password"><input type="password" id="p2" placeholder="Wiederholen" autocomplete="new-password">
+      <div class="row" style="justify-content:flex-end"><button class="btn" data-x>Abbrechen</button><button class="btn pri" data-s>Speichern</button></div></div>`);
+    m.querySelector('[data-x]').onclick = () => m.remove();
+    m.querySelector('[data-s]').onclick = async () => {
+      const a = m.querySelector('#p1').value, b = m.querySelector('#p2').value;
+      if (a.length < 8) return toast('Mindestens 8 Zeichen.'); if (a !== b) return toast('Passwörter stimmen nicht überein.');
+      const { error } = await sb.auth.updateUser({ password: a }); if (error) return err(error);
+      m.remove(); toast('Passwort gespeichert ✅');
+    };
+  };
+}
+async function swReg() { if (!('serviceWorker' in navigator)) return null; return navigator.serviceWorker.register('sw.js'); }
+function b64u(s) { const p = '='.repeat((4 - (s.length % 4)) % 4); const b = atob((s + p).replace(/-/g, '+').replace(/_/g, '/')); return Uint8Array.from([...b].map((c) => c.charCodeAt(0))); }
+async function paintPush() {
+  const box = $('#pushBox');
+  if (!('PushManager' in window) || !('serviceWorker' in navigator)) { box.innerHTML = `<p class="muted">Dieses Gerät/Browser unterstützt keine Push-Nachrichten.${/iPhone|iPad/.test(navigator.userAgent) ? ' Auf dem iPhone: Seite über „Teilen → Zum Home-Bildschirm“ hinzufügen und die App von dort öffnen.' : ''}</p>`; return; }
+  const reg = await swReg(); const sub = await reg.pushManager.getSubscription();
+  let row = null;
+  if (sub) { const { data } = await sb.from('hs_push_subs').select('*').eq('endpoint', sub.endpoint).maybeSingle(); row = data; }
+  if (!sub || !row) {
+    box.innerHTML = `<p class="muted" style="margin-top:0">Lass dich benachrichtigen, wenn die Klappe abends offen bleibt oder der Stall offline ist.</p><button class="btn pri" id="pOn">🔔 Benachrichtigungen aktivieren</button>`;
+    $('#pOn').onclick = async () => {
+      try {
+        const perm = await Notification.requestPermission(); if (perm !== 'granted') return toast('Benachrichtigungen wurden nicht erlaubt.');
+        const { publicKey } = await (await fetch(FN + '/hs-push')).json();
+        const s = sub || (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64u(publicKey) }));
+        const j = s.toJSON();
+        const { error } = await sb.from('hs_push_subs').upsert({ endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth, user_id: me.id }, { onConflict: 'endpoint' });
+        if (error) throw error; toast('Aktiviert ✅'); paintPush();
+      } catch (e) { err(e); }
+    };
+    return;
+  }
+  const prefs = row.prefs || {};
+  box.innerHTML = PUSHCAT.map((c) => `<label class="chk"><input type="checkbox" data-k="${c.k}" ${prefs[c.k] !== false ? 'checked' : ''}><div><div>${c.t}</div>${c.d ? `<div class="small muted">${c.d}</div>` : ''}</div></label>`).join('') +
+    `<div class="row" style="margin-top:10px"><button class="btn" id="pTest">Testnachricht</button><button class="btn bad" id="pOff">Auf diesem Gerät aus</button></div>`;
+  box.querySelectorAll('[data-k]').forEach((c) => (c.onchange = async () => { prefs[c.dataset.k] = c.checked; const { error } = await sb.from('hs_push_subs').update({ prefs }).eq('id', row.id); if (error) err(error); }));
+  $('#pTest').onclick = async () => { const { data: { session } } = await sb.auth.getSession(); const r = await fetch(FN + '/hs-push', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + session.access_token, apikey: SUPABASE_KEY }, body: JSON.stringify({ test: true }) }); const j = await r.json(); toast(j.sent ? 'Testnachricht gesendet' : 'Nichts gesendet: ' + (j.error || '0 Geräte')); };
+  $('#pOff').onclick = async () => { await sb.from('hs_push_subs').delete().eq('id', row.id); await sub.unsubscribe(); paintPush(); };
+}
+
+document.addEventListener('visibilitychange', () => { if (!document.hidden && member?.status === 'approved') { loadState(); } });
+boot().catch(err);
+</script>
+</body>
+</html>

@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#16140f"/>
+  <circle cx="256" cy="256" r="200" fill="#26221b"/>
+  <!-- Mond -->
+  <path d="M150 96a46 46 0 1 0 50 70a38 38 0 1 1 -50 -70z" fill="#f4efe4" opacity=".85"/>
+  <circle cx="222" cy="104" r="5" fill="#f4efe4" opacity=".6"/><circle cx="110" cy="190" r="4" fill="#f4efe4" opacity=".5"/>
+  <!-- Huhn -->
+  <path d="M150 300 q-44 -66 6 -118 q-4 46 34 64 q40 -84 110 -70 q76 16 74 110 q-2 102 -110 114 q-82 8 -114 -100z" fill="#f2b33d"/>
+  <path d="M190 276 q36 62 104 46 q-60 44 -104 -46z" fill="#d99a2b"/>
+  <!-- Kamm -->
+  <path d="M262 182 q-6 -40 22 -44 q6 -30 34 -20 q24 -16 38 12 q22 8 6 40 z" fill="#e0533f"/>
+  <!-- Schnabel -->
+  <path d="M372 226 l42 18 l-42 16 z" fill="#ffcf6e"/>
+  <!-- Kehllappen -->
+  <path d="M358 262 q16 34 -4 50 q-18 -22 4 -50z" fill="#e0533f"/>
+  <!-- Auge -->
+  <circle cx="330" cy="222" r="13" fill="#16140f"/>
+  <circle cx="334" cy="218" r="4" fill="#fff"/>
+  <!-- Beine -->
+  <path d="M236 404 v34 M276 404 v34" stroke="#ffcf6e" stroke-width="12" stroke-linecap="round"/>
+</svg>
