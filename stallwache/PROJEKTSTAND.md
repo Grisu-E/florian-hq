@@ -23,7 +23,7 @@ Die LOGO bleibt der Chef: Astro-Uhr fährt die Klappe auch ohne Pi. Die App gibt
 ## Stand der Teile
 | Teil | Stand |
 |---|---|
-| App (`index.html`, `sw.js`) | ✅ live. Schlüssel: Klappe, Kamera, Eier, Pflege, Herde, Umzug Stall, Tränke, Ziegen, Personal (Admin). Gesundheit entfernt (Daten bleiben in `hs_items`, tile `gesundheit`). Motel-Design (Neonschild, Schlüsselanhänger, Bungee + Figtree). Passwort-Login, E-Mail-Link, Registrieren, Passwort vergessen, Einladungslink, Push. |
+| App (`index.html`, `sw.js`) | ✅ live. Schlüssel (Reihenfolge): Klappe, Kamera, Ziegen, Umzug Stall, Eier, Pflege, Herde, Tränke, Personal (Admin). Gesundheit entfernt (Daten bleiben in `hs_items`, tile `gesundheit`). Motel-Design (Neonschild, Schlüsselanhänger, Bungee + Figtree). Passwort-Login, E-Mail-Link, Registrieren, Passwort vergessen, Einladungslink, Push. |
 | Supabase | ✅ eingerichtet und getestet |
 | Wetter (Open-Meteo) | ✅ läuft (alle 3 h, Warn-Push 17:13 UTC ≈ 18 Uhr) |
 | Raspberry Pi | ⏳ noch nicht installiert → `bash install.sh` (fragt LOGO-IP, Kamera, Gast-WLAN ab) |
@@ -63,7 +63,7 @@ Die LOGO bleibt der Chef: Astro-Uhr fährt die Klappe auch ohne Pi. Die App gibt
 - Neues Geheimnis: Hash in `fhq_private.hs_bridge` ersetzen (SQL in `supabase/stallwache.sql`).
 
 ## Arbeitsweise / Hinweise
-- Änderungen an der App: `stallwache/index.html` + **Cache-Version in `sw.js` hochzählen** (`huehnerhotel-vNN`, zuletzt v17), Commit auf `main` → GitHub Pages ist nach ca. 1 Min. live.
+- Änderungen an der App: `stallwache/index.html` + **Cache-Version in `sw.js` hochzählen** (`huehnerhotel-vNN`, zuletzt v18), Commit auf `main` → GitHub Pages ist nach ca. 1 Min. live.
 - Tests: `stallwache/tests/` (simulierte LOGO per Modbus, Fake-Supabase). `python3 test_real.py` testet die echte Belegung.
 - Alle Apps teilen sich ein Login. Wer schon bei Florian HQ, H&E Hub oder Alarmstufe Pink ist, meldet sich an, statt sich zu registrieren.
 - Kostenloser Supabase-Mailversand: nur wenige Mails pro Stunde.

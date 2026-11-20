@@ -232,14 +232,14 @@ const FN = SUPABASE_URL + '/functions/v1';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } });
 
 const TILES = [
-  { key: 'klappe',     icon: '🚪', name: 'Klappe',     desc: 'Auf, zu, Zeiten und Protokoll', c: 'var(--sign)',  r: -2 },
-  { key: 'kamera',     icon: '📷', name: 'Kamera',     desc: 'Blick in die Zimmer',           c: 'var(--sky)',   r: 1.5 },
-  { key: 'eier',       icon: '🥚', name: 'Eier',       desc: 'Was die Gäste gelegt haben',    c: 'var(--chalk)', r: -1 },
-  { key: 'pflege',     icon: '🧹', name: 'Pflege',     desc: 'Zimmerservice: Futter, Wasser, Ausmisten', c: 'var(--mint)', r: 2 },
-  { key: 'herde',      icon: '🐔', name: 'Herde',      desc: 'Unsere Gäste',                  c: 'var(--coral)', r: -1.5 },
-  { key: 'stallpflicht', icon: '🚚', name: 'Umzug Stall', desc: 'Klappe bleibt zu', c: '#ff8a96', r: 1.8 },
-  { key: 'traenke',    icon: '♨️', name: 'Tränke',     desc: 'Heizung bei Frost',             c: '#9fd8ff', r: -0.8 },
-  { key: 'ziegen',     icon: '🐐', name: 'Ziegen',     desc: 'Ziegentür und Freigabe',        c: '#f7b7d2',      r: -2.2 },
+  { key: 'klappe',       icon: '🚪', name: 'Klappe',      desc: 'Auf, zu, Zeiten und Protokoll', c: 'var(--sign)',  r: -2 },
+  { key: 'kamera',       icon: '📷', name: 'Kamera',      desc: 'Blick in die Zimmer',           c: 'var(--sky)',   r: 1.5 },
+  { key: 'ziegen',       icon: '🐐', name: 'Ziegen',      desc: 'Ziegentür und Freigabe',        c: '#f7b7d2',      r: -1.2 },
+  { key: 'stallpflicht', icon: '🚚', name: 'Umzug Stall', desc: 'Klappe bleibt zu',              c: '#ff8a96',      r: 1.8 },
+  { key: 'eier',         icon: '🥚', name: 'Eier',        desc: 'Was die Gäste gelegt haben',    c: 'var(--chalk)', r: -1 },
+  { key: 'pflege',       icon: '🧹', name: 'Pflege',      desc: 'Zimmerservice: Futter, Wasser, Ausmisten', c: 'var(--mint)', r: 2 },
+  { key: 'herde',        icon: '🐔', name: 'Herde',       desc: 'Unsere Gäste',                  c: 'var(--coral)', r: -1.5 },
+  { key: 'traenke',      icon: '♨️', name: 'Tränke',      desc: 'Heizung bei Frost',             c: '#9fd8ff',      r: 1 },
 ];
 const DOOR = {
   offen:     { t: 'Klappe offen',     c: 'ok',   e: '🐔' },
