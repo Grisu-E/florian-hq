@@ -26,7 +26,7 @@ try:
 except Exception:  # sehr alte Python-Version
     TZ = None
 
-VERSION = "1.1"
+VERSION = "1.2"
 log = logging.getLogger("stallwache")
 
 
@@ -289,7 +289,9 @@ class Bridge:
         sig = lambda k: Signal(L[k]) if L.get(k, "").strip() else None
         self.sig = {k: sig(k) for k in ("endschalter_oben", "endschalter_unten", "motor_auf", "motor_zu", "stoerung", "temperatur")}
         self.cmd_auf, self.cmd_zu = sig("befehl_auf"), sig("befehl_zu")
-        for s in (self.cmd_auf, self.cmd_zu):
+        self.cmd_sperre = sig("befehl_sperre")
+        self.sperre_ist, self.sperre_t = None, 0
+        for s in (self.cmd_auf, self.cmd_zu, self.cmd_sperre):
             if s and not s.writable:
                 raise ValueError(f"Befehls-Adresse {s.spec} muss ein V-Bit oder Merker sein (z. B. V0.0)")
         self.pulse_s = L.getfloat("impuls_ms", 800) / 1000
@@ -533,6 +535,24 @@ class Bridge:
         log.info("Ziegentür: warte auf Chips vom Reader auf Port %s", self.z_port)
         return srv
 
+    # ───── Stallpflicht ─────
+    def stallpflicht(self):
+        return bool(((self.cfg or {}).get("stallpflicht") or {}).get("aktiv"))
+
+    def sync_sperre(self):
+        """Hält das Sperr-Bit in der LOGO auf dem Stand der App (alle 30 s neu geschrieben)."""
+        if self.cmd_sperre is None or not self.logo_ok or not self.cfg:
+            return
+        soll = self.stallpflicht()
+        if soll != self.sperre_ist or time.time() - self.sperre_t > 30:
+            try:
+                self.mb.write_coil(self.cmd_sperre.addr, soll)
+                if soll != self.sperre_ist:
+                    log.info("Stallpflicht-Sperre in der LOGO: %s", "AN" if soll else "aus")
+                self.sperre_ist, self.sperre_t = soll, time.time()
+            except Exception as e:
+                log.warning("Sperr-Bit konnte nicht geschrieben werden: %s", e)
+
     # ───── Befehle ─────
     def run_command(self, c):
         if c["cmd"] == "unlock":
@@ -543,6 +563,9 @@ class Bridge:
                 self.event("ziege", f"Entriegeln aus der App fehlgeschlagen: {txt}")
             return
         which = "auf" if c["cmd"] == "open" else "zu"
+        if which == "auf" and self.stallpflicht():
+            self.safe_ack(c["id"], False, "Stallpflicht aktiv – Öffnen gesperrt")
+            return
         target = "offen" if which == "auf" else "zu"
         if not self.logo_ok:
             self.safe_ack(c["id"], False, "LOGO nicht erreichbar")
@@ -600,7 +623,8 @@ class Bridge:
         auf, zu = p["auf"], p["zu"]
         app_mode = self.cfg.get("steuerung") == "app"
         # Pi steuert nach Zeit (nur wenn in der App „Pi / App“ gewählt)
-        if app_mode and auf and auf <= now < zu and now - auf < timedelta(hours=2) and self.door in ("zu", "zwischen") and self.flag("auf"):
+        sp = self.stallpflicht()
+        if app_mode and not sp and auf and auf <= now < zu and now - auf < timedelta(hours=2) and self.door in ("zu", "zwischen") and self.flag("auf"):
             log.info("Zeitsteuerung: öffnen")
             try:
                 self.pulse("auf"); self.last_cmd_src = ("nach Zeitplan (Pi)", time.time())
@@ -616,7 +640,7 @@ class Bridge:
         if now >= p["alarm_zu"] and now.hour >= 12 and self.door not in ("zu", "unbekannt") and self.flag("alarm_zu"):
             self.event("alarm", f"Klappe ist um {now:%H:%M} noch nicht zu (sollte seit {hm(zu)} zu sein) – Fuchsgefahr!")
         # Alarm: morgens noch zu
-        if p["alarm_auf"] <= now < zu and self.door == "zu" and self.flag("alarm_auf"):
+        if not sp and p["alarm_auf"] <= now < zu and self.door == "zu" and self.flag("alarm_auf"):
             self.event("alarm", f"Klappe ist um {now:%H:%M} noch zu (sollte seit {hm(auf)} offen sein)")
         # Motor läuft zu lange
         if self.door in ("oeffnet", "schliesst"):
@@ -632,6 +656,7 @@ class Bridge:
     # ───── Hauptschleife ─────
     def info(self, p):
         i = {"version": VERSION, "logo_ok": self.logo_ok, "steuerung": self.cfg.get("steuerung", "logo")}
+        i["stallpflicht"] = self.stallpflicht()
         if self.cams:
             i["cams"] = [c["name"] for c in self.cams]
             i["cam_ok"] = self.cam.ok
@@ -691,6 +716,7 @@ class Bridge:
                 self.server_offset = datetime.fromisoformat(st.replace("Z", "+00:00")).timestamp() - time.time()
             lu = res.get("live_until")
             self.live_until = datetime.fromisoformat(lu.replace("Z", "+00:00")).timestamp() if lu else None
+            self.sync_sperre()
             for c in res.get("commands") or []:
                 log.info("Befehl aus der App: %s (#%s)", c["cmd"], c["id"])
                 self.run_command(c)

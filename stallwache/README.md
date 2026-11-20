@@ -50,6 +50,7 @@ Die Belegung ist noch offen, deshalb hier ein Vorschlag. Die Brücke ist genau s
 | **Q2** | Motor **ZU** | |
 | **V0.0** | Netzwerkeingang **NI1 = AUF aus der App** | Impuls 0,8 s |
 | **V0.1** | Netzwerkeingang **NI2 = ZU aus der App** | Impuls 0,8 s |
+| **V0.3** | Netzwerkeingang **NI4 = Stallpflicht-Sperre** | bleibt 1, solange in der App Stallpflicht aktiv ist |
 | **M1** | Störung (Laufzeit überschritten) | optional, dann in der INI `stoerung = M1` |
 
 **Logik (Funktionsplan):**
@@ -57,7 +58,7 @@ Die Belegung ist noch offen, deshalb hier ein Vorschlag. Die Brücke ist genau s
 - **Astro-Uhr** (Sonderfunktion „Astronomische Uhr“): Breiten- und Längengrad von Gitzensteig ≈ 47,67 N / 9,59 O, Offset nach Wunsch, z. B. AUF = Sonnenaufgang + 30 Min, ZU = Sonnenuntergang + 20 Min.
 - **AUF-Anforderung** = ODER( Astro *steigende Flanke*, I1, NI1 )
 - **ZU-Anforderung** = ODER( Astro *fallende Flanke*, I2, NI2 )
-- **Q1 (Motor auf)** über Selbsthalterelais (RS): Setzen = AUF-Anforderung UND NICHT I3 UND NICHT Q2; Rücksetzen = I3 ODER ZU-Anforderung ODER Laufzeit-Überwachung
+- **Q1 (Motor auf)** über Selbsthalterelais (RS): Setzen = AUF-Anforderung UND NICHT I3 UND NICHT Q2 UND NICHT NI4 (Stallpflicht); Rücksetzen = I3 ODER ZU-Anforderung ODER Laufzeit-Überwachung
 - **Q2 (Motor zu)** genauso mit I4, Q1 und der AUF-Anforderung
 - **Laufzeit-Überwachung:** Einschaltverzögerung ca. 60 s an Q1 ODER Q2 → setzt Q1/Q2 zurück und setzt **M1**. M1 wird bei der nächsten Anforderung zurückgesetzt.
 - **Modbus freischalten:** LOGO!Soft Comfort → *Extras → Ethernet-Verbindungen* → Haken bei **„Modbus-Zugriff zulassen“** (Port 502), danach Programm übertragen.
@@ -130,7 +131,7 @@ Danach zeigt die App oben **„online“** und den Klappenstatus.
 
 | Kachel | Funktion |
 |---|---|
-| 🚪 **Klappe** | Status live, Öffnen/Schließen per Knopf (mit Rückmeldung), heutige Sonnen- und Sollzeiten, Protokoll, Zeiten & Alarm einstellen |
+| 🚪 **Klappe** | Status live, Öffnen/Schließen per Knopf (mit Rückmeldung), **Stallpflicht-Schalter**, heutige Sonnen- und Sollzeiten, Protokoll, Zeiten & Alarm einstellen |
 | 📷 **Kamera** | Letztes Bild beider Objektive, Live-Modus, Verlauf mit Bildern beim Öffnen/Schließen |
 | 🥚 **Eier** | Tageszähler (+/−), Statistik 7/30 Tage, Monate, Legequote |
 | 🧹 **Pflege** | Futter, Wasser, Ausmisten … mit Intervall und Ampel, Push-Erinnerung ca. 17 Uhr |

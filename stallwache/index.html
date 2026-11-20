@@ -246,7 +246,7 @@ const DOOR = {
   stoerung:  { t: 'Störung',          c: 'bad',  e: '⚠️' },
   unbekannt: { t: 'Status unbekannt', c: '',     e: '❔' },
 };
-const EVI = { auf: '🐔', zu: '🌙', befehl: '👆', alarm: '🚨', fehler: '⚠️', offline: '📡', online: '📡', info: 'ℹ️', start: '🔌' };
+const EVI = { stallpflicht: '🏠', auf: '🐔', zu: '🌙', befehl: '👆', alarm: '🚨', fehler: '⚠️', offline: '📡', online: '📡', info: 'ℹ️', start: '🔌' };
 
 /* ═════════ Zustand ═════════ */
 let me = null, member = null, cfg = null, st = null, names = {};
@@ -487,13 +487,14 @@ function heroCard() {
   const flick = !signFlicked && known ? ' flick' : ''; if (known) signFlicked = true;
   const spaetOffen = ['offen', 'zwischen', 'oeffnet', 'stoerung'].includes(st?.door) && c.c !== 'bad' && p.zu && now > p.zu && (now.getHours() >= 12);
   const next = spaetOffen ? '' : p.auf && now < p.auf ? `Öffnet ca. ${hm(p.auf)}` : p.zu && now < p.zu ? `Schließt ca. ${hm(p.zu)}` : p.auf ? `Öffnet morgen früh` : '';
-  const sub = known && st?.changed_at ? `Klappe ${st.door === 'zu' ? 'zu' : st.door === 'offen' ? 'offen' : 'in Bewegung'} seit ${fmtDT(st.changed_at)} Uhr` : c.t;
+  const spa = !!cfg?.stallpflicht?.aktiv;
+  const sub = spa ? 'Stallpflicht – alle Gäste bleiben drinnen' : known && st?.changed_at ? `Klappe ${st.door === 'zu' ? 'zu' : st.door === 'offen' ? 'offen' : 'in Bewegung'} seit ${fmtDT(st.changed_at)} Uhr` : c.t;
   return `<a class="signpost" href="#klappe" aria-label="Klappe: ${esc(word)}">
     <div class="board"><div class="bulbs"></div>
       <div class="name">Hühnerhotel</div>
       <div class="sub">${esc(sub)}</div>
       <div class="vacancy ${cls}${flick}">${esc(word)}</div>
-      <div class="meta"><span class="pill"><span class="dot ${c.c}"></span>${c.t}</span>${next ? `<span class="pill">⏱ ${next}</span>` : ''}${st?.info?.temp != null ? `<span class="pill">🌡 ${esc(String(st.info.temp).replace('.', ','))} °C</span>` : ''}</div>
+      <div class="meta">${spa ? '<span class="pill" style="border-color:var(--neon-r);color:#ffd1d7">🏠 Stallpflicht</span>' : ''}<span class="pill"><span class="dot ${c.c}"></span>${c.t}</span>${next && !spa ? `<span class="pill">⏱ ${next}</span>` : ''}${st?.info?.temp != null ? `<span class="pill">🌡 ${esc(String(st.info.temp).replace('.', ','))} °C</span>` : ''}</div>
       ${spaetOffen ? `<div class="warnbox small" style="margin-top:12px">Die Klappe sollte seit ca. ${hm(p.zu)} Uhr zu sein.</div>` : ''}
     </div>
     <div class="poles" aria-hidden="true"><i></i><i></i></div></a>`;
@@ -514,10 +515,31 @@ let cmdWatch = null;
 async function paintKlappe(soft) {
   if (soft && $('#klHero')) { $('#klHero').innerHTML = klHero(); return; }
   $('#app').innerHTML = `${backBtn()}<h1>🚪 Klappe</h1><div id="klHero">${klHero()}</div>
+    <h2>Stallpflicht</h2><div class="card" id="klSp"></div>
     <h2>Heute</h2><div class="card" id="klPlan"></div>
     <h2>Protokoll</h2><div class="card" id="klEv"><div class="spin"></div></div>
     ${canEdit('klappe') ? `<h2>Zeiten & Alarm</h2><div class="card" id="klCfg"></div>` : ''}`;
-  paintPlan(); paintEvents(); if (canEdit('klappe')) paintCfgForm();
+  paintPlan(); paintEvents(); paintSp(); if (canEdit('klappe')) paintCfgForm();
+}
+const spAktiv = () => !!cfg?.stallpflicht?.aktiv;
+function paintSp() {
+  const sp = cfg?.stallpflicht || {}, ed = canEdit('klappe'), el = $('#klSp'); if (!el) return;
+  el.innerHTML = sp.aktiv
+    ? `<div class="row" style="align-items:flex-start"><div style="font-size:30px">🏠</div><div style="flex:1"><b style="color:var(--neon-r)">Stallpflicht ist aktiv</b>
+        <div class="small muted">seit ${sp.seit ? fmtDT(sp.seit) : '–'}${sp.von ? ', eingeschaltet von ' + esc(sp.von) : ''}${sp.notiz ? '<br>' + esc(sp.notiz) : ''}</div>
+        <div class="small" style="margin-top:6px">Die Klappe bleibt zu: Astro-Uhr, Taster und „Öffnen“ in der App sind gesperrt. Schließen geht weiterhin.</div></div></div>
+      ${ed ? '<div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="spOff">Stallpflicht aufheben</button></div>' : ''}`
+    : `<div class="small muted">Bei einer Aufstallungsanordnung (z. B. wegen Geflügelpest) hier einschalten. Die Klappe öffnet dann nicht mehr, auch nicht über die Astro-Uhr der LOGO.</div>
+      ${ed ? `<div class="row" style="margin-top:12px"><input id="spNote" placeholder="Notiz, z. B. Aufstallung Bodenseekreis ab 21.11." style="flex:1;min-width:0"><button class="btn bad" id="spOn" style="border-color:var(--neon-r);color:#ffd1d7">🏠 Stallpflicht einschalten</button></div>` : ''}`;
+  const set = async (on) => {
+    if (!(await confirmBox(on ? 'Stallpflicht einschalten? Die Klappe öffnet dann nicht mehr, bis du sie wieder aufhebst.' : 'Stallpflicht aufheben? Die Klappe läuft dann wieder nach Astro-Uhr bzw. Zeitplan.', on ? 'Einschalten' : 'Aufheben'))) return;
+    const { data, error } = await sb.rpc('hs_set_stallpflicht', { aktiv: on, notiz: on ? ($('#spNote')?.value || '') : null });
+    if (error) return err(error);
+    cfg = { ...cfg, stallpflicht: data }; toast(on ? 'Stallpflicht eingeschaltet' : 'Stallpflicht aufgehoben');
+    paintSp(); $('#klHero').innerHTML = klHero(); paintEvents();
+  };
+  $('#spOn') && ($('#spOn').onclick = () => set(true));
+  $('#spOff') && ($('#spOff').onclick = () => set(false));
 }
 function klHero() {
   const d = DOOR[st?.door] || DOOR.unbekannt, c = conn(), io = st?.io || {};
@@ -529,7 +551,7 @@ function klHero() {
       <span class="pill">Steuerung: ${cfg?.steuerung === 'app' ? 'Pi/App-Zeiten' : 'LOGO-Astro'}</span></div>
     </div></div>
     ${ed ? `<div class="row" style="margin-top:16px">
-      <button class="btn big pri" onclick="cmd('open')" ${c.c === 'bad' ? 'disabled' : ''}>⬆️ Öffnen</button>
+      <button class="btn big pri" onclick="cmd('open')" ${c.c === 'bad' || spAktiv() ? 'disabled' : ''} ${spAktiv() ? 'title="Stallpflicht aktiv"' : ''}>${spAktiv() ? '🏠 Gesperrt' : '⬆️ Öffnen'}</button>
       <button class="btn big" onclick="cmd('close')" ${c.c === 'bad' ? 'disabled' : ''}>⬇️ Schließen</button></div>
       <div id="cmdStat" class="small muted" style="margin-top:8px"></div>` : ''}
     ${c.c === 'bad' ? `<div class="warnbox small" style="margin-top:12px">Keine Verbindung zum Stall – Befehle sind gesperrt. Prüfe Pi, Richtfunk und LOGO.</div>` : ''}
