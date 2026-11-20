@@ -73,14 +73,14 @@ Die Belegung ist noch offen, deshalb hier ein Vorschlag. Die Brücke ist genau s
 
 ### Anpassungen an deinem LOGO-Programm (Stand 20.11.)
 
-Dein Programm nutzt: **I1** Taster öffnen, **I2** Taster schließen, **I3** Licht-Taster → **Q2** Licht (mit 5-Min-Abschaltung), **I4** Klappe oben → M4, **I5** Klappe unten → M5, **Q1** Klappenantrieb, **B002** Astro-Uhr (Aufgang +59 Min., Untergang +40 Min.). Die Brücke ist darauf eingestellt (Endschalter I4/I5, Motor Q1).
+Dein Programm nutzt: **I1** Taster öffnen, **I2** Taster schließen, **I3** Licht-Taster → **Q2** Licht (mit 5-Min-Abschaltung), **I4** Klappe oben → M4, **I5** Klappe unten → M5, **Q1** Relais für den Klappenantrieb (**angezogen = Klappe auf, stromlos = Klappe zu**, gesetzt über das Selbsthalterelais B007), **B002** Astro-Uhr (Aufgang +59 Min., Untergang +40 Min.). Die Brücke ist darauf eingestellt: Endschalter I4/I5 zeigen die echte Lage, Q1 den Sollzustand. Daraus ergibt sich „öffnet …“ bzw. „schließt …“, und bleibt die Klappe hängen, kommt nach 60 s ein Fehler-Alarm. Bei Stromausfall fällt Q1 ab und die Klappe geht zu.
 
 | # | Änderung | Warum |
 |---|---|---|
 | 1 | **B002 Astro-Uhr: Koordinaten auf Gitzensteig** (N 47° 40′, O 9° 35′) | Eingetragen ist **Berlin** (N52°31′ / O13°24′, der Standardwert von LOGO!Soft). Heute schließt die Klappe dadurch um ca. **16:47 statt 17:20**, im Juni öffnet sie ca. 40 Min. zu früh. |
 | 2 | Nach **I1** einen **ODER-Baustein** mit **NI1 (V0.0)** einfügen und alle bisherigen Verbindungen von I1 an dessen Ausgang hängen | „Öffnen“ aus der App wirkt wie ein Druck auf den Taster |
 | 3 | Genauso nach **I2** ein ODER mit **NI2 (V0.1)** | „Schließen“ aus der App |
-| 4 | Den **Öffnen-Weg der Astro-Uhr** mit **UND NICHT NI4 (V0.3)** sperren | Stallpflicht: Die Astro-Uhr öffnet nicht mehr, Schließen bleibt erlaubt |
+| 4 | Vor den **S-Eingang von B007** ein **UND** mit **NICHT NI4 (V0.3)** setzen | Stallpflicht: B007 kann nicht mehr gesetzt werden, Q1 bleibt aus, die Klappe bleibt zu (Astro-Uhr, Taster und App). Schließen über R bleibt möglich. Soll der Taster am Stall trotz Stallpflicht öffnen können, das UND nur in den Astro-Zweig setzen. |
 | 5 | **Q4** = NI5 (V0.4) für die Tränke-Heizung, **Q3** = Schloss Ziegentür (NI3 / V0.2 mit 120-s-Begrenzung) | Ausgänge sind noch frei |
 | 6 | Ziegentür-Türkontakt auf **I6** (I5 ist schon „Klappe unten“) | Belegung angepasst |
 | 7 | *Extras → Ethernet-Verbindungen* → **„Modbus-Zugriff zulassen“** | sonst kommt der Pi nicht an die LOGO |
