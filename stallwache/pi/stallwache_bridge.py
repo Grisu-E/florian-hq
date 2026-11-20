@@ -26,7 +26,7 @@ try:
 except Exception:  # sehr alte Python-Version
     TZ = None
 
-VERSION = "1.5"
+VERSION = "1.6"
 log = logging.getLogger("stallwache")
 
 
@@ -520,6 +520,25 @@ class Bridge:
             self.z_last[k] = time.time()
             self.event("ziege", text)
 
+    def z_discovery(self):
+        """Antwortet auf die Suche des ESP32 („HUEHNERHOTEL?<token>“ per UDP-Broadcast)."""
+        try:
+            u = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            u.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            u.bind(("0.0.0.0", self.z_port))
+        except OSError as e:
+            log.warning("Reader-Suche (UDP %s) nicht möglich: %s", self.z_port, e)
+            return
+        while True:
+            try:
+                data, addr = u.recvfrom(256)
+                msg = data.decode(errors="ignore").strip()
+                if msg.startswith("HUEHNERHOTEL?") and (not self.z_token or msg[13:] == self.z_token):
+                    u.sendto(f"HUEHNERHOTEL!{self.z_port}".encode(), addr)
+                    log.info("Ziegentür-Reader %s hat den Pi gefunden", addr[0])
+            except Exception as e:
+                log.debug("UDP: %s", e)
+
     def z_server(self):
         bridge = self
 
@@ -554,6 +573,7 @@ class Bridge:
 
         srv = ThreadingHTTPServer(("0.0.0.0", self.z_port), H)
         threading.Thread(target=srv.serve_forever, daemon=True).start()
+        threading.Thread(target=self.z_discovery, daemon=True).start()
         log.info("Ziegentür: warte auf Chips vom Reader auf Port %s", self.z_port)
         return srv
 

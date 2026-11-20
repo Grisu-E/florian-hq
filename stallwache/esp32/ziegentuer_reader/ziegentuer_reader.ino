@@ -21,9 +21,10 @@
 #endif
 #include <ETH.h>
 #include <HTTPClient.h>
+#include <WiFiUdp.h>
 
 // ═══════════ Einstellungen ═══════════
-const char* PI_HOST   = "192.168.0.10";        // IP-Adresse des Raspberry Pi
+const char* PI_HOST   = "";                    // leer lassen = Pi wird im Netz automatisch gesucht (oder feste IP eintragen)
 const int   PI_PORT   = 8088;                  // wie [ziegen] port in stallwache.ini
 const char* TOKEN     = "HIER_KENNWORT";           // wie [ziegen] token in stallwache.ini
 const char* READER_ID = "1";                   // falls später ein zweiter Reader dazukommt
@@ -98,11 +99,45 @@ void blink(int pin, int times, int ms) {
   for (int i = 0; i < times; i++) { digitalWrite(pin, HIGH); delay(ms); digitalWrite(pin, LOW); delay(ms); }
 }
 
+// ═══════════ Pi im Netz finden ═══════════
+String piHost = PI_HOST;
+unsigned long lastSearch = 0;
+bool findPi() {
+  if (strlen(PI_HOST)) { piHost = PI_HOST; return true; }
+  if (!ethUp) return false;
+  lastSearch = millis();
+  WiFiUDP udp;
+  udp.begin(PI_PORT + 1);
+  String q = String("HUEHNERHOTEL?") + TOKEN;
+  for (int versuch = 0; versuch < 3; versuch++) {
+    udp.beginPacket(IPAddress(255, 255, 255, 255), PI_PORT);
+    udp.write((const uint8_t*)q.c_str(), q.length());
+    udp.endPacket();
+    unsigned long t0 = millis();
+    while (millis() - t0 < 1500) {
+      if (udp.parsePacket()) {
+        char buf[32] = {0}; udp.read(buf, sizeof(buf) - 1);
+        if (String(buf).startsWith("HUEHNERHOTEL!")) {
+          piHost = udp.remoteIP().toString();
+          Serial.printf("Pi gefunden: %s\n", piHost.c_str());
+          udp.stop(); return true;
+        }
+      }
+      delay(20);
+    }
+  }
+  udp.stop();
+  Serial.println("Pi nicht gefunden – läuft die Brücke mit [ziegen] aktiv = yes?");
+  piHost = "";
+  return false;
+}
+
 // ═══════════ an den Pi melden ═══════════
 void report(const String& tag) {
   if (!ethUp) { Serial.println("kein LAN – Chip nicht gemeldet"); blink(LED_NO, 5, 80); return; }
+  if (piHost.length() == 0 && !findPi()) { blink(LED_NO, 6, 60); return; }
   HTTPClient http;
-  String url = String("http://") + PI_HOST + ":" + PI_PORT + "/rfid?reader=" + READER_ID + "&token=" + TOKEN + "&tag=";
+  String url = String("http://") + piHost + ":" + PI_PORT + "/rfid?reader=" + READER_ID + "&token=" + TOKEN + "&tag=";
   String enc = tag; enc.replace(" ", "%20");
   http.setTimeout(4000);
   http.begin(url + enc);
@@ -112,7 +147,7 @@ void report(const String& tag) {
   Serial.printf("Chip %s → HTTP %d %s\n", tag.c_str(), code, body.c_str());
   if (code == 200 && body.indexOf("\"ok\": true") >= 0) { digitalWrite(LED_OK, HIGH); delay(1500); digitalWrite(LED_OK, LOW); }
   else if (code == 200) blink(LED_NO, 3, 150);
-  else blink(LED_NO, 6, 60);    // Pi nicht erreichbar
+  else { blink(LED_NO, 6, 60); if (!strlen(PI_HOST)) piHost = ""; }   // Pi nicht erreichbar → beim nächsten Mal neu suchen
 }
 
 void setup() {
@@ -143,11 +178,13 @@ void loop() {
       report(tag);
     }
   }
+  // Pi suchen, solange er noch nicht gefunden ist (alle 30 s)
+  if (ethUp && piHost.length() == 0 && millis() - lastSearch > 30000) findPi();
   // Lebenszeichen alle 5 Min., damit die App sieht, dass der Reader läuft
-  if (ethUp && millis() - lastPing > 300000) {
+  if (ethUp && piHost.length() && millis() - lastPing > 300000) {
     lastPing = millis();
     HTTPClient http; http.setTimeout(3000);
-    http.begin(String("http://") + PI_HOST + ":" + PI_PORT + "/ping?token=" + TOKEN);
+    http.begin(String("http://") + piHost + ":" + PI_PORT + "/ping?token=" + TOKEN);
     http.GET(); http.end();
   }
   delay(10);
