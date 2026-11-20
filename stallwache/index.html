@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Stallwache</title>
+<title>Hühnerhotel</title>
 <meta name="theme-color" content="#16140f">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
@@ -120,7 +120,7 @@ table.mem select{padding:6px 8px;font-size:14px}
 <body>
 <header class="top" id="hdr" hidden>
   <div class="in">
-    <div class="brand" onclick="go('')"><img src="icon.svg" alt=""><div>Stallwache<small id="hdrSub">Hühnerstall</small></div></div>
+    <div class="brand" onclick="go('')"><img src="icon.svg" alt=""><div>Hühnerhotel<small id="hdrSub">Hühnerstall</small></div></div>
     <div class="sp"></div>
     <span id="hdrConn" class="pill"><span class="dot"></span><span>…</span></span>
     <button class="iconbtn" title="Einstellungen" onclick="go('profil')">⚙️</button>
@@ -274,7 +274,7 @@ function showLogin() {
   let mode = 'pw';
   const draw = () => {
     $('#app').innerHTML = `<div class="center"><div class="login col">
-      <img src="icon.svg" alt="" style="margin:0 auto"><h1 style="margin:6px 0 0">Stallwache</h1>
+      <img src="icon.svg" alt="" style="margin:0 auto"><h1 style="margin:6px 0 0">Hühnerhotel</h1>
       <p class="muted" style="margin:0 0 10px">Hühnerstall im Blick – Klappe, Kamera, Tagebuch.</p>
       <div class="seg" style="align-self:center"><button data-m="pw" class="${mode === 'pw' ? 'on' : ''}">Passwort</button><button data-m="link" class="${mode === 'link' ? 'on' : ''}">Link per E-Mail</button><button data-m="neu" class="${mode === 'neu' ? 'on' : ''}">Registrieren</button></div>
       ${mode === 'neu' ? '<input id="nm" placeholder="Dein Name" autocomplete="name">' : ''}
@@ -745,7 +745,7 @@ async function paintProfil() {
   $('#app').innerHTML = `${backBtn()}<h1>⚙️ Einstellungen</h1>
     <div class="card"><div class="row"><div style="flex:1"><b>${esc(member.name || me.email)}</b><div class="small muted">${esc(me.email)} · ${member.role === 'admin' ? 'Admin' : 'Mitglied'}</div></div><button class="btn" id="pwSet">🔑 Passwort festlegen</button></div></div>
     <h2>Benachrichtigungen auf diesem Gerät</h2><div class="card" id="pushBox"><div class="spin"></div></div>
-    <div class="row" style="margin-top:24px"><button class="btn" onclick="logout()">Abmelden</button><span class="sp"></span><span class="small muted">Stallwache 1.0</span></div>`;
+    <div class="row" style="margin-top:24px"><button class="btn" onclick="logout()">Abmelden</button><span class="sp"></span><span class="small muted">Hühnerhotel 1.0</span></div>`;
   paintPush();
   $('#pwSet').onclick = () => {
     const m = modal(`<h3>🔑 Passwort festlegen</h3><p class="small muted">Gilt für dein ganzes Konto – also auch für Florian HQ und H&amp;E Hub.</p><div class="col">

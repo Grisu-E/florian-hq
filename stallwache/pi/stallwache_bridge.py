@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Stallwache-Brücke – läuft auf dem Raspberry Pi im Netz des Hühnerstalls.
+Hühnerhotel-Brücke – läuft auf dem Raspberry Pi im Netz des Hühnerstalls.
 
 * liest die Siemens LOGO! 8 per Modbus TCP (Endschalter, Motor-Ausgänge, optional Temperatur)
 * meldet den Zustand an Supabase und holt Befehle (Klappe auf/zu) aus der App ab
@@ -548,7 +548,7 @@ class Bridge:
             self.last_snap = t
 
     def run(self):
-        log.info("Stallwache-Brücke %s startet – LOGO %s:%s, %d Kamera(s)", VERSION, self.mb.host, self.mb.port, len(self.cams))
+        log.info("Hühnerhotel-Brücke %s startet – LOGO %s:%s, %d Kamera(s)", VERSION, self.mb.host, self.mb.port, len(self.cams))
         if self.cam:
             self.cam.start()
         self.event("start", f"Brücke gestartet (v{VERSION})")
@@ -563,7 +563,7 @@ class Bridge:
 
 # ═════════════════════════ Kommandozeile ═════════════════════════
 def main():
-    ap = argparse.ArgumentParser(description="Stallwache-Brücke (LOGO! 8 ↔ Supabase)")
+    ap = argparse.ArgumentParser(description="Hühnerhotel-Brücke (LOGO! 8 ↔ Supabase)")
     ap.add_argument("-c", "--config", default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "stallwache.ini"))
     ap.add_argument("--test", action="store_true", help="LOGO einmal auslesen")
     ap.add_argument("--pulse", choices=["auf", "zu"], help="Testimpuls an die LOGO")

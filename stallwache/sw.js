@@ -1,5 +1,5 @@
-// Stallwache – Service Worker (Push + Offline-Hülle)
-const CACHE = 'stallwache-v2';
+// Hühnerhotel – Service Worker (Push + Offline-Hülle)
+const CACHE = 'huehnerhotel-v3';
 const SHELL = ['./', './index.html', './icon.svg', './icon-192.png', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {})); self.skipWaiting(); });
@@ -13,8 +13,8 @@ self.addEventListener('fetch', (e) => {
 });
 
 self.addEventListener('push', (e) => {
-  let d = {}; try { d = e.data.json(); } catch { d = { title: 'Stallwache', body: e.data ? e.data.text() : '' }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'Stallwache', {
+  let d = {}; try { d = e.data.json(); } catch { d = { title: 'Hühnerhotel', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Hühnerhotel', {
     body: d.body || '', icon: 'icon-192.png', badge: 'icon-192.png', data: { url: d.url || './' },
     tag: d.title && d.title.includes('Klappe') ? 'klappe' : undefined, renotify: true,
   }));

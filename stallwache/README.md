@@ -1,4 +1,4 @@
-# 🐔 Stallwache – Anleitung
+# 🐔 Hühnerhotel – Anleitung
 
 Überwachung und Steuerung des Hühnerstalls: Klappe (LOGO! 8), Kamera (GENBOLT), Eier, Pflege, Herde und Gesundheit.
 

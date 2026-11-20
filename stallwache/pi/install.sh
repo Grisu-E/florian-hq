@@ -1,5 +1,5 @@
 #!/bin/bash
-# Stallwache-Brücke auf dem Raspberry Pi installieren
+# Hühnerhotel-Brücke auf dem Raspberry Pi installieren
 # Aufruf im entpackten Ordner:  bash install.sh
 set -e
 ZIEL=/opt/stallwache
@@ -22,7 +22,7 @@ sudo chmod 600 "$ZIEL/stallwache.ini"
 echo "▶ Dienst einrichten …"
 sudo tee /etc/systemd/system/stallwache.service >/dev/null <<EOF
 [Unit]
-Description=Stallwache-Brücke (LOGO ↔ App)
+Description=Hühnerhotel-Brücke (LOGO ↔ App)
 After=network-online.target
 Wants=network-online.target
 
