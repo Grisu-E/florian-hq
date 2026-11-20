@@ -240,3 +240,18 @@ drop policy if exists listen_upload on storage.objects;
 create policy listen_upload on storage.objects for insert to authenticated with check (bucket_id = 'listen' and public.is_admin());
 drop policy if exists listen_delete on storage.objects;
 create policy listen_delete on storage.objects for delete to authenticated using (bucket_id = 'listen' and public.is_admin());
+
+-- ═══ Nachtrag 20.11.2026 (Migration handle_new_user_huehnerhotel) ═══
+-- Andere Apps im selben Projekt legen kein Florian-HQ-Profil an: app in ('hehub','fwmaedels','stallwache').
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path to 'public' as $function$
+begin
+  if coalesce(new.raw_user_meta_data->>'app','') in ('hehub','fwmaedels','stallwache') then
+    return new;
+  end if;
+  insert into public.profiles (id, name, email, role)
+  values (new.id, coalesce(nullif(new.raw_user_meta_data->>'name',''), split_part(new.email,'@',1)), new.email,
+          case when exists(select 1 from public.profiles) then 'pending' else 'admin' end)
+  on conflict (id) do nothing;
+  return new;
+end $function$;

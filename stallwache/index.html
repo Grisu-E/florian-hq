@@ -391,11 +391,11 @@ function showLogin() {
   const draw = () => {
     $('#app').innerHTML = `<div class="center"><div class="login col">
       <div class="signpost"><div class="board"><div class="bulbs"></div><div class="name">Hühnerhotel</div><div class="sub">${invite ? 'Du bist eingeladen – willkommen!' : 'Bitte an der Rezeption anmelden'}</div></div><div class="poles" aria-hidden="true"><i></i><i></i></div></div>
-      <div class="seg" style="align-self:center"><button data-m="pw" class="${mode === 'pw' ? 'on' : ''}">Passwort</button><button data-m="link" class="${mode === 'link' ? 'on' : ''}">E-Mail-Link</button><button data-m="neu" class="${mode === 'neu' ? 'on' : ''}">Registrieren</button></div>
+      <div class="seg" style="align-self:center"><button data-m="pw" class="${mode === 'pw' ? 'on' : ''}">Passwort</button><button data-m="neu" class="${mode === 'neu' ? 'on' : ''}">Registrieren</button></div>
       ${mode === 'neu' ? '<input id="nm" placeholder="Dein Name" autocomplete="name">' : ''}
       <input id="em" type="email" placeholder="E-Mail-Adresse" autocomplete="email">
-      ${mode !== 'link' ? `<input id="pw" type="password" placeholder="Passwort${mode === 'neu' ? ' (mind. 8 Zeichen)' : ''}" autocomplete="${mode === 'neu' ? 'new-password' : 'current-password'}">` : ''}
-      <button class="btn pri" id="go">${{ pw: 'Anmelden', link: 'Anmelde-Link schicken', neu: 'Konto anlegen' }[mode]}</button>
+      <input id="pw" type="password" placeholder="Passwort${mode === 'neu' ? ' (mind. 8 Zeichen)' : ''}" autocomplete="${mode === 'neu' ? 'new-password' : 'current-password'}">
+      <button class="btn pri" id="go">${mode === 'neu' ? 'Konto anlegen' : 'Anmelden'}</button>
       ${mode === 'pw' ? '<button class="back" id="forgot" type="button" style="align-self:center;padding:2px 0">Passwort vergessen?</button>' : ''}
       <div id="msg" class="small"></div>
       <p class="small muted">${invite ? 'Lege dir ein Konto an. Danach schaltet dich der Admin für die passenden Bereiche frei. Hast du schon ein Konto (z. B. von Florian HQ), melde dich einfach mit „Passwort“ an.' : 'Gleiches Konto wie Florian HQ / H&amp;E Hub. Neue Personen werden vom Admin freigeschaltet.'}</p></div></div>`;
@@ -407,11 +407,7 @@ function showLogin() {
       if (!email) return msg('Bitte E-Mail eingeben.', true);
       goBtn.disabled = true;
       try {
-        if (mode === 'link') {
-          const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
-          if (error) return msg(/rate|limit/i.test(error.message) ? 'Gerade zu viele Mails verschickt – bitte später nochmal oder mit Passwort anmelden.' : esc(error.message), true);
-          msg(`📬 Link ist unterwegs an <b>${esc(email)}</b>. Mail auf diesem Gerät öffnen und auf den Link tippen.`);
-        } else if (mode === 'neu') {
+        if (mode === 'neu') {
           if (password.length < 8) return msg('Passwort braucht mindestens 8 Zeichen.', true);
           const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname, data: { app: 'stallwache', name: ($('#nm')?.value || '').trim() } } });
           if (error && /registered|exists/i.test(error.message)) { mode = 'pw'; draw(); $('#em').value = email; return $('#msg').innerHTML = `<div class="infobox">Mit <b>${esc(email)}</b> gibt es schon ein Konto – meist von <b>Florian HQ, H&amp;E Hub oder Alarmstufe Pink</b>. Melde dich mit <b>diesem Passwort</b> an. Passwort nicht mehr da? Tippe unten auf „Passwort vergessen“.</div>`; }
@@ -913,44 +909,6 @@ async function paintHerde() {
     };
   };
   paint(); if (ed) $('#hAdd').onclick = () => edit(null);
-}
-
-/* ═════════ Gesundheit ═════════ */
-async function paintGesundheit() {
-  const ed = canEdit('gesundheit');
-  $('#app').innerHTML = `${backBtn()}<div class="row"><h1 style="flex:1">🩺 Gesundheit</h1>${ed ? '<button class="btn pri" id="gAdd">＋ Eintrag</button>' : ''}</div>
-    <div id="gDue"></div><div class="list" id="gList" style="margin-top:12px"></div>`;
-  let all = await items('gesundheit');
-  const herde = canView('herde') ? (await items('herde')).filter((x) => (x.data.status || 'aktiv') === 'aktiv').map((x) => x.data.name).filter(Boolean).sort() : [];
-  const ART = { kontrolle: '🔍 Kontrolle', behandlung: '💊 Behandlung', tierarzt: '🏥 Tierarzt', impfung: '💉 Impfung', wurmkur: '🪱 Wurmkur', parasiten: '🕷 Milben/Läuse', sonstiges: '📝 Sonstiges' };
-  const paint = () => {
-    const due = all.filter((x) => x.data.wiedervorlage && x.data.wiedervorlage <= isoOf(new Date(Date.now() + 3 * 86400000)) && !x.data.erledigt);
-    $('#gDue').innerHTML = due.length ? `<div class="infobox">⏰ Wiedervorlage: ${due.map((x) => `<b>${esc(x.data.titel)}</b> (${fmtD(x.data.wiedervorlage)})`).join(', ')}</div>` : '';
-    $('#gList').innerHTML = all.slice().sort((a, b) => (b.data.datum || '').localeCompare(a.data.datum || '')).map((x) => { const d = x.data;
-      return `<div class="li" data-id="${x.id}" style="cursor:${ed ? 'pointer' : 'default'}"><div class="m"><div class="a">${esc(d.titel || 'Eintrag')}</div>
-      <div class="b">${fmtD(d.datum)} · ${esc(ART[d.art] || d.art || '')} · ${esc(d.huhn || 'Alle')}${d.wiedervorlage ? ` · ⏰ ${fmtD(d.wiedervorlage)}${d.erledigt ? ' ✓' : ''}` : ''}</div>
-      ${d.notiz ? `<div class="b" style="white-space:pre-wrap">${esc(d.notiz)}</div>` : ''}</div></div>`; }).join('') || '<span class="muted">Keine Einträge – hoffentlich bleibt das so 🐔💪</span>';
-    if (ed) $('#gList').querySelectorAll('.li').forEach((el) => (el.onclick = () => edit(all.find((x) => x.id === el.dataset.id))));
-  };
-  const edit = (x) => {
-    const d = x?.data || { datum: todayISO(), art: 'kontrolle' };
-    const m = modal(`<h3>${x ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}</h3><div class="col" style="margin-top:12px">
-      <div class="row"><label class="f">Datum<input type="date" id="gD" value="${esc(d.datum || todayISO())}"></label><label class="f">Art<select id="gA">${Object.entries(ART).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}</select></label></div>
-      <label class="f">Huhn<input id="gH" list="gHl" value="${esc(d.huhn || '')}" placeholder="leer = ganze Herde"><datalist id="gHl">${herde.map((n) => `<option value="${esc(n)}">`).join('')}</datalist></label>
-      <label class="f">Titel<input id="gT" value="${esc(d.titel || '')}" placeholder="z. B. Kalkbeine behandelt"></label>
-      <label class="f">Details / Mittel / Dosierung laut Tierarzt<textarea id="gN">${esc(d.notiz || '')}</textarea></label>
-      <div class="row"><label class="f">Wiedervorlage<input type="date" id="gW" value="${esc(d.wiedervorlage || '')}"></label><label class="chk" style="flex:1"><input type="checkbox" id="gE" ${d.erledigt ? 'checked' : ''}> erledigt</label></div>
-      <div class="row" style="justify-content:space-between">${x ? '<button class="btn bad" data-d>Löschen</button>' : '<span></span>'}<div class="row"><button class="btn" data-x>Abbrechen</button><button class="btn pri" data-s>Speichern</button></div></div></div>`);
-    m.querySelector('#gA').value = d.art || 'kontrolle';
-    m.querySelector('[data-x]').onclick = () => m.remove();
-    m.querySelector('[data-d]') && (m.querySelector('[data-d]').onclick = async () => { if (await delItem(x.id)) { m.remove(); all = await items('gesundheit'); paint(); } });
-    m.querySelector('[data-s]').onclick = async () => {
-      const v = (id) => m.querySelector(id).value.trim();
-      const nd = { datum: v('#gD'), art: v('#gA'), huhn: v('#gH'), titel: v('#gT') || 'Eintrag', notiz: v('#gN'), wiedervorlage: v('#gW'), erledigt: m.querySelector('#gE').checked };
-      if (await saveItem('gesundheit', 'eintrag', nd, x?.id)) { m.remove(); all = await items('gesundheit'); paint(); }
-    };
-  };
-  paint(); if (ed) $('#gAdd').onclick = () => edit(null);
 }
 
 /* ═════════ Ziegen ═════════ */

@@ -416,3 +416,18 @@ end $$;
 
 -- ═══ v1.3: Stallpflicht (hs_set_stallpflicht), Foto beim Schließen (hs_events.bild), Tränke-Heizung (config.traenke),
 --     Wetter (Tabelle hs_wetter, Edge Function hs-wetter, Cron hs-wetter / hs-wetter-abend) ═══
+
+-- ═══ Gemeinsame Anmelde-Funktion: Hühnerhotel-Registrierungen (app = 'stallwache') legen KEIN Florian-HQ-Profil an ═══
+-- (Migration handle_new_user_huehnerhotel vom 20.11.2026 – gilt auch für schema.sql)
+create or replace function public.handle_new_user() returns trigger
+language plpgsql security definer set search_path to 'public' as $function$
+begin
+  if coalesce(new.raw_user_meta_data->>'app','') in ('hehub','fwmaedels','stallwache') then
+    return new;
+  end if;
+  insert into public.profiles (id, name, email, role)
+  values (new.id, coalesce(nullif(new.raw_user_meta_data->>'name',''), split_part(new.email,'@',1)), new.email,
+          case when exists(select 1 from public.profiles) then 'pending' else 'admin' end)
+  on conflict (id) do nothing;
+  return new;
+end $function$;
