@@ -93,7 +93,7 @@ h3{font-size:17px;margin:0 0 6px}
 .key .fob::before{content:"";position:absolute;top:10px;left:38px;width:12px;height:12px;border-radius:50%;background:var(--night);box-shadow:inset 0 2px 2px rgba(0,0,0,.5)}
 .key .fob::after{content:"";position:absolute;inset:6px;border-radius:12px 40px 12px 12px;border:2px dashed rgba(22,34,49,.28);pointer-events:none}
 .key .ic{display:block;position:absolute;bottom:10px;right:12px;font-size:24px}
-.key .t{font:16px/1.1 var(--disp);margin-top:6px;white-space:nowrap}
+.key .t{font:16px/1.1 var(--disp);margin-top:6px;white-space:nowrap;overflow:hidden}
 .key .s{font:600 13px/1.3 var(--body);opacity:.78;margin-top:5px;padding-right:30px}
 .key .badge{position:absolute;top:-6px;right:-4px;background:var(--neon-r);color:#fff;border:2px solid var(--night);font:700 12px/1 var(--body);padding:5px 8px;border-radius:999px;z-index:2}
 
@@ -520,6 +520,13 @@ function heroCard() {
     </div>
     <div class="poles" aria-hidden="true"><i></i><i></i></div></a>`;
 }
+function fitKeys() {   // lange Titel auf dem Schlüsselanhänger verkleinern, bis sie passen
+  document.querySelectorAll('.key .t').forEach((t) => {
+    t.style.fontSize = ''; let f = parseFloat(getComputedStyle(t).fontSize);
+    while (t.scrollWidth > t.clientWidth + 1 && f > 10) { f -= 0.5; t.style.fontSize = f + 'px'; }
+  });
+}
+window.addEventListener('resize', () => { if (!location.hash || location.hash === '#') fitKeys(); });
 function paintHome() {
   if (location.hash && location.hash !== '#') return;
   const tiles = TILES.filter((t) => canView(t.key));
@@ -528,6 +535,8 @@ function paintHome() {
     <h2>Schlüsselbrett</h2>
     <div class="keys">${tiles.map((t) => ({ ...t, desc: t.key === 'stallpflicht' && spAktiv() ? '⚠ AKTIV – Klappe bleibt zu' : t.key === 'traenke' && st?.info?.heizung ? (st.info.heizung.an ? '♨ heizt gerade' : 'Heizung aus') + (st.info.heizung.temp != null ? ', ' + dez(st.info.heizung.temp, 1) + ' °C' : '') : t.desc })).map((t) => `<button class="key" style="--c:${t.c};--r:${t.r}deg" onclick="go('${t.key}')"><span class="ring"></span><span class="fob"><span class="ic">${t.icon}</span><span class="t" style="display:block">${t.name}</span><span class="s" style="display:block">${t.desc}</span></span>${t.key === 'mitglieder' ? '<span class="badge" id="pendBadge" hidden></span>' : ''}</button>`).join('')}</div>
     ${tiles.length === 0 ? '<p class="muted">Dir wurde noch kein Schlüssel ausgehändigt. Der Admin schaltet dich frei.</p>' : ''}`;
+  fitKeys();
+  if (document.fonts?.ready) document.fonts.ready.then(fitKeys);
   if (member.role === 'admin') sb.from('hs_members').select('user_id', { count: 'exact', head: true }).eq('status', 'pending').then(({ count }) => { const b = $('#pendBadge'); if (b && count) { b.hidden = false; b.textContent = count + ' neu'; } });
 }
 
