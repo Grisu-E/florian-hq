@@ -51,6 +51,9 @@ Die Belegung ist noch offen, deshalb hier ein Vorschlag. Die Brücke ist genau s
 | **V0.0** | Netzwerkeingang **NI1 = AUF aus der App** | Impuls 0,8 s |
 | **V0.1** | Netzwerkeingang **NI2 = ZU aus der App** | Impuls 0,8 s |
 | **V0.3** | Netzwerkeingang **NI4 = Stallpflicht-Sperre** | bleibt 1, solange in der App Stallpflicht aktiv ist |
+| **V0.4** | Netzwerkeingang **NI5 = Tränke-Heizung** | 1 = heizen (Pi entscheidet nach Modus und Temperatur) |
+| **Q4** | Heizplatte / Tränkenwärmer | Q4 = NI5. Empfehlung: zusätzlich ODER eine eigene Frostschutz-Schwelle der LOGO (z. B. Analogschwellwert an AI1 < −2 °C), damit die Tränke auch ohne Pi nicht einfriert |
+| **AI1** | optional Temperaturfühler am Stall (0–10 V) | ohne Fühler nimmt der Pi die Außentemperatur vom Wetterdienst |
 | **M1** | Störung (Laufzeit überschritten) | optional, dann in der INI `stoerung = M1` |
 
 **Logik (Funktionsplan):**
@@ -131,12 +134,11 @@ Danach zeigt die App oben **„online“** und den Klappenstatus.
 
 | Kachel | Funktion |
 |---|---|
-| 🚪 **Klappe** | Status live, Öffnen/Schließen per Knopf (mit Rückmeldung), **Stallpflicht-Schalter**, heutige Sonnen- und Sollzeiten, Protokoll, Zeiten & Alarm einstellen |
+| 🚪 **Klappe** | Status live, Öffnen/Schließen per Knopf (mit Rückmeldung), **Stallpflicht-Schalter**, **Tränke-Heizung** (Automatisch/An/Aus mit Temperaturschwellen), **Wetter-Warnungen**, Protokoll mit **Foto beim Schließen**, heutige Sonnen- und Sollzeiten, Protokoll, Zeiten & Alarm einstellen |
 | 📷 **Kamera** | Letztes Bild beider Objektive, Live-Modus, Verlauf mit Bildern beim Öffnen/Schließen |
 | 🥚 **Eier** | Tageszähler (+/−), Statistik 7/30 Tage, Monate, Legequote |
 | 🧹 **Pflege** | Futter, Wasser, Ausmisten … mit Intervall und Ampel, Push-Erinnerung ca. 17 Uhr |
 | 🐔 **Herde** | Hühner mit Rasse, Fußring, Alter, Status |
-| 🩺 **Gesundheit** | Behandlungen, Tierarzt, Wiedervorlage |
 | 🐐 **Ziegen** | Ziegentür: Freigabe (aus/Zeitfenster/dauerhaft), Ziegen mit Chip, Protokoll, „Jetzt entriegeln“ |
 | 👥 **Personal** | Mitglieder und Freigaben (nur Admin) |
 
@@ -145,7 +147,8 @@ Danach zeigt die App oben **„online“** und den Klappenstatus.
 - 🚨 Klappe morgens X Min nach Öffnungszeit noch zu
 - ⚠️ Endlage nicht erreicht, Motor läuft zu lange, LOGO-Störung (M1), LOGO nicht erreichbar
 - 📡 Stall offline (> 10 Min keine Meldung vom Pi) und wieder online
-- 🐔/🌙 jedes Öffnen und Schließen
+- 🐔/🌙 jedes Öffnen und Schließen. „Klappe zu – alle drin?“ kommt mit dem **Kamerafoto** vom Schließen (Bild in der Meldung auf Android; iPhone zeigt nur den Text, das Foto steht im Protokoll)
+- 🌦 **Wetter am Stall** (Open-Meteo): abends ca. 18 Uhr bei Frost, Sturm, Schnee, Gewitter oder Starkregen. Die Vorhersage steht außerdem auf der Startseite
 - 🧹 Pflege fällig, 🩺 neuer Gesundheits-Eintrag
 
 **Steuerung** (Klappe → Zeiten & Alarm):

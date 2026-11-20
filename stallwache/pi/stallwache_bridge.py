@@ -26,7 +26,7 @@ try:
 except Exception:  # sehr alte Python-Version
     TZ = None
 
-VERSION = "1.2"
+VERSION = "1.3"
 log = logging.getLogger("stallwache")
 
 
@@ -257,19 +257,22 @@ class CamWorker(threading.Thread):
         self.busy = threading.Event()
         self.ok = [None] * len(cams)
 
-    def request(self, cam, archive=False, label=""):
+    def request(self, cam, archive=False, label="", cb=None):
         try:
-            self.q.put_nowait((cam, archive, label))
+            self.q.put_nowait((cam, archive, label, cb))
+            return True
         except queue.Full:
-            pass
+            return False
 
     def run(self):
         while True:
-            cam, archive, label = self.q.get()
+            cam, archive, label, cb = self.q.get()
             self.busy.set()
+            path = None
             try:
                 jpg = grab_jpeg(self.cams[cam]["url"])
-                self.sb.upload_snapshot(cam, jpg, archive, label)
+                res = self.sb.upload_snapshot(cam, jpg, archive, label)
+                path = (res or {}).get("path")
                 self.ok[cam] = True
                 log.debug("Bild cam%s hochgeladen (%d kB%s)", cam, len(jpg) // 1024, ", Archiv" if archive else "")
             except Exception as e:
@@ -278,6 +281,11 @@ class CamWorker(threading.Thread):
                 self.ok[cam] = False
             finally:
                 self.busy.clear()
+                if cb:
+                    try:
+                        cb(path)
+                    except Exception:
+                        log.exception("Rückruf nach Kamerabild")
 
 
 # ═════════════════════════ Brücke ═════════════════════════
@@ -287,11 +295,14 @@ class Bridge:
         L = ini["logo"]
         self.mb = ModbusTCP(L.get("host"), L.getint("port", 502), L.getint("unit_id", 1))
         sig = lambda k: Signal(L[k]) if L.get(k, "").strip() else None
-        self.sig = {k: sig(k) for k in ("endschalter_oben", "endschalter_unten", "motor_auf", "motor_zu", "stoerung", "temperatur")}
+        self.sig = {k: sig(k) for k in ("endschalter_oben", "endschalter_unten", "motor_auf", "motor_zu", "stoerung", "temperatur", "heizung")}
         self.cmd_auf, self.cmd_zu = sig("befehl_auf"), sig("befehl_zu")
         self.cmd_sperre = sig("befehl_sperre")
+        self.cmd_heizung = sig("befehl_heizung")
+        self.heiz_ist, self.heiz_t, self.heiz_info = None, 0, None
+        self.wetter = {}
         self.sperre_ist, self.sperre_t = None, 0
-        for s in (self.cmd_auf, self.cmd_zu, self.cmd_sperre):
+        for s in (self.cmd_auf, self.cmd_zu, self.cmd_sperre, self.cmd_heizung):
             if s and not s.writable:
                 raise ValueError(f"Befehls-Adresse {s.spec} muss ein V-Bit oder Merker sein (z. B. V0.0)")
         self.pulse_s = L.getfloat("impuls_ms", 800) / 1000
@@ -354,7 +365,7 @@ class Bridge:
     def read_logo(self):
         io, raw = {}, {}
         labels = {"endschalter_oben": "Endschalter oben", "endschalter_unten": "Endschalter unten", "motor_auf": "Motor auf",
-                  "motor_zu": "Motor zu", "stoerung": "Störung", "schloss": "Schloss entriegelt", "tuerkontakt": "Ziegentür offen"}
+                  "motor_zu": "Motor zu", "stoerung": "Störung", "schloss": "Schloss entriegelt", "tuerkontakt": "Ziegentür offen", "heizung": "Tränke-Heizung"}
         try:
             for k, s in self.sig.items():
                 if s is None:
@@ -406,10 +417,13 @@ class Bridge:
         self.mb.write_coil(s.addr, False)
 
     # ───── Ereignisse ─────
-    def event(self, kind, text, source="stall"):
-        log.info("Ereignis %s: %s", kind, text)
+    def event(self, kind, text, source="stall", bild=None):
+        log.info("Ereignis %s: %s%s", kind, text, f" [{bild}]" if bild else "")
         with self.ev_lock:
-            self.events.append({"kind": kind, "text": text, "source": source})
+            e = {"kind": kind, "text": text, "source": source}
+            if bild:
+                e["bild"] = bild
+            self.events.append(e)
             self.events = self.events[-100:]
 
     # ───── Ziegentür ─────
@@ -553,6 +567,37 @@ class Bridge:
             except Exception as e:
                 log.warning("Sperr-Bit konnte nicht geschrieben werden: %s", e)
 
+    # ───── Tränke-Heizung ─────
+    def heizung(self):
+        """Schaltet die Tränke-Heizung über ein V-Bit (Netzwerkeingang) in der LOGO."""
+        if self.cmd_heizung is None or not self.logo_ok or not self.cfg:
+            return
+        t = (self.cfg or {}).get("traenke") or {}
+        modus = t.get("modus", "auto")
+        temp, quelle = None, None
+        if "Temperatur" in self.io:
+            temp, quelle = self.io["Temperatur"], "Fühler am Stall"
+        elif (self.wetter.get("aktuell") or {}).get("temp") is not None:
+            temp, quelle = float(self.wetter["aktuell"]["temp"]), "Wetterdienst (Außenluft)"
+        if modus == "an":
+            soll = True
+        elif modus == "aus":
+            soll = False
+        elif temp is None:
+            soll = bool(self.heiz_ist)          # keine Temperatur: Zustand halten
+        else:
+            ein, aus = float(t.get("ein", 1)), float(t.get("aus", 3))
+            soll = True if temp <= ein else False if temp >= aus else bool(self.heiz_ist)
+        self.heiz_info = {"modus": modus, "an": soll, "temp": temp, "quelle": quelle}
+        if soll != self.heiz_ist or time.time() - self.heiz_t > 30:
+            try:
+                self.mb.write_coil(self.cmd_heizung.addr, soll)
+                if self.heiz_ist is not None and soll != self.heiz_ist:
+                    self.event("info", f"Tränke-Heizung {'EIN' if soll else 'aus'}" + (f" ({temp:.1f} °C, {quelle})".replace(".", ",", 1) if temp is not None and modus == "auto" else f" (Modus {modus})"))
+                self.heiz_ist, self.heiz_t = soll, time.time()
+            except Exception as e:
+                log.warning("Heizungs-Bit konnte nicht geschrieben werden: %s", e)
+
     # ───── Befehle ─────
     def run_command(self, c):
         if c["cmd"] == "unlock":
@@ -657,6 +702,8 @@ class Bridge:
     def info(self, p):
         i = {"version": VERSION, "logo_ok": self.logo_ok, "steuerung": self.cfg.get("steuerung", "logo")}
         i["stallpflicht"] = self.stallpflicht()
+        if self.heiz_info:
+            i["heizung"] = self.heiz_info
         if self.cams:
             i["cams"] = [c["name"] for c in self.cams]
             i["cam_ok"] = self.cam.ok
@@ -680,10 +727,26 @@ class Bridge:
             if self.stable is not None:
                 src = self.last_cmd_src[0] if self.last_cmd_src and time.time() - self.last_cmd_src[1] < self.fahrzeit + 30 else (
                     "LOGO-Astro / Taster" if self.cfg.get("steuerung") != "app" else "LOGO / Taster")
-                self.event("auf" if new == "offen" else "zu", f"Klappe {'geöffnet' if new == 'offen' else 'geschlossen'} – {src}")
-                if self.cam:
-                    for i in range(len(self.cams)):
-                        self.cam.request(i, archive=True, label="auf" if new == "offen" else "zu")
+                kind = "auf" if new == "offen" else "zu"
+                text = f"Klappe {'geöffnet' if new == 'offen' else 'geschlossen'} – {src}"
+                if self.cam and kind == "zu":
+                    # „Alle drin?“: Push erst mit dem Foto vom Schließen (spätestens nach 30 s ohne Foto)
+                    done = threading.Event()
+                    def mit_bild(path, text=text):
+                        if not done.is_set():
+                            done.set()
+                            self.event("zu", text, bild=path)
+                    if not self.cam.request(0, archive=True, label="zu", cb=mit_bild):
+                        mit_bild(None)
+                    else:
+                        threading.Timer(30, lambda: mit_bild(None)).start()
+                    for i in range(1, len(self.cams)):
+                        self.cam.request(i, archive=True, label="zu")
+                else:
+                    self.event(kind, text)
+                    if self.cam:
+                        for i in range(len(self.cams)):
+                            self.cam.request(i, archive=True, label=kind)
             self.stable = new
             self.last_cmd_src = None
         if new == "stoerung" and self.flag(f"stoer{now_local():%H}"):
@@ -716,7 +779,9 @@ class Bridge:
                 self.server_offset = datetime.fromisoformat(st.replace("Z", "+00:00")).timestamp() - time.time()
             lu = res.get("live_until")
             self.live_until = datetime.fromisoformat(lu.replace("Z", "+00:00")).timestamp() if lu else None
+            self.wetter = res.get("wetter") or self.wetter
             self.sync_sperre()
+            self.heizung()
             for c in res.get("commands") or []:
                 log.info("Befehl aus der App: %s (#%s)", c["cmd"], c["id"])
                 self.run_command(c)

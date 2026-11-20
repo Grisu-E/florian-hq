@@ -169,6 +169,9 @@ table.mem select{padding:6px 8px;font-size:14px}
 .chk input{width:22px;height:22px;accent-color:var(--sign)}
 details summary{cursor:pointer}
 
+.kv.wtage{grid-template-columns:repeat(3,minmax(0,1fr))}
+.kv.wtage b{font-size:16px;white-space:nowrap;margin:2px 0}
+.kv.wtage span{display:block;white-space:nowrap;font-size:12px}
 /* ═══ Smartphone ═══ */
 html,body{overflow-x:hidden}
 header.top .in{min-width:0}
@@ -234,7 +237,6 @@ const TILES = [
   { key: 'eier',       icon: '🥚', name: 'Eier',       desc: 'Was die Gäste gelegt haben',    c: 'var(--chalk)', r: -1 },
   { key: 'pflege',     icon: '🧹', name: 'Pflege',     desc: 'Zimmerservice: Futter, Wasser, Ausmisten', c: 'var(--mint)', r: 2 },
   { key: 'herde',      icon: '🐔', name: 'Herde',      desc: 'Unsere Gäste',                  c: 'var(--coral)', r: -1.5 },
-  { key: 'gesundheit', icon: '🩺', name: 'Gesundheit', desc: 'Hausarzt und Behandlungen',     c: 'var(--lilac)', r: 1 },
   { key: 'ziegen',     icon: '🐐', name: 'Ziegen',     desc: 'Ziegentür und Freigabe',        c: '#f7b7d2',      r: -2.2 },
 ];
 const DOOR = {
@@ -246,10 +248,10 @@ const DOOR = {
   stoerung:  { t: 'Störung',          c: 'bad',  e: '⚠️' },
   unbekannt: { t: 'Status unbekannt', c: '',     e: '❔' },
 };
-const EVI = { stallpflicht: '🏠', auf: '🐔', zu: '🌙', befehl: '👆', alarm: '🚨', fehler: '⚠️', offline: '📡', online: '📡', info: 'ℹ️', start: '🔌' };
+const EVI = { wetter: '🌦', stallpflicht: '🏠', auf: '🐔', zu: '🌙', befehl: '👆', alarm: '🚨', fehler: '⚠️', offline: '📡', online: '📡', info: 'ℹ️', start: '🔌' };
 
 /* ═════════ Zustand ═════════ */
-let me = null, member = null, cfg = null, st = null, names = {};
+let me = null, member = null, cfg = null, st = null, names = {}, wetter = null;
 let pollT = null, liveT = null, liveOn = false, camUrls = {}, camSnapSeen = {};
 
 /* ═════════ Helfer ═════════ */
@@ -336,6 +338,23 @@ async function loadState() {
   if (data) st = data;
   paintConn();
 }
+async function loadWetter() {
+  const { data } = await sb.from('hs_wetter').select('data,updated_at').eq('id', 1).maybeSingle();
+  wetter = data?.data?.tage ? { ...data.data, updated_at: data.updated_at } : null;
+}
+const WCODE = (c) => c == null ? '' : c >= 95 ? '⛈' : c >= 71 && c <= 86 ? '🌨' : c >= 51 && c <= 67 || c >= 80 ? '🌧' : c >= 45 && c <= 48 ? '🌫' : c >= 2 ? '⛅' : '☀️';
+const dez = (n, d = 0) => n == null || !isFinite(n) ? '–' : Number(n).toFixed(d).replace('.', ',');
+function wetterCard() {
+  if (!wetter) return '';
+  const a = wetter.aktuell || {}, n = wetter.nacht || {}, t = wetter.tage || [];
+  const tagName = (iso, i) => i === 0 ? 'Heute' : i === 1 ? 'Morgen' : new Date(iso + 'T12:00').toLocaleDateString('de-DE', { weekday: 'short' });
+  return `<div class="card" style="margin-top:14px">
+    <div class="row" style="align-items:center"><div style="font-size:34px">${WCODE(a.code)}</div>
+      <div style="flex:1"><div style="font:24px/1 var(--disp);color:var(--sign2)">${dez(a.temp, 1)} °C</div><div class="small muted">Wetter am Stall · heute Nacht bis ${dez(n.tmin, 1)} °C, Böen ${dez(n.gmax)} km/h</div></div></div>
+    <div class="kv wtage">${t.slice(0, 3).map((d, i) => `<div><span>${tagName(d.datum, i)}</span><b>${WCODE(d.code)} ${dez(d.min)}°/${dez(d.max)}°</b><span>${d.schnee >= 0.5 ? '❄ ' + dez(d.schnee) + ' cm' : '💧 ' + dez(d.regen) + ' mm'}</span><span>💨 ${dez(d.boeen)} km/h</span></div>`).join('')}</div>
+    ${(wetter.warnungen || []).length ? `<div class="infobox small" style="margin-top:10px">${wetter.warnungen.map(esc).join('<br>')}</div>` : ''}
+    <div class="small muted" style="margin-top:8px">Quelle: Open-Meteo · aktualisiert ${wetter.updated_at ? fmtDT(wetter.updated_at) : '–'}</div></div>`;
+}
 async function loadCfg() {
   if (!(canView('klappe') || canView('pflege') || canView('ziegen'))) return;
   const { data } = await sb.from('hs_config').select('data').eq('id', 1).maybeSingle();
@@ -358,10 +377,10 @@ async function bootInner() {
   member = m;
   if (m.status !== 'approved') return showPending();
   $('#hdr').hidden = false;
-  await Promise.all([loadState(), loadCfg(), sb.rpc('hs_names').then(({ data }) => (data || []).forEach((x) => (names[x.user_id] = x.name)))]);
+  await Promise.all([loadState(), loadCfg(), loadWetter(), sb.rpc('hs_names').then(({ data }) => (data || []).forEach((x) => (names[x.user_id] = x.name)))]);
   route();
   clearInterval(pollT);
-  pollT = setInterval(async () => { if (document.hidden) return; await loadState(); if (location.hash === '' || location.hash === '#') paintHome(); if (location.hash === '#klappe') paintKlappe(true); if (location.hash === '#ziegen') paintZiegen(true); }, 10000);
+  pollT = setInterval(async () => { if (document.hidden) return; await loadState(); if (Date.now() - (window._wt || 0) > 600000) { window._wt = Date.now(); await loadWetter(); } if (location.hash === '' || location.hash === '#') paintHome(); if (location.hash === '#klappe') { paintKlappe(true); paintHz(); } if (location.hash === '#ziegen') paintZiegen(true); }, 10000);
 }
 function showLogin() {
   $('#hdr').hidden = true;
@@ -450,7 +469,7 @@ function route() {
   stopLive();
   const h = location.hash.replace('#', '');
   window.scrollTo(0, 0);
-  const views = { '': paintHome, klappe: paintKlappe, kamera: paintKamera, eier: paintEier, pflege: paintPflege, herde: paintHerde, gesundheit: paintGesundheit, ziegen: paintZiegen, mitglieder: paintMitglieder, profil: paintProfil };
+  const views = { '': paintHome, klappe: paintKlappe, kamera: paintKamera, eier: paintEier, pflege: paintPflege, herde: paintHerde, ziegen: paintZiegen, mitglieder: paintMitglieder, profil: paintProfil };
   const tileKey = TILES.find((t) => t.key === h)?.key;
   if (tileKey && !canView(tileKey)) return go('');
   if (h === 'mitglieder' && member.role !== 'admin') return go('');
@@ -503,7 +522,7 @@ function paintHome() {
   if (location.hash && location.hash !== '#') return;
   const tiles = TILES.filter((t) => canView(t.key));
   if (member.role === 'admin') tiles.push({ key: 'mitglieder', icon: '👥', name: 'Personal', desc: 'Mitglieder und Freigaben', c: 'var(--neon-t)', r: -1.2 });
-  $('#app').innerHTML = `${heroCard()}
+  $('#app').innerHTML = `${heroCard()}${wetterCard()}
     <h2>Schlüsselbrett</h2>
     <div class="keys">${tiles.map((t) => `<button class="key" style="--c:${t.c};--r:${t.r}deg" onclick="go('${t.key}')"><span class="ring"></span><span class="fob"><span class="ic">${t.icon}</span><span class="t" style="display:block">${t.name}</span><span class="s" style="display:block">${t.desc}</span></span>${t.key === 'mitglieder' ? '<span class="badge" id="pendBadge" hidden></span>' : ''}</button>`).join('')}</div>
     ${tiles.length === 0 ? '<p class="muted">Dir wurde noch kein Schlüssel ausgehändigt. Der Admin schaltet dich frei.</p>' : ''}`;
@@ -516,10 +535,45 @@ async function paintKlappe(soft) {
   if (soft && $('#klHero')) { $('#klHero').innerHTML = klHero(); return; }
   $('#app').innerHTML = `${backBtn()}<h1>🚪 Klappe</h1><div id="klHero">${klHero()}</div>
     <h2>Stallpflicht</h2><div class="card" id="klSp"></div>
+    <h2>Tränke-Heizung</h2><div class="card" id="klHz"></div>
     <h2>Heute</h2><div class="card" id="klPlan"></div>
     <h2>Protokoll</h2><div class="card" id="klEv"><div class="spin"></div></div>
-    ${canEdit('klappe') ? `<h2>Zeiten & Alarm</h2><div class="card" id="klCfg"></div>` : ''}`;
-  paintPlan(); paintEvents(); paintSp(); if (canEdit('klappe')) paintCfgForm();
+    ${canEdit('klappe') ? `<h2>Zeiten & Alarm</h2><div class="card" id="klCfg"></div><h2>Wetter-Warnungen</h2><div class="card" id="klWt"></div>` : ''}`;
+  paintPlan(); paintEvents(); paintSp(); paintHz(); if (canEdit('klappe')) { paintCfgForm(); paintWt(); }
+}
+function paintHz() {
+  const el = $('#klHz'); if (!el) return;
+  const t = cfg?.traenke || { modus: 'auto', ein: 1, aus: 3 }, h = st?.info?.heizung, ed = canEdit('klappe');
+  const an = h ? h.an : st?.io?.['Tränke-Heizung'];
+  el.innerHTML = `<div class="row" style="align-items:center"><div style="font-size:30px">${an ? '♨️' : '💧'}</div><div style="flex:1">
+      <b>${an == null ? 'Noch keine Meldung vom Stall' : an ? 'Heizung läuft' : 'Heizung aus'}</b>
+      <div class="small muted">${h?.temp != null ? `${dez(h.temp, 1)} °C (${esc(h.quelle || '')})` : 'Temperatur: Fühler an der LOGO oder Wetterdienst'}</div></div></div>
+    ${ed ? `<div class="seg" id="hzMo" style="margin-top:12px"><button data-v="auto">Automatisch</button><button data-v="an">Immer an</button><button data-v="aus">Aus</button></div>
+      <div class="row" id="hzAuto" style="margin-top:12px"><label class="f">einschalten bei ≤ °C<input type="number" step="0.5" id="hzEin" value="${esc(t.ein)}"></label><label class="f">ausschalten bei ≥ °C<input type="number" step="0.5" id="hzAus" value="${esc(t.aus)}"></label></div>
+      <div class="row" style="justify-content:flex-end;margin-top:10px"><button class="btn pri" id="hzSave">Speichern</button></div>` : ''}`;
+  if (!ed) return;
+  const seg = (v) => { $('#hzMo').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === v); b.onclick = () => seg(b.dataset.v); }); $('#hzAuto').hidden = v !== 'auto'; };
+  seg(t.modus || 'auto');
+  $('#hzSave').onclick = async () => {
+    const ein = +$('#hzEin').value, aus = +$('#hzAus').value;
+    if (!(aus > ein)) return toast('„Ausschalten“ muss über „Einschalten“ liegen.');
+    const n = { ...cfg, traenke: { modus: $('#hzMo .on').dataset.v, ein, aus } };
+    const { error } = await sb.from('hs_config').update({ data: n }).eq('id', 1); if (error) return err(error);
+    cfg = n; toast('Gespeichert ✅'); paintHz();
+  };
+}
+function paintWt() {
+  const el = $('#klWt'); if (!el) return;
+  const w = cfg?.wetter || { aktiv: true, frost: 0, boeen: 70 };
+  el.innerHTML = `<label class="chk"><input type="checkbox" id="wtA" ${w.aktiv !== false ? 'checked' : ''}> Abends (ca. 18 Uhr) warnen, wenn die Nacht ungemütlich wird</label>
+    <div class="row"><label class="f">Frost-Warnung ab ≤ °C<input type="number" step="0.5" id="wtF" value="${esc(w.frost ?? 0)}"></label><label class="f">Sturm-Warnung ab Böen km/h<input type="number" step="5" id="wtB" value="${esc(w.boeen ?? 70)}"></label></div>
+    <p class="small muted">Schnee, Gewitter und Starkregen werden immer gemeldet. Wer die Meldungen nicht will, schaltet sie unter ⚙️ für sein Gerät ab.</p>
+    <div class="row" style="justify-content:flex-end"><button class="btn pri" id="wtSave">Speichern</button></div>`;
+  $('#wtSave').onclick = async () => {
+    const n = { ...cfg, wetter: { aktiv: $('#wtA').checked, frost: +$('#wtF').value, boeen: +$('#wtB').value || 70 } };
+    const { error } = await sb.from('hs_config').update({ data: n }).eq('id', 1); if (error) return err(error);
+    cfg = n; toast('Gespeichert ✅');
+  };
 }
 const spAktiv = () => !!cfg?.stallpflicht?.aktiv;
 function paintSp() {
@@ -530,7 +584,7 @@ function paintSp() {
         <div class="small" style="margin-top:6px">Die Klappe bleibt zu: Astro-Uhr, Taster und „Öffnen“ in der App sind gesperrt. Schließen geht weiterhin.</div></div></div>
       ${ed ? '<div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="spOff">Stallpflicht aufheben</button></div>' : ''}`
     : `<div class="small muted">Bei einer Aufstallungsanordnung (z. B. wegen Geflügelpest) hier einschalten. Die Klappe öffnet dann nicht mehr, auch nicht über die Astro-Uhr der LOGO.</div>
-      ${ed ? `<div class="row" style="margin-top:12px"><input id="spNote" placeholder="Notiz, z. B. Aufstallung Bodenseekreis ab 21.11." style="flex:1;min-width:0"><button class="btn bad" id="spOn" style="border-color:var(--neon-r);color:#ffd1d7">🏠 Stallpflicht einschalten</button></div>` : ''}`;
+      ${ed ? `<div class="row" style="margin-top:12px"><input id="spNote" placeholder="Notiz, z. B. Aufstallung Bodenseekreis ab 21.11." style="flex:1 1 100%;min-width:0"><button class="btn bad" id="spOn" style="border-color:var(--neon-r);color:#ffd1d7">🏠 Stallpflicht einschalten</button></div>` : ''}`;
   const set = async (on) => {
     if (!(await confirmBox(on ? 'Stallpflicht einschalten? Die Klappe öffnet dann nicht mehr, bis du sie wieder aufhebst.' : 'Stallpflicht aufheben? Die Klappe läuft dann wieder nach Astro-Uhr bzw. Zeitplan.', on ? 'Einschalten' : 'Aufheben'))) return;
     const { data, error } = await sb.rpc('hs_set_stallpflicht', { aktiv: on, notiz: on ? ($('#spNote')?.value || '') : null });
@@ -591,7 +645,11 @@ async function paintEvents() {
   const { data, error } = await sb.from('hs_events').select('*').neq('kind', 'ziege').order('ts', { ascending: false }).limit(60);
   if (error) return err(error);
   const el = $('#klEv'); if (!el) return;
-  el.innerHTML = (data || []).map((e) => `<div class="ev"><div class="e">${EVI[e.kind] || '•'}</div><div style="flex:1">${esc(e.text || e.kind)}</div><div class="tm">${fmtDT(e.ts)}</div></div>`).join('') || '<span class="muted">Noch keine Einträge.</span>';
+  const withImg = (data || []).filter((e) => e.bild).map((e) => e.bild);
+  const urls = {};
+  if (withImg.length && canView('kamera')) { const { data: su } = await sb.storage.from('hs-cam').createSignedUrls(withImg, 600); (su || []).forEach((u, i) => { if (u.signedUrl) urls[withImg[i]] = u.signedUrl; }); }
+  el.innerHTML = (data || []).map((e) => `<div class="ev"><div class="e">${EVI[e.kind] || '•'}</div><div style="flex:1;white-space:pre-line">${esc(e.text || e.kind)}${urls[e.bild] ? `<img src="${esc(urls[e.bild])}" alt="Foto beim Schließen" data-big="${esc(urls[e.bild])}" style="display:block;margin-top:6px;width:150px;aspect-ratio:16/9;object-fit:cover;border-radius:8px;cursor:pointer">` : ''}</div><div class="tm">${fmtDT(e.ts)}</div></div>`).join('') || '<span class="muted">Noch keine Einträge.</span>';
+  el.querySelectorAll('[data-big]').forEach((i) => (i.onclick = () => bigImg(i.dataset.big, 'Beim Schließen')));
 }
 function paintCfgForm() {
   const c = cfg || {};
@@ -993,7 +1051,7 @@ const PUSHCAT = [
   { k: 'alarm', t: '🚨 Alarme', d: 'Klappe abends noch offen, Störung, Stall offline' },
   { k: 'klappe', t: '🚪 Klappe auf/zu', d: 'jedes Öffnen und Schließen' },
   { k: 'pflege', t: '🧹 Pflege fällig', d: 'tägliche Erinnerung ca. 17 Uhr' },
-  { k: 'neu', t: '🩺 Neue Gesundheits-Einträge', d: '' },
+  { k: 'wetter', t: '🌦 Wetter-Warnungen', d: 'Frost, Sturm, Schnee – abends ca. 18 Uhr' },
 ];
 async function paintProfil() {
   $('#app').innerHTML = `${backBtn()}<h1>⚙️ Einstellungen</h1>

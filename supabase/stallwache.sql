@@ -413,3 +413,6 @@ end $$;
 -- hs_set_ziegen(z jsonb) setzt nur config.ziegen {modus aus|zeit|an, von, bis, sekunden}
 -- hs_bridge_sync liefert zusätzlich 'ziegen': [{name, chip}] aus hs_items (tile 'ziegen')
 -- Ereignisse mit kind 'ziege' sind nur mit Ansehen-Recht auf 'ziegen' sichtbar
+
+-- ═══ v1.3: Stallpflicht (hs_set_stallpflicht), Foto beim Schließen (hs_events.bild), Tränke-Heizung (config.traenke),
+--     Wetter (Tabelle hs_wetter, Edge Function hs-wetter, Cron hs-wetter / hs-wetter-abend) ═══
