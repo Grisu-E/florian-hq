@@ -70,6 +70,23 @@ Die Belegung ist noch offen, deshalb hier ein Vorschlag. Die Brücke ist genau s
 > Der Pi schaltet **nie direkt** Q1/Q2, er gibt nur einen Impuls auf V0.0/V0.1. Verriegelung, Endschalter und Laufzeitgrenze bleiben in der LOGO. Das ist sicherer.
 > Falls deine LOGO!Soft-Version die NI-Einstellung anders benennt: Screenshot schicken, dann passe ich die Adressen an.
 
+
+### Anpassungen an deinem LOGO-Programm (Stand 20.11.)
+
+Dein Programm nutzt: **I1** Taster öffnen, **I2** Taster schließen, **I3** Licht-Taster → **Q2** Licht (mit 5-Min-Abschaltung), **I4** Klappe oben → M4, **I5** Klappe unten → M5, **Q1** Klappenantrieb, **B002** Astro-Uhr (Aufgang +59 Min., Untergang +40 Min.). Die Brücke ist darauf eingestellt (Endschalter I4/I5, Motor Q1).
+
+| # | Änderung | Warum |
+|---|---|---|
+| 1 | **B002 Astro-Uhr: Koordinaten auf Gitzensteig** (N 47° 40′, O 9° 35′) | Eingetragen ist **Berlin** (N52°31′ / O13°24′, der Standardwert von LOGO!Soft). Heute schließt die Klappe dadurch um ca. **16:47 statt 17:20**, im Juni öffnet sie ca. 40 Min. zu früh. |
+| 2 | Nach **I1** einen **ODER-Baustein** mit **NI1 (V0.0)** einfügen und alle bisherigen Verbindungen von I1 an dessen Ausgang hängen | „Öffnen“ aus der App wirkt wie ein Druck auf den Taster |
+| 3 | Genauso nach **I2** ein ODER mit **NI2 (V0.1)** | „Schließen“ aus der App |
+| 4 | Den **Öffnen-Weg der Astro-Uhr** mit **UND NICHT NI4 (V0.3)** sperren | Stallpflicht: Die Astro-Uhr öffnet nicht mehr, Schließen bleibt erlaubt |
+| 5 | **Q4** = NI5 (V0.4) für die Tränke-Heizung, **Q3** = Schloss Ziegentür (NI3 / V0.2 mit 120-s-Begrenzung) | Ausgänge sind noch frei |
+| 6 | Ziegentür-Türkontakt auf **I6** (I5 ist schon „Klappe unten“) | Belegung angepasst |
+| 7 | *Extras → Ethernet-Verbindungen* → **„Modbus-Zugriff zulassen“** | sonst kommt der Pi nicht an die LOGO |
+
+> Die App rechnet mit denselben Verschiebungen (+59 / +40 Min.), damit Überwachung und Alarm zur LOGO passen.
+
 ---
 
 ## 3. Kamera (GENBOLT Dual-Lens)
@@ -187,7 +204,7 @@ Danach zeigt die App oben **„online“** und den Klappenstatus.
 | Lesemodul | FDX-B-Modul mit **TTL-Ausgang (9600 Baud)** und Spulen-Antenne, z. B. „WL-134“ | Reichweite meist nur **wenige cm bis ca. 10 cm**. Antenne an einer Engstelle auf **Halsband-Höhe** montieren, sodass der Anhänger daran vorbeistreift. Reicht das nicht, wären UHF-Tags mit UHF-Reader die Alternative (Reichweite in Metern). |
 | Steuerung am Stall | **WT32-ETH01** (ESP32 mit LAN-Buchse) + 5-V-Netzteil, wetterfestes Gehäuse | hängt am LAN über die Richtfunkstrecke |
 | Schloss | **Elektroschloss / Riegel „stromlos verriegelt“ (fail-secure)**, 12 oder 24 V DC | Bei Stromausfall bleibt die Tür zu. **Kein** „stromlos offen“ verwenden! |
-| Türkontakt | Reed-Kontakt an der Tür → LOGO **I5** | optional; die App zeigt dann „Tür auf/zu“ und meldet, wenn sie zu lange offen steht |
+| Türkontakt | Reed-Kontakt an der Tür → LOGO **I6** | optional; die App zeigt dann „Tür auf/zu“ und meldet, wenn sie zu lange offen steht |
 | Tür | Pendeltür oder Tür mit Feder, die die Ziegen aufdrücken | schließt von selbst, dann rastet das Schloss wieder ein |
 
 ### LOGO-Erweiterung
@@ -196,7 +213,7 @@ Danach zeigt die App oben **„online“** und den Klappenstatus.
 |---|---|
 | **V0.2 → NI3** | „Ziegentür entriegeln“ vom Pi (bleibt 1, solange entriegelt sein soll) |
 | **Q3** | Elektroschloss |
-| **I5** | Türkontakt Ziegentür (optional) |
+| **I6** | Türkontakt Ziegentür (optional) |
 
 **Logik:** Q3 = NI3 UND NICHT T1. Dabei ist T1 eine **Einschaltverzögerung 120 s** am Eingang NI3. Das ist die Sicherheitsgrenze: Bleibt das Signal vom Pi hängen (Absturz genau beim Entriegeln), verriegelt die LOGO nach 2 Min. trotzdem.
 

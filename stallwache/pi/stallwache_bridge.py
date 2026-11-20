@@ -26,7 +26,7 @@ try:
 except Exception:  # sehr alte Python-Version
     TZ = None
 
-VERSION = "1.3"
+VERSION = "1.4"
 log = logging.getLogger("stallwache")
 
 
@@ -295,7 +295,7 @@ class Bridge:
         L = ini["logo"]
         self.mb = ModbusTCP(L.get("host"), L.getint("port", 502), L.getint("unit_id", 1))
         sig = lambda k: Signal(L[k]) if L.get(k, "").strip() else None
-        self.sig = {k: sig(k) for k in ("endschalter_oben", "endschalter_unten", "motor_auf", "motor_zu", "stoerung", "temperatur", "heizung")}
+        self.sig = {k: sig(k) for k in ("endschalter_oben", "endschalter_unten", "motor_auf", "motor_zu", "motor", "stoerung", "temperatur", "heizung")}
         self.cmd_auf, self.cmd_zu = sig("befehl_auf"), sig("befehl_zu")
         self.cmd_sperre = sig("befehl_sperre")
         self.cmd_heizung = sig("befehl_heizung")
@@ -365,7 +365,7 @@ class Bridge:
     def read_logo(self):
         io, raw = {}, {}
         labels = {"endschalter_oben": "Endschalter oben", "endschalter_unten": "Endschalter unten", "motor_auf": "Motor auf",
-                  "motor_zu": "Motor zu", "stoerung": "Störung", "schloss": "Schloss entriegelt", "tuerkontakt": "Ziegentür offen", "heizung": "Tränke-Heizung"}
+                  "motor_zu": "Motor zu", "motor": "Motor läuft", "stoerung": "Störung", "schloss": "Schloss entriegelt", "tuerkontakt": "Ziegentür offen", "heizung": "Tränke-Heizung"}
         try:
             for k, s in self.sig.items():
                 if s is None:
@@ -400,6 +400,8 @@ class Bridge:
             return "oeffnet"
         if mz:
             return "schliesst"
+        if raw.get("motor"):   # ein Ausgang für beide Richtungen: Richtung aus der letzten Endlage
+            return "oeffnet" if (u or self.stable == "zu") and not o else "schliesst" if (o or self.stable == "offen") else "zwischen"
         if o:
             return "offen"
         if u:
