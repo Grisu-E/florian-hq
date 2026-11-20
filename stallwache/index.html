@@ -365,17 +365,18 @@ async function bootInner() {
 }
 function showLogin() {
   $('#hdr').hidden = true;
-  let mode = 'pw';
+  const invite = /[?&]einladung\b/.test(location.search);
+  let mode = invite ? 'neu' : 'pw';
   const draw = () => {
     $('#app').innerHTML = `<div class="center"><div class="login col">
-      <div class="signpost"><div class="board"><div class="bulbs"></div><div class="name">Hühnerhotel</div><div class="sub">Bitte an der Rezeption anmelden</div></div><div class="poles" aria-hidden="true"><i></i><i></i></div></div>
+      <div class="signpost"><div class="board"><div class="bulbs"></div><div class="name">Hühnerhotel</div><div class="sub">${invite ? 'Du bist eingeladen – willkommen!' : 'Bitte an der Rezeption anmelden'}</div></div><div class="poles" aria-hidden="true"><i></i><i></i></div></div>
       <div class="seg" style="align-self:center"><button data-m="pw" class="${mode === 'pw' ? 'on' : ''}">Passwort</button><button data-m="link" class="${mode === 'link' ? 'on' : ''}">E-Mail-Link</button><button data-m="neu" class="${mode === 'neu' ? 'on' : ''}">Registrieren</button></div>
       ${mode === 'neu' ? '<input id="nm" placeholder="Dein Name" autocomplete="name">' : ''}
       <input id="em" type="email" placeholder="E-Mail-Adresse" autocomplete="email">
       ${mode !== 'link' ? `<input id="pw" type="password" placeholder="Passwort${mode === 'neu' ? ' (mind. 8 Zeichen)' : ''}" autocomplete="${mode === 'neu' ? 'new-password' : 'current-password'}">` : ''}
       <button class="btn pri" id="go">${{ pw: 'Anmelden', link: 'Anmelde-Link schicken', neu: 'Konto anlegen' }[mode]}</button>
       <div id="msg" class="small"></div>
-      <p class="small muted">Gleiches Konto wie Florian HQ / H&amp;E Hub. Neue Personen werden vom Admin freigeschaltet.</p></div></div>`;
+      <p class="small muted">${invite ? 'Lege dir ein Konto an. Danach schaltet dich der Admin für die passenden Bereiche frei. Hast du schon ein Konto (z. B. von Florian HQ), melde dich einfach mit „Passwort“ an.' : 'Gleiches Konto wie Florian HQ / H&amp;E Hub. Neue Personen werden vom Admin freigeschaltet.'}</p></div></div>`;
     document.querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => { mode = b.dataset.m; draw(); }));
     const msg = (t, bad) => { $('#msg').innerHTML = `<div class="${bad ? 'warnbox' : 'infobox'}">${t}</div>`; };
     const goBtn = $('#go');
@@ -917,12 +918,15 @@ async function paintMitglieder() {
   const { data, error } = await sb.from('hs_members').select('*').order('created_at');
   if (error) return err(error);
   const lv = (u, t) => `<select data-u="${u.user_id}" data-t="${t.key}"><option value="none">–</option><option value="view">sehen</option><option value="edit">bearbeiten</option></select>`;
-  $('#app').innerHTML = `${backBtn()}<h1>👥 Mitglieder</h1><p class="muted small">Neue Personen melden sich mit ihrer E-Mail an und erscheinen hier. Freigeben, dann je Bereich „sehen“ oder „bearbeiten“ wählen.</p>
+  $('#app').innerHTML = `${backBtn()}<h1>👥 Mitglieder</h1><div class="card" style="margin-bottom:14px"><b>Einladungslink</b><div class="small muted" style="margin:4px 0 10px">Schick diesen Link an alle, die mitmachen sollen. Sie registrieren sich und erscheinen dann hier zum Freischalten.</div><div class="row"><input readonly id="invLink" value="${esc(location.origin + location.pathname + '?einladung')}" style="flex:1;min-width:0"><button class="btn pri" id="invCopy">Kopieren</button>${navigator.share ? '<button class="btn" id="invShare">Teilen</button>' : ''}</div></div>
+    <p class="muted small">Neue Personen melden sich mit ihrer E-Mail an und erscheinen hier. Freigeben, dann je Bereich „sehen“ oder „bearbeiten“ wählen.</p>
     ${data.map((u) => `<div class="card"><div class="row"><div style="flex:1"><input data-name="${u.user_id}" value="${esc(u.name || '')}" placeholder="Name"><div class="small muted" style="margin-top:4px">${esc(u.email)} · ${u.role === 'admin' ? '👑 Admin' : u.status === 'approved' ? '✅ freigegeben' : '⏳ wartet'}</div></div></div>
       ${u.role === 'admin' ? '' : `<table class="mem" style="margin-top:10px">${TILES.map((t) => `<tr><td>${t.icon} ${t.name}</td><td style="text-align:right">${lv(u, t)}</td></tr>`).join('')}</table>
       <div class="row" style="margin-top:10px;justify-content:space-between"><button class="btn bad" data-del="${u.user_id}">Entfernen</button>
         <div class="row"><button class="btn" data-all="${u.user_id}">Alles sehen</button>${u.status === 'approved' ? `<button class="btn" data-st="${u.user_id}" data-v="pending">Sperren</button>` : `<button class="btn pri" data-st="${u.user_id}" data-v="approved">Freigeben</button>`}</div></div>`}</div>`).join('')}`;
   const byId = Object.fromEntries(data.map((u) => [u.user_id, u]));
+  $('#invCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#invLink').value); toast('Link kopiert'); } catch { $('#invLink').select(); toast('Link markiert – jetzt kopieren'); } };
+  $('#invShare') && ($('#invShare').onclick = () => navigator.share({ title: 'Hühnerhotel', text: 'Komm mit ins Hühnerhotel – unsere App für Hühner und Ziegen:', url: $('#invLink').value }).catch(() => {}));
   const up = async (uid, patch) => { const { error } = await sb.from('hs_members').update(patch).eq('user_id', uid); if (error) return err(error); Object.assign(byId[uid], patch); toast('Gespeichert ✅'); };
   document.querySelectorAll('select[data-u]').forEach((s) => { s.value = byId[s.dataset.u].tiles?.[s.dataset.t] || 'none'; s.onchange = () => up(s.dataset.u, { tiles: { ...byId[s.dataset.u].tiles, [s.dataset.t]: s.value } }); });
   document.querySelectorAll('[data-name]').forEach((i) => (i.onchange = () => up(i.dataset.name, { name: i.value.trim() })));
