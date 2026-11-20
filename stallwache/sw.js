@@ -1,5 +1,5 @@
 // Hühnerhotel – Service Worker (Push + Offline-Hülle)
-const CACHE = 'huehnerhotel-v4';
+const CACHE = 'huehnerhotel-v5';
 const SHELL = ['./', './index.html', './icon.svg', './icon-192.png', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {})); self.skipWaiting(); });
