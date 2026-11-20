@@ -353,7 +353,7 @@ function doorSvg(state) {
 function heroCard() {
   if (!canView('klappe')) return '';
   const d = DOOR[st?.door] || DOOR.unbekannt, c = conn(), p = planToday(cfg), now = new Date();
-  const spaetOffen = st?.door !== 'zu' && p.zu && now > p.zu && (now.getHours() >= 12);
+  const spaetOffen = ['offen', 'zwischen', 'oeffnet', 'stoerung'].includes(st?.door) && c.c !== 'bad' && p.zu && now > p.zu && (now.getHours() >= 12);
   const next = spaetOffen ? '' : p.auf && now < p.auf ? `Öffnet ca. ${hm(p.auf)}` : p.zu && now < p.zu ? `Schließt ca. ${hm(p.zu)}` : p.auf ? `Öffnet morgen früh` : '';
   return `<div class="card" style="margin-top:16px;cursor:pointer" onclick="go('klappe')">
     <div class="hero">${doorSvg(st?.door)}<div style="flex:1">
