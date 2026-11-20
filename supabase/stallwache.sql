@@ -431,3 +431,6 @@ begin
   on conflict (id) do nothing;
   return new;
 end $function$;
+
+-- ═══ 20.11.2026: Brücken-Funktionen nur für den Pi (anon + Geheimnis), nicht für angemeldete Nutzer ═══
+revoke execute on function public.hs_bridge_sync(text, jsonb, jsonb), public.hs_bridge_ack(text, bigint, boolean, text) from authenticated;

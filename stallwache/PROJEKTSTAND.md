@@ -62,6 +62,12 @@ Die LOGO bleibt der Chef: Astro-Uhr fährt die Klappe auch ohne Pi. Die App gibt
 - Brücken-Geheimnis (`bridge_secret`) und Reader-Kennwort (`[ziegen] token`): nur in `stallwache.ini` / `.ino` aus dem ZIP „Huehnerhotel-Geraete“. Im Repo Platzhalter.
 - Neues Geheimnis: Hash in `fhq_private.hs_bridge` ersetzen (SQL in `supabase/stallwache.sql`).
 
+## Sicherheit (Stand 20.11.2026)
+- Supabase-Advisor: ohne Anmeldung sind nur noch `hs_bridge_sync`/`hs_bridge_ack` aufrufbar (gewollt, Pi mit Geheimnis). Florian-HQ-Hilfsfunktionen und `handle_new_user` für anon gesperrt, `he_eur` mit festem search_path.
+- 42 Hinweise „für angemeldete Nutzer aufrufbar“ sind gewollt (Rechte-Funktionen der Apps prüfen intern).
+- Schutz vor geleakten Passwörtern: nur im Supabase-Pro-Tarif, daher aus.
+- App-Prüfer (unabhängiger Agent) nach größeren Änderungen laufen lassen, siehe Skill „app-baukasten“.
+
 ## Arbeitsweise / Hinweise
 - Änderungen an der App: `stallwache/index.html` + **Cache-Version in `sw.js` hochzählen** (`huehnerhotel-vNN`, zuletzt v19), Commit auf `main` → GitHub Pages ist nach ca. 1 Min. live.
 - Tests: `stallwache/tests/` (simulierte LOGO per Modbus, Fake-Supabase). `python3 test_real.py` testet die echte Belegung.

@@ -255,3 +255,14 @@ begin
   on conflict (id) do nothing;
   return new;
 end $function$;
+
+-- ═══ Nachtrag 20.11.2026: Sicherheits-Hinweise (Migrationen security_anon_definer_functions, security_bridge_only_anon) ═══
+revoke execute on function public.can_cmd(), public.can_gear(), public.can_lead(), public.can_see_list(uuid), public.can_staff(),
+  public.has_fn(text), public.is_admin(), public.is_member(), public.is_treasurer(), public.remove_member(uuid), public.set_role(uuid, text)
+  from public, anon;
+grant execute on function public.can_cmd(), public.can_gear(), public.can_lead(), public.can_see_list(uuid), public.can_staff(),
+  public.has_fn(text), public.is_admin(), public.is_member(), public.is_treasurer(), public.remove_member(uuid), public.set_role(uuid, text)
+  to authenticated, service_role;
+revoke execute on function public.handle_new_user() from public, anon, authenticated;
+grant execute on function public.handle_new_user() to supabase_auth_admin, service_role;
+alter function public.he_eur(numeric) set search_path = public;
