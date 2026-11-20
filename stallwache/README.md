@@ -80,6 +80,22 @@ Die App zeigt **Standbilder**: alle 10 Min, im Live-Modus alle ~3 s und beim Öf
    - Hilfe: ispyconnect.com → Hersteller „Genbolt“ → Modell auswählen
 3. Die funktionierende Adresse in `stallwache.ini` bei `cam0_url` (und `cam1_url` für das zweite Objektiv) eintragen. Der **Substream** reicht und schont den Pi.
 
+
+### Kamera im FRITZ!Box-Gastnetz (192.168.179.x)
+
+Bei euch hängt die Kamera im **Gast-WLAN** und kann dort nicht weg. Der Pi nutzt deshalb **beide Netze**: per **LAN-Kabel** das Heimnetz (LOGO, Internet) und per **WLAN** das Gastnetz (Kamera).
+
+1. FRITZ!Box → WLAN → Gastzugang → Haken bei **„Die im Gastzugang angemeldeten Geräte dürfen untereinander kommunizieren“**.
+2. Auf dem Pi (Raspberry Pi OS Bookworm, Kabel bleibt dran):
+   ```bash
+   sudo nmcli dev wifi connect "NAME-DES-GAST-WLANS" password "GAST-PASSWORT" ifname wlan0
+   sudo nmcli con modify "NAME-DES-GAST-WLANS" ipv4.never-default yes ipv4.route-metric 600
+   sudo nmcli con up "NAME-DES-GAST-WLANS"
+   ping -c 3 192.168.179.11
+   ```
+   `never-default` sorgt dafür, dass Internet und Supabase weiter übers Kabel laufen.
+3. Test: `python3 /opt/stallwache/stallwache_bridge.py --snapshot`
+
 ---
 
 ## 4. Raspberry Pi einrichten
