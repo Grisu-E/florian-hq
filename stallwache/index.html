@@ -195,6 +195,7 @@ const TILES = [
   { key: 'pflege',     icon: '🧹', name: 'Pflege',     desc: 'Zimmerservice: Futter, Wasser, Ausmisten', c: 'var(--mint)', r: 2 },
   { key: 'herde',      icon: '🐔', name: 'Herde',      desc: 'Unsere Gäste',                  c: 'var(--coral)', r: -1.5 },
   { key: 'gesundheit', icon: '🩺', name: 'Gesundheit', desc: 'Hausarzt und Behandlungen',     c: 'var(--lilac)', r: 1 },
+  { key: 'ziegen',     icon: '🐐', name: 'Ziegen',     desc: 'Ziegentür und Freigabe',        c: '#f7b7d2',      r: -2.2 },
 ];
 const DOOR = {
   offen:     { t: 'Klappe offen',     c: 'ok',   e: '🐔' },
@@ -285,18 +286,18 @@ function conn() {
 function paintConn() {
   const c = conn(); const el = $('#hdrConn');
   if (!el) return;
-  el.hidden = !(canView('klappe') || canView('kamera'));
+  el.hidden = !(canView('klappe') || canView('kamera') || canView('ziegen'));
   el.innerHTML = `<span class="dot ${c.c}"></span><span>${c.t.replace('Stall ', '')}</span>`;
   el.title = c.t + (st?.last_seen ? ' – letzte Meldung ' + ago(st.last_seen) : '');
 }
 async function loadState() {
-  if (!(canView('klappe') || canView('kamera'))) return;
+  if (!(canView('klappe') || canView('kamera') || canView('ziegen'))) return;
   const { data } = await sb.from('hs_state').select('*').eq('id', 1).maybeSingle();
   if (data) st = data;
   paintConn();
 }
 async function loadCfg() {
-  if (!(canView('klappe') || canView('pflege'))) return;
+  if (!(canView('klappe') || canView('pflege') || canView('ziegen'))) return;
   const { data } = await sb.from('hs_config').select('data').eq('id', 1).maybeSingle();
   cfg = data?.data || {};
 }
@@ -320,7 +321,7 @@ async function bootInner() {
   await Promise.all([loadState(), loadCfg(), sb.rpc('hs_names').then(({ data }) => (data || []).forEach((x) => (names[x.user_id] = x.name)))]);
   route();
   clearInterval(pollT);
-  pollT = setInterval(async () => { if (document.hidden) return; await loadState(); if (location.hash === '' || location.hash === '#') paintHome(); if (location.hash === '#klappe') paintKlappe(true); }, 10000);
+  pollT = setInterval(async () => { if (document.hidden) return; await loadState(); if (location.hash === '' || location.hash === '#') paintHome(); if (location.hash === '#klappe') paintKlappe(true); if (location.hash === '#ziegen') paintZiegen(true); }, 10000);
 }
 function showLogin() {
   $('#hdr').hidden = true;
@@ -382,7 +383,7 @@ function route() {
   stopLive();
   const h = location.hash.replace('#', '');
   window.scrollTo(0, 0);
-  const views = { '': paintHome, klappe: paintKlappe, kamera: paintKamera, eier: paintEier, pflege: paintPflege, herde: paintHerde, gesundheit: paintGesundheit, mitglieder: paintMitglieder, profil: paintProfil };
+  const views = { '': paintHome, klappe: paintKlappe, kamera: paintKamera, eier: paintEier, pflege: paintPflege, herde: paintHerde, gesundheit: paintGesundheit, ziegen: paintZiegen, mitglieder: paintMitglieder, profil: paintProfil };
   const tileKey = TILES.find((t) => t.key === h)?.key;
   if (tileKey && !canView(tileKey)) return go('');
   if (h === 'mitglieder' && member.role !== 'admin') return go('');
@@ -498,7 +499,7 @@ function paintPlan() {
       : 'Die LOGO fährt die Klappe mit ihrer Astro-Uhr. Die Zeiten hier dienen zur Überwachung – stimme sie grob auf die LOGO ab.'}</p>`;
 }
 async function paintEvents() {
-  const { data, error } = await sb.from('hs_events').select('*').order('ts', { ascending: false }).limit(60);
+  const { data, error } = await sb.from('hs_events').select('*').neq('kind', 'ziege').order('ts', { ascending: false }).limit(60);
   if (error) return err(error);
   const el = $('#klEv'); if (!el) return;
   el.innerHTML = (data || []).map((e) => `<div class="ev"><div class="e">${EVI[e.kind] || '•'}</div><div style="flex:1">${esc(e.text || e.kind)}</div><div class="tm">${fmtDT(e.ts)}</div></div>`).join('') || '<span class="muted">Noch keine Einträge.</span>';
@@ -779,6 +780,96 @@ async function paintGesundheit() {
     };
   };
   paint(); if (ed) $('#gAdd').onclick = () => edit(null);
+}
+
+/* ═════════ Ziegen ═════════ */
+function zFreigabe(z) {
+  z = z || {}; const now = new Date(), m = now.getHours() * 60 + now.getMinutes();
+  const toM = (t) => { const [h, mi] = String(t || '00:00').split(':').map(Number); return h * 60 + mi; };
+  if (z.modus === 'an') return { ok: true, t: 'Freigegeben', s: 'dauerhaft, bis jemand sie abschaltet' };
+  if (z.modus === 'zeit') {
+    const v = toM(z.von), b = toM(z.bis), in_ = v <= b ? m >= v && m < b : m >= v || m < b;
+    return in_ ? { ok: true, t: 'Freigegeben', s: `heute bis ${z.bis} Uhr` } : { ok: false, t: 'Gesperrt', s: `Freigabe von ${z.von} bis ${z.bis} Uhr` };
+  }
+  return { ok: false, t: 'Gesperrt', s: 'Freigabe ist ausgeschaltet' };
+}
+const normChip = (c) => String(c || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+async function paintZiegen(soft) {
+  const ed = canEdit('ziegen'), z = cfg?.ziegen || { modus: 'aus', von: '08:00', bis: '18:00', sekunden: 10 };
+  const status = () => {
+    const f = zFreigabe(z), c = conn(), io = st?.io || {};
+    const lockOpen = io['Schloss entriegelt'], doorOpen = io['Ziegentür offen'];
+    return `<div class="signpost" style="margin-top:6px;cursor:default"><div class="board"><div class="bulbs"></div>
+      <div class="name" style="font-size:clamp(24px,6vw,36px)">Ziegentür</div>
+      <div class="sub">${esc(f.s)}</div>
+      <div class="vacancy ${c.c === 'bad' ? 'off' : f.ok ? 'on-t' : 'on-r'}">${c.c === 'bad' ? 'Kein Signal' : f.t}</div>
+      <div class="meta"><span class="pill"><span class="dot ${c.c}"></span>${c.t}</span>
+        ${lockOpen != null ? `<span class="pill">${lockOpen ? '🔓 Schloss offen' : '🔒 verriegelt'}</span>` : ''}
+        ${doorOpen != null ? `<span class="pill">${doorOpen ? '🚪 Tür auf' : '🚪 Tür zu'}</span>` : ''}</div></div>
+      <div class="poles" aria-hidden="true"><i></i><i></i></div></div>`;
+  };
+  if (soft && $('#zStat')) { $('#zStat').innerHTML = status(); return; }
+  $('#app').innerHTML = `${backBtn()}<h1>🐐 Ziegen</h1><div id="zStat">${status()}</div>
+    ${ed ? `<div class="card" style="margin-top:14px"><h3>Freigabe</h3>
+      <div class="seg" id="zMo"><button data-v="aus">Aus</button><button data-v="zeit">Im Zeitfenster</button><button data-v="an">Dauerhaft</button></div>
+      <div class="row" id="zZeit" style="margin-top:12px"><label class="f">von<input type="time" id="zVon" value="${esc(z.von)}"></label><label class="f">bis<input type="time" id="zBis" value="${esc(z.bis)}"></label></div>
+      <div class="row" style="margin-top:12px"><label class="f">Schloss bleibt offen (Sekunden)<input type="number" min="3" max="120" id="zSek" value="${esc(z.sekunden ?? 10)}"></label></div>
+      <p class="small muted">Steht eine eingetragene Ziege am Reader und die Freigabe passt, entriegelt das Schloss für diese Zeit. Unbekannte Chips öffnen nie.</p>
+      <div class="row" style="justify-content:space-between"><button class="btn" id="zUnlock">🔓 Jetzt entriegeln</button><button class="btn pri" id="zSave">Freigabe speichern</button></div>
+      <div id="zCmd" class="small muted" style="margin-top:8px"></div></div>` : ''}
+    <div class="row" style="margin-top:4px"><h2 style="flex:1">Unsere Ziegen</h2>${ed ? '<button class="btn pri" id="zAdd">＋ Ziege</button>' : ''}</div>
+    <div id="zUnk"></div><div class="list" id="zList"></div>
+    <h2>Protokoll</h2><div class="card" id="zEv"><div class="spin"></div></div>`;
+  let all = await items('ziegen');
+  const paintList = () => {
+    $('#zList').innerHTML = all.map((x) => { const d = x.data; return `<div class="li" data-id="${x.id}" style="cursor:${ed ? 'pointer' : 'default'}"><div style="font-size:28px">🐐</div><div class="m"><div class="a">${esc(d.name || 'ohne Namen')}${d.aktiv === false ? ' <span class="pill">gesperrt</span>' : ''}</div><div class="b">Chip ${esc(d.chip || '– noch keiner –')}${d.notiz ? ' – ' + esc(d.notiz) : ''}</div></div></div>`; }).join('') || '<span class="muted">Noch keine Ziegen eingetragen.</span>';
+    if (ed) $('#zList').querySelectorAll('.li').forEach((el) => (el.onclick = () => edit(all.find((x) => x.id === el.dataset.id))));
+    const unk = st?.info?.rfid_unbekannt, known = new Set(all.map((x) => normChip(x.data.chip)));
+    $('#zUnk').innerHTML = ed && unk?.chip && !known.has(normChip(unk.chip)) ? `<div class="infobox small" style="margin-bottom:10px">Unbekannter Chip am Reader: <b>${esc(unk.chip)}</b> (${unk.ts ? fmtDT(unk.ts) : ''}). Beim Anlegen einer Ziege kannst du ihn übernehmen.</div>` : '';
+  };
+  const edit = (x) => {
+    const d = x?.data || { aktiv: true }; const unk = st?.info?.rfid_unbekannt;
+    const m = modal(`<h3>${x ? 'Ziege bearbeiten' : 'Neue Ziege'}</h3><div class="col" style="margin-top:12px">
+      <label class="f">Name<input id="gzN" value="${esc(d.name || '')}"></label>
+      <label class="f">Chip-Nummer<input id="gzC" value="${esc(d.chip || '')}" placeholder="z. B. 900 123 456 789 012"></label>
+      ${unk?.chip ? `<button class="btn" id="gzU" type="button">Letzten Chip übernehmen: ${esc(unk.chip)}</button>` : '<p class="small muted">Tipp: Halsband einmal an den Reader halten, dann kann die Nummer hier übernommen werden.</p>'}
+      <label class="chk"><input type="checkbox" id="gzA" ${d.aktiv !== false ? 'checked' : ''}> darf durch die Tür</label>
+      <label class="f">Notiz<input id="gzNo" value="${esc(d.notiz || '')}"></label>
+      <div class="row" style="justify-content:space-between">${x ? '<button class="btn bad" data-d>Löschen</button>' : '<span></span>'}<div class="row"><button class="btn" data-x>Abbrechen</button><button class="btn pri" data-s>Speichern</button></div></div></div>`);
+    m.querySelector('#gzU') && (m.querySelector('#gzU').onclick = () => (m.querySelector('#gzC').value = unk.chip));
+    m.querySelector('[data-x]').onclick = () => m.remove();
+    m.querySelector('[data-d]') && (m.querySelector('[data-d]').onclick = async () => { if (await delItem(x.id)) { m.remove(); all = await items('ziegen'); paintList(); } });
+    m.querySelector('[data-s]').onclick = async () => {
+      const nd = { name: m.querySelector('#gzN').value.trim(), chip: m.querySelector('#gzC').value.trim(), aktiv: m.querySelector('#gzA').checked, notiz: m.querySelector('#gzNo').value.trim() };
+      if (nd.chip && all.some((y) => y.id !== x?.id && normChip(y.data.chip) === normChip(nd.chip))) return toast('Diese Chip-Nummer gehört schon einer anderen Ziege.');
+      if (await saveItem('ziegen', 'ziege', nd, x?.id)) { m.remove(); all = await items('ziegen'); paintList(); }
+    };
+  };
+  const paintEv = async () => {
+    const { data } = await sb.from('hs_events').select('*').eq('kind', 'ziege').order('ts', { ascending: false }).limit(40);
+    $('#zEv').innerHTML = (data || []).map((e) => `<div class="ev"><div class="e">${/abgewiesen|unbekannt/i.test(e.text) ? '⛔' : /entriegelt|durch/i.test(e.text) ? '🐐' : '⚙️'}</div><div style="flex:1">${esc(e.text)}</div><div class="tm">${fmtDT(e.ts)}</div></div>`).join('') || '<span class="muted">Noch keine Einträge.</span>';
+  };
+  paintList(); paintEv();
+  if (ed) {
+    $('#zAdd').onclick = () => edit(null);
+    const seg = (val) => { $('#zMo').querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.v === val); b.onclick = () => seg(b.dataset.v); }); $('#zZeit').hidden = val !== 'zeit'; };
+    seg(z.modus || 'aus');
+    $('#zSave').onclick = async () => {
+      const nz = { modus: $('#zMo .on').dataset.v, von: $('#zVon').value, bis: $('#zBis').value, sekunden: +$('#zSek').value || 10 };
+      const { data, error } = await sb.rpc('hs_set_ziegen', { z: nz }); if (error) return err(error);
+      cfg = { ...cfg, ziegen: data }; toast('Freigabe gespeichert'); paintZiegen();
+    };
+    $('#zUnlock').onclick = async () => {
+      if (conn().c === 'bad') return toast('Keine Verbindung zum Stall – Entriegeln geht gerade nicht.');
+      if (!(await confirmBox(`Ziegentür jetzt für ${z.sekunden || 10} Sekunden entriegeln?`, 'Entriegeln'))) return;
+      const { data: id, error } = await sb.rpc('hs_command', { c: 'unlock' }); if (error) return err(error);
+      $('#zCmd').textContent = '⏳ Befehl gesendet …'; let n = 0;
+      const t = setInterval(async () => { n++; const { data: r } = await sb.from('hs_commands').select('status,result').eq('id', id).maybeSingle();
+        const el = $('#zCmd'); if (!el || !r) return;
+        el.textContent = { pending: '⏳ wartet auf den Stall …', running: '⚙️ wird ausgeführt …', done: '✅ ' + (r.result || 'entriegelt'), failed: '❌ ' + (r.result || 'fehlgeschlagen'), expired: '⌛ Stall hat nicht reagiert' }[r.status] || r.status;
+        if (['done', 'failed', 'expired', 'replaced'].includes(r.status) || n > 30) { clearInterval(t); paintEv(); } }, 2000);
+    };
+  }
 }
 
 /* ═════════ Mitglieder (Admin) ═════════ */

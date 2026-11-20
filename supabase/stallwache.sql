@@ -407,3 +407,9 @@ end $$;
 -- Brücken-Geheimnis (Hash) setzen:
 -- insert into fhq_private.hs_bridge(id, secret_hash) values (1, encode(extensions.digest('GEHEIMNIS','sha256'),'hex'))
 --   on conflict (id) do update set secret_hash = excluded.secret_hash;
+
+-- ═══ Ziegentür (v1.1): siehe Migration huehnerhotel_ziegentuer im Supabase-Projekt ═══
+-- hs_commands.cmd erlaubt zusätzlich 'unlock'; hs_command('unlock') braucht Bearbeiten-Recht auf Kachel 'ziegen'
+-- hs_set_ziegen(z jsonb) setzt nur config.ziegen {modus aus|zeit|an, von, bis, sekunden}
+-- hs_bridge_sync liefert zusätzlich 'ziegen': [{name, chip}] aus hs_items (tile 'ziegen')
+-- Ereignisse mit kind 'ziege' sind nur mit Ansehen-Recht auf 'ziegen' sichtbar

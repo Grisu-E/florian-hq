@@ -18,8 +18,9 @@ Die **LOGO bleibt der Chef**: Ihre Astro-Uhr fährt die Klappe auch dann, wenn P
 | Ordner | Was | Wohin |
 |---|---|---|
 | `stallwache/` | Web-App (index.html, sw.js, manifest, Icons) | läuft direkt über GitHub Pages |
-| `stallwache/pi/` | Brücken-Programm, Konfiguration, Installationsskript | auf den Raspberry Pi kopieren. In der INI steht hier im Repo nur ein **Platzhalter** fürs Brücken-Geheimnis, das echte steht in der `stallwache.ini` aus dem ZIP. ⚠️ Das echte Geheimnis **nie** ins Repo committen, das Repo ist öffentlich. |
+| `stallwache/pi/` | Brücken-Programm, Konfiguration, Installationsskript | auf den Raspberry Pi kopieren. In der INI stehen hier im Repo nur **Platzhalter** für Brücken-Geheimnis und Reader-Kennwort, die echten Werte stehen in der `stallwache.ini` aus dem ZIP. ⚠️ Echte Werte **nie** ins Repo committen, das Repo ist öffentlich. |
 | `supabase/stallwache.sql` | SQL zum Nachlesen (ist schon eingespielt) | nichts zu tun |
+| `stallwache/esp32/` | Sketch für den Ziegentür-Reader (WT32-ETH01), Kennwort hier als Platzhalter | per Arduino IDE auf den ESP32 |
 
 Supabase ist **bereits fertig eingerichtet** (Projekt florian-hq, Tabellen `hs_…`, Edge Functions `hs-push` und `hs-snap`, Cron-Jobs für Offline-Wächter und Pflege-Erinnerung).
 
@@ -119,7 +120,8 @@ Danach zeigt die App oben **„online“** und den Klappenstatus.
 | 🧹 **Pflege** | Futter, Wasser, Ausmisten … mit Intervall und Ampel, Push-Erinnerung ca. 17 Uhr |
 | 🐔 **Herde** | Hühner mit Rasse, Fußring, Alter, Status |
 | 🩺 **Gesundheit** | Behandlungen, Tierarzt, Wiedervorlage |
-| 👥 **Mitglieder** | Freigaben (nur Admin) |
+| 🐐 **Ziegen** | Ziegentür: Freigabe (aus/Zeitfenster/dauerhaft), Ziegen mit Chip, Protokoll, „Jetzt entriegeln“ |
+| 👥 **Personal** | Mitglieder und Freigaben (nur Admin) |
 
 **Push-Meldungen** (pro Gerät abwählbar):
 - 🚨 **Fuchs-Alarm:** Klappe X Min nach Schließzeit noch offen (Standard 30 Min)
@@ -149,7 +151,54 @@ Danach zeigt die App oben **„online“** und den Klappenstatus.
 
 ---
 
-## 7. Sicherheit
+## 8. Ziegentür mit RFID 🐐
+
+**Prinzip:** Der Reader meldet nur, *welcher* Chip davorsteht. Ob das Schloss aufgeht, entscheidet der Pi anhand der **Freigabe aus der App**: aus, im Zeitfenster oder dauerhaft. Ist alles in Ordnung, entriegelt die LOGO das Schloss für ein paar Sekunden und die Ziegen drücken die Tür selbst auf. Unbekannte Chips öffnen **nie**.
+
+```
+ Halsband-Chip ──► Lesemodul + ESP32 (LAN) ──HTTP──► Pi ──Modbus──► LOGO NI3 (V0.2) ──► Q3 ──► Elektroschloss
+```
+
+### Hardware-Vorschlag
+
+| Teil | Empfehlung | Hinweis |
+|---|---|---|
+| Chips | **FDX-B 134,2 kHz** (ISO 11784/11785) als Anhänger am Halsband | Tier-Standard. Falls eure Ziegen schon eine **elektronische Ohrmarke** haben, prüfen, ob sie FDX-B ist, dann passt derselbe Reader. |
+| Lesemodul | FDX-B-Modul mit **TTL-Ausgang (9600 Baud)** und Spulen-Antenne, z. B. „WL-134“ | Reichweite meist nur **wenige cm bis ca. 10 cm**. Antenne an einer Engstelle auf **Halsband-Höhe** montieren, sodass der Anhänger daran vorbeistreift. Reicht das nicht, wären UHF-Tags mit UHF-Reader die Alternative (Reichweite in Metern). |
+| Steuerung am Stall | **WT32-ETH01** (ESP32 mit LAN-Buchse) + 5-V-Netzteil, wetterfestes Gehäuse | hängt am LAN über die Richtfunkstrecke |
+| Schloss | **Elektroschloss / Riegel „stromlos verriegelt“ (fail-secure)**, 12 oder 24 V DC | Bei Stromausfall bleibt die Tür zu. **Kein** „stromlos offen“ verwenden! |
+| Türkontakt | Reed-Kontakt an der Tür → LOGO **I5** | optional; die App zeigt dann „Tür auf/zu“ und meldet, wenn sie zu lange offen steht |
+| Tür | Pendeltür oder Tür mit Feder, die die Ziegen aufdrücken | schließt von selbst, dann rastet das Schloss wieder ein |
+
+### LOGO-Erweiterung
+
+| LOGO | Funktion |
+|---|---|
+| **V0.2 → NI3** | „Ziegentür entriegeln“ vom Pi (bleibt 1, solange entriegelt sein soll) |
+| **Q3** | Elektroschloss |
+| **I5** | Türkontakt Ziegentür (optional) |
+
+**Logik:** Q3 = NI3 UND NICHT T1. Dabei ist T1 eine **Einschaltverzögerung 120 s** am Eingang NI3. Das ist die Sicherheitsgrenze: Bleibt das Signal vom Pi hängen (Absturz genau beim Entriegeln), verriegelt die LOGO nach 2 Min. trotzdem.
+
+### ESP32 einrichten
+
+1. Arduino IDE → Boardverwalter: **esp32** von Espressif installieren → Board **„WT32-ETH01 Ethernet Module“**.
+2. Sketch `esp32/ziegentuer_reader/ziegentuer_reader.ino` öffnen und oben eintragen: **IP des Pi** (`PI_HOST`). Das Kennwort `TOKEN` muss zu `[ziegen] token` in `stallwache.ini` passen (im ZIP ist es schon gleich eingetragen).
+3. Hochladen mit USB-Seriell-Adapter: IO0 beim Einschalten auf GND = Flash-Modus.
+4. Seriellen Monitor (115200 Baud) öffnen und einen Chip an die Antenne halten. Es erscheint `Chip 900 … → HTTP 200 …`. Die **Rohdaten** stehen ebenfalls dort, falls ein Modul ein anderes Format sendet. Dann einfach mir schicken.
+5. LED-Bedeutung: **grün 1,5 s** = darf durch, **rot 3×** = abgewiesen, **rot schnell** = Pi nicht erreichbar.
+
+### Pi und App
+
+1. In `stallwache.ini` im Abschnitt `[ziegen]` **`aktiv = yes`** setzen und den Dienst neu starten: `sudo systemctl restart stallwache`.
+2. Test ohne Ziege: `python3 stallwache_bridge.py --entriegeln` → Schloss ist 10 s offen.
+3. In der App unter 🐐 **Ziegen**: Ziege anlegen. Halsband einmal an den Reader halten, dann kann die Chip-Nummer per Knopf übernommen werden.
+4. **Freigabe** wählen: *Aus*, *Im Zeitfenster* (z. B. 08:00–18:00) oder *Dauerhaft*, dazu die Entriegelungszeit in Sekunden. **„Jetzt entriegeln“** öffnet einmalig, auch außerhalb der Freigabe.
+5. Wer die Ziegen bedienen darf, stellst du unter 👥 Personal beim Schlüssel **Ziegen** ein. Das ist unabhängig von den Rechten an der Hühnerklappe.
+
+---
+
+## 9. Sicherheit
 
 - Die App nutzt dieselbe Anmeldung (E-Mail-Link) wie Florian HQ / H&E Hub, aber **eigene Freigaben**.
 - Klappe fahren dürfen nur Personen mit **„bearbeiten“ bei Klappe**.

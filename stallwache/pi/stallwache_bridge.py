@@ -7,6 +7,7 @@ Hühnerhotel-Brücke – läuft auf dem Raspberry Pi im Netz des Hühnerstalls.
 * gibt Befehle als kurzen Impuls auf ein V-Bit (Netzwerkeingang) der LOGO
 * überwacht Zeiten und meldet Alarme (abends noch offen, morgens noch zu, Störung)
 * holt per ffmpeg Standbilder von den Kameras (RTSP) und lädt sie hoch
+* Ziegentür: nimmt Chip-Meldungen vom ESP32-Reader an und entriegelt nur mit Freigabe aus der App
 
 Nur Python-Standardbibliothek + ffmpeg. Aufruf:
   python3 stallwache_bridge.py                 # Dauerbetrieb
@@ -16,7 +17,8 @@ Nur Python-Standardbibliothek + ffmpeg. Aufruf:
   python3 stallwache_bridge.py --sync          # Verbindung zu Supabase testen
 """
 import argparse, configparser, json, logging, math, os, queue, re, socket, struct, subprocess, sys, threading, time
-import urllib.request, urllib.error
+import urllib.request, urllib.error, urllib.parse
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from datetime import datetime, date, timedelta, timezone
 try:
     from zoneinfo import ZoneInfo
@@ -24,7 +26,7 @@ try:
 except Exception:  # sehr alte Python-Version
     TZ = None
 
-VERSION = "1.0"
+VERSION = "1.1"
 log = logging.getLogger("stallwache")
 
 
@@ -305,6 +307,29 @@ class Bridge:
         self.live_every = float(K.get("live_alle_s", 3) or 3)
         self.cam = CamWorker(self.sb, self.cams) if self.cams else None
         self.poll_s = L.getfloat("abfrage_s", 2)
+        # Ziegentür
+        Z = ini["ziegen"] if ini.has_section("ziegen") else None
+        self.z_on = bool(Z and Z.getboolean("aktiv", False))
+        self.z_cmd = Signal(Z["befehl"]) if self.z_on and Z.get("befehl", "").strip() else None
+        if self.z_cmd is not None and not self.z_cmd.writable:
+            raise ValueError(f"Ziegentür-Befehl {self.z_cmd.spec} muss ein V-Bit oder Merker sein (z. B. V0.2)")
+        if self.z_on:
+            for k, lab in (("schloss", "schloss"), ("tuerkontakt", "tuerkontakt")):
+                if Z.get(k, "").strip():
+                    self.sig[lab] = Signal(Z[k])
+        self.z_port = Z.getint("port", 8088) if Z else 8088
+        self.z_token = (Z.get("token", "") if Z else "").strip()
+        self.z_offen_alarm = (Z.getfloat("tuer_offen_alarm_min", 10) if Z else 10) * 60
+        self.z_lock = threading.Lock()
+        self.ev_lock = threading.Lock()
+        self.goats = {}               # normierte Chip-Nummer → Name
+        self.z_until = 0              # Schloss entriegelt bis (time.time())
+        self.z_timer = None
+        self.z_last = {}              # (chip, ergebnis) → Zeit, gegen Protokoll-Flut
+        self.z_unknown = None         # letzter unbekannter Chip
+        self.z_reader_seen = None
+        self.z_door_since = None
+        self.z_door_alarmed = False
         # Laufzeit-Zustand
         self.cfg = {}
         self.events = []
@@ -327,7 +352,7 @@ class Bridge:
     def read_logo(self):
         io, raw = {}, {}
         labels = {"endschalter_oben": "Endschalter oben", "endschalter_unten": "Endschalter unten", "motor_auf": "Motor auf",
-                  "motor_zu": "Motor zu", "stoerung": "Störung"}
+                  "motor_zu": "Motor zu", "stoerung": "Störung", "schloss": "Schloss entriegelt", "tuerkontakt": "Ziegentür offen"}
         try:
             for k, s in self.sig.items():
                 if s is None:
@@ -381,11 +406,142 @@ class Bridge:
     # ───── Ereignisse ─────
     def event(self, kind, text, source="stall"):
         log.info("Ereignis %s: %s", kind, text)
-        self.events.append({"kind": kind, "text": text, "source": source})
-        self.events = self.events[-100:]
+        with self.ev_lock:
+            self.events.append({"kind": kind, "text": text, "source": source})
+            self.events = self.events[-100:]
+
+    # ───── Ziegentür ─────
+    @staticmethod
+    def norm_chip(c):
+        return re.sub(r"[^0-9A-Za-z]", "", str(c or "")).upper()
+
+    def z_window(self):
+        """(erlaubt, Begründung) nach der Freigabe aus der App."""
+        z = (self.cfg or {}).get("ziegen") or {}
+        mode = z.get("modus", "aus")
+        if mode == "an":
+            return True, "dauerhaft freigegeben"
+        if mode == "zeit":
+            now = now_local()
+            m = now.hour * 60 + now.minute
+            def mins(t):
+                try:
+                    h, mi = [int(x) for x in str(t).split(":")[:2]]
+                    return h * 60 + mi
+                except ValueError:
+                    return 0
+            v, b = mins(z.get("von", "08:00")), mins(z.get("bis", "18:00"))
+            inside = v <= m < b if v <= b else (m >= v or m < b)
+            return (True, f"Freigabe bis {z.get('bis')} Uhr") if inside else (False, f"außerhalb der Freigabe ({z.get('von')}–{z.get('bis')} Uhr)")
+        return False, "Freigabe ist aus"
+
+    def z_unlock(self, seconds, who):
+        """Hält das V-Bit für die Ziegentür <seconds> lang auf 1. Gibt (ok, Text) zurück."""
+        if self.z_cmd is None:
+            return False, "keine Befehls-Adresse für die Ziegentür konfiguriert"
+        if not self.logo_ok:
+            return False, "LOGO nicht erreichbar"
+        seconds = max(3, min(120, float(seconds or 10)))
+        with self.z_lock:
+            already = time.time() < self.z_until
+            try:
+                self.mb.write_coil(self.z_cmd.addr, True)
+            except Exception as e:
+                return False, f"Impuls fehlgeschlagen: {e}"
+            self.z_until = time.time() + seconds
+            if self.z_timer:
+                self.z_timer.cancel()
+            self.z_timer = threading.Timer(seconds, self.z_relock)
+            self.z_timer.daemon = True
+            self.z_timer.start()
+        return True, ("Entriegelung verlängert" if already else "Schloss entriegelt") + f" ({int(seconds)} s)"
+
+    def z_relock(self):
+        with self.z_lock:
+            for attempt in range(5):
+                try:
+                    self.mb.write_coil(self.z_cmd.addr, False)
+                    break
+                except Exception as e:
+                    log.warning("Ziegentür verriegeln fehlgeschlagen (%s), neuer Versuch …", e)
+                    time.sleep(1)
+            else:
+                self.event("fehler", "Ziegentür-Signal ließ sich nicht zurücksetzen – die LOGO-Maximalzeit verriegelt das Schloss")
+            self.z_until = 0
+
+    def z_tag(self, chip_raw, reader="1"):
+        """Vom ESP32 gemeldeter Chip. Antwort für die LED am Reader."""
+        chip = self.norm_chip(chip_raw)
+        self.z_reader_seen = time.time()
+        if not chip:
+            return {"ok": False, "grund": "leer"}
+        name = self.goats.get(chip)
+        if name is None:
+            self.z_unknown = {"chip": str(chip_raw).strip(), "ts": datetime.now(timezone.utc).isoformat()}
+            self.z_log(chip, "unbekannt", f"Unbekannter Chip {str(chip_raw).strip()} abgewiesen")
+            return {"ok": False, "grund": "unbekannt"}
+        allowed, why = self.z_window()
+        if not allowed:
+            self.z_log(chip, "nein", f"{name} abgewiesen – {why}")
+            return {"ok": False, "name": name, "grund": why}
+        secs = ((self.cfg or {}).get("ziegen") or {}).get("sekunden", 10)
+        ok, txt = self.z_unlock(secs, name)
+        self.z_log(chip, "ja" if ok else "fehler", f"{name}: {txt}" if ok else f"{name} durfte, aber: {txt}", force=not ok)
+        return {"ok": ok, "name": name, "grund": txt}
+
+    def z_log(self, chip, result, text, force=False):
+        """Protokolliert höchstens einmal pro Minute je Chip und Ergebnis (der Reader liest dauernd)."""
+        k = (chip, result)
+        if force or time.time() - self.z_last.get(k, 0) > 60:
+            self.z_last[k] = time.time()
+            self.event("ziege", text)
+
+    def z_server(self):
+        bridge = self
+
+        class H(BaseHTTPRequestHandler):
+            def log_message(self, *a):
+                pass
+
+            def do_GET(self):
+                u = urllib.parse.urlparse(self.path)
+                q = urllib.parse.parse_qs(u.query)
+                if u.path not in ("/rfid", "/ping"):
+                    return self._send(404, {"ok": False})
+                if bridge.z_token and q.get("token", [""])[0] != bridge.z_token:
+                    return self._send(403, {"ok": False, "grund": "token"})
+                if u.path == "/ping":
+                    bridge.z_reader_seen = time.time()
+                    return self._send(200, {"ok": True})
+                try:
+                    res = bridge.z_tag(q.get("tag", [""])[0], q.get("reader", ["1"])[0])
+                except Exception as e:
+                    log.exception("RFID-Verarbeitung")
+                    res = {"ok": False, "grund": str(e)}
+                self._send(200, res)
+
+            def _send(self, code, obj):
+                b = json.dumps(obj, ensure_ascii=False).encode()
+                self.send_response(code)
+                self.send_header("Content-Type", "application/json; charset=utf-8")
+                self.send_header("Content-Length", str(len(b)))
+                self.end_headers()
+                self.wfile.write(b)
+
+        srv = ThreadingHTTPServer(("0.0.0.0", self.z_port), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        log.info("Ziegentür: warte auf Chips vom Reader auf Port %s", self.z_port)
+        return srv
 
     # ───── Befehle ─────
     def run_command(self, c):
+        if c["cmd"] == "unlock":
+            secs = ((self.cfg or {}).get("ziegen") or {}).get("sekunden", 10)
+            ok, txt = self.z_unlock(secs, "App")
+            self.safe_ack(c["id"], ok, txt)
+            if not ok:
+                self.event("ziege", f"Entriegeln aus der App fehlgeschlagen: {txt}")
+            return
         which = "auf" if c["cmd"] == "open" else "zu"
         target = "offen" if which == "auf" else "zu"
         if not self.logo_ok:
@@ -483,6 +639,9 @@ class Bridge:
             i.update(sunrise=hm(p["rise"]), sunset=hm(p["set"]), plan_auf=hm(p["auf"]), plan_zu=hm(p["zu"]), alarm_ab=hm(p["alarm_zu"]))
         if "Temperatur" in self.io:
             i["temp"] = self.io["Temperatur"]
+        if self.z_on:
+            i["rfid_unbekannt"] = self.z_unknown
+            i["rfid_reader"] = datetime.fromtimestamp(self.z_reader_seen, timezone.utc).isoformat() if self.z_reader_seen else None
         return i
 
     def step(self):
@@ -507,21 +666,26 @@ class Bridge:
         self.check_running()
         p = self.timers()
 
+        self.z_watch()
         state = {"door": self.door, "io": self.io, "info": self.info(p)}
-        events, self.events = self.events, []
+        with self.ev_lock:
+            events, self.events = self.events, []
         try:
             res = self.sb.sync(state, events)
             if self.sync_fail:
                 log.info("Supabase wieder erreichbar")
             self.sync_fail = 0
         except Exception as e:
-            self.events = events + self.events   # später erneut senden
+            with self.ev_lock:
+                self.events = (events + self.events)[-100:]   # später erneut senden
             self.sync_fail += 1
             if self.sync_fail in (1, 10) or self.sync_fail % 150 == 0:
                 log.warning("Sync fehlgeschlagen (%sx): %s", self.sync_fail, e)
             return
         if isinstance(res, dict):
             self.cfg = res.get("config") or self.cfg
+            if isinstance(res.get("ziegen"), list):
+                self.goats = {self.norm_chip(g.get("chip")): g.get("name") or "Ziege" for g in res["ziegen"] if g.get("chip")}
             st = res.get("server_time")
             if st:
                 self.server_offset = datetime.fromisoformat(st.replace("Z", "+00:00")).timestamp() - time.time()
@@ -531,6 +695,19 @@ class Bridge:
                 log.info("Befehl aus der App: %s (#%s)", c["cmd"], c["id"])
                 self.run_command(c)
         self.cameras()
+
+    def z_watch(self):
+        """Alarm, wenn die Ziegentür (Türkontakt) zu lange offen steht."""
+        if not self.z_on or "Ziegentür offen" not in self.io:
+            return
+        if self.io["Ziegentür offen"]:
+            self.z_door_since = self.z_door_since or time.time()
+            if not self.z_door_alarmed and time.time() - self.z_door_since > self.z_offen_alarm:
+                self.z_door_alarmed = True
+                self.event("alarm", f"Ziegentür steht seit über {max(1, round(self.z_offen_alarm / 60))} Min. offen")
+        else:
+            self.z_door_since = None
+            self.z_door_alarmed = False
 
     def cameras(self):
         if not self.cam:
@@ -551,6 +728,13 @@ class Bridge:
         log.info("Hühnerhotel-Brücke %s startet – LOGO %s:%s, %d Kamera(s)", VERSION, self.mb.host, self.mb.port, len(self.cams))
         if self.cam:
             self.cam.start()
+        if self.z_on:
+            try:
+                if self.z_cmd is not None:
+                    self.mb.write_coil(self.z_cmd.addr, False)   # nach Neustart sicher verriegeln
+            except Exception as e:
+                log.warning("Ziegentür-Bit beim Start nicht zurückgesetzt: %s", e)
+            self.z_server()
         self.event("start", f"Brücke gestartet (v{VERSION})")
         while True:
             t0 = time.time()
@@ -569,6 +753,7 @@ def main():
     ap.add_argument("--pulse", choices=["auf", "zu"], help="Testimpuls an die LOGO")
     ap.add_argument("--snapshot", action="store_true", help="Testbild jeder Kamera hochladen")
     ap.add_argument("--sync", action="store_true", help="Supabase-Verbindung testen")
+    ap.add_argument("--entriegeln", action="store_true", help="Ziegentür testweise entriegeln (Sekunden aus der INI-Vorgabe 10)")
     ap.add_argument("-v", "--verbose", action="store_true")
     a = ap.parse_args()
     logging.basicConfig(level=logging.DEBUG if a.verbose else logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
@@ -592,6 +777,8 @@ def main():
             except Exception as e:
                 print(f"{c['name']}: FEHLER {e}")
         return
+    if a.entriegeln:
+        b.read_logo(); ok, txt = b.z_unlock(10, "Test"); print(txt); time.sleep(10.5); return
     if a.sync:
         print(json.dumps(b.sb.sync(None, [{"kind": "info", "text": "Verbindungstest vom Pi"}]), indent=2, ensure_ascii=False)); return
     b.run()
