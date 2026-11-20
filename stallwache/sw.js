@@ -1,5 +1,5 @@
 // Hühnerhotel – Service Worker (Push + Offline-Hülle)
-const CACHE = 'huehnerhotel-v14';
+const CACHE = 'huehnerhotel-v15';
 const SHELL = ['./', './index.html', './icon.svg', './icon-192.png', './manifest.webmanifest'];
 
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(SHELL)).catch(() => {})); self.skipWaiting(); });
@@ -9,7 +9,8 @@ self.addEventListener('activate', (e) => { e.waitUntil(caches.keys().then((ks) =
 self.addEventListener('fetch', (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== 'GET' || u.origin !== location.origin) return;
-  e.respondWith(fetch(e.request).then((r) => { const c = r.clone(); caches.open(CACHE).then((x) => x.put(e.request, c)); return r; }).catch(() => caches.match(e.request).then((r) => r || caches.match('./'))));
+  // immer frisch vom Server holen (am HTTP-Zwischenspeicher vorbei), nur offline aus dem Cache
+  e.respondWith(fetch(e.request, { cache: 'no-cache' }).then((r) => { const c = r.clone(); caches.open(CACHE).then((x) => x.put(e.request, c)); return r; }).catch(() => caches.match(e.request).then((r) => r || caches.match('./'))));
 });
 
 self.addEventListener('push', (e) => {

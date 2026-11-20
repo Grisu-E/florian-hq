@@ -1117,6 +1117,12 @@ async function paintPush() {
   $('#pOff').onclick = async () => { await sb.from('hs_push_subs').delete().eq('id', row.id); await sub.unsubscribe(); paintPush(); };
 }
 
+// Neue Version automatisch laden: Service Worker beim Öffnen und alle 30 Min. aktualisieren, bei Wechsel einmal neu laden
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').then((r) => { r.update(); setInterval(() => r.update(), 30 * 60 * 1000); document.addEventListener('visibilitychange', () => { if (!document.hidden) r.update(); }); }).catch(() => {});
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!reloaded) { reloaded = true; location.reload(); } });
+}
 document.addEventListener('visibilitychange', () => { if (!document.hidden && member?.status === 'approved') { loadState(); } });
 boot().catch(err);
 </script>
