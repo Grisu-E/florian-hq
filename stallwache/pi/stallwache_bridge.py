@@ -590,7 +590,7 @@ class Bridge:
             try:
                 self.mb.write_coil(self.cmd_sperre.addr, soll)
                 if soll != self.sperre_ist:
-                    log.info("Stallpflicht-Sperre in der LOGO: %s", "AN" if soll else "aus")
+                    log.info("Sperre Umzug Stall in der LOGO: %s", "AN" if soll else "aus")
                 self.sperre_ist, self.sperre_t = soll, time.time()
             except Exception as e:
                 log.warning("Sperr-Bit konnte nicht geschrieben werden: %s", e)
@@ -637,7 +637,7 @@ class Bridge:
             return
         which = "auf" if c["cmd"] == "open" else "zu"
         if which == "auf" and self.stallpflicht():
-            self.safe_ack(c["id"], False, "Stallpflicht aktiv – Öffnen gesperrt")
+            self.safe_ack(c["id"], False, "Umzug Stall aktiv – Öffnen gesperrt")
             return
         target = "offen" if which == "auf" else "zu"
         if not self.logo_ok:

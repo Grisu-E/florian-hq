@@ -50,7 +50,7 @@ Die Belegung ist noch offen, deshalb hier ein Vorschlag. Die Brücke ist genau s
 | **Q2** | Motor **ZU** | |
 | **V0.0** | Netzwerkeingang **NI1 = AUF aus der App** | Impuls 0,8 s |
 | **V0.1** | Netzwerkeingang **NI2 = ZU aus der App** | Impuls 0,8 s |
-| **V0.3** | Netzwerkeingang **NI4 = Stallpflicht-Sperre** | bleibt 1, solange in der App Stallpflicht aktiv ist |
+| **V0.3** | Netzwerkeingang **NI4 = Sperre „Umzug Stall“** | bleibt 1, solange in der App Umzug Stall aktiv ist |
 | **V0.4** | Netzwerkeingang **NI5 = Tränke-Heizung** | 1 = heizen (Pi entscheidet nach Modus und Temperatur) |
 | **Q4** | Heizplatte / Tränkenwärmer | Q4 = NI5. Empfehlung: zusätzlich ODER eine eigene Frostschutz-Schwelle der LOGO (z. B. Analogschwellwert an AI1 < −2 °C), damit die Tränke auch ohne Pi nicht einfriert |
 | **AI1** | optional Temperaturfühler am Stall (0–10 V) | ohne Fühler nimmt der Pi die Außentemperatur vom Wetterdienst |
@@ -61,7 +61,7 @@ Die Belegung ist noch offen, deshalb hier ein Vorschlag. Die Brücke ist genau s
 - **Astro-Uhr** (Sonderfunktion „Astronomische Uhr“): Breiten- und Längengrad von Gitzensteig ≈ 47,67 N / 9,59 O, Offset nach Wunsch, z. B. AUF = Sonnenaufgang + 30 Min, ZU = Sonnenuntergang + 20 Min.
 - **AUF-Anforderung** = ODER( Astro *steigende Flanke*, I1, NI1 )
 - **ZU-Anforderung** = ODER( Astro *fallende Flanke*, I2, NI2 )
-- **Q1 (Motor auf)** über Selbsthalterelais (RS): Setzen = AUF-Anforderung UND NICHT I3 UND NICHT Q2 UND NICHT NI4 (Stallpflicht); Rücksetzen = I3 ODER ZU-Anforderung ODER Laufzeit-Überwachung
+- **Q1 (Motor auf)** über Selbsthalterelais (RS): Setzen = AUF-Anforderung UND NICHT I3 UND NICHT Q2 UND NICHT NI4 (Umzug Stall); Rücksetzen = I3 ODER ZU-Anforderung ODER Laufzeit-Überwachung
 - **Q2 (Motor zu)** genauso mit I4, Q1 und der AUF-Anforderung
 - **Laufzeit-Überwachung:** Einschaltverzögerung ca. 60 s an Q1 ODER Q2 → setzt Q1/Q2 zurück und setzt **M1**. M1 wird bei der nächsten Anforderung zurückgesetzt.
 - **Modbus freischalten:** LOGO!Soft Comfort → *Extras → Ethernet-Verbindungen* → Haken bei **„Modbus-Zugriff zulassen“** (Port 502), danach Programm übertragen.
@@ -80,7 +80,7 @@ Dein Programm nutzt: **I1** Taster öffnen, **I2** Taster schließen, **I3** Lic
 | 1 | **B002 Astro-Uhr: Koordinaten auf Gitzensteig** (N 47° 40′, O 9° 35′) | Eingetragen ist **Berlin** (N52°31′ / O13°24′, der Standardwert von LOGO!Soft). Heute schließt die Klappe dadurch um ca. **16:47 statt 17:20**, im Juni öffnet sie ca. 40 Min. zu früh. |
 | 2 | Nach **I1** einen **ODER-Baustein** mit **NI1 (V0.0)** einfügen und alle bisherigen Verbindungen von I1 an dessen Ausgang hängen | „Öffnen“ aus der App wirkt wie ein Druck auf den Taster |
 | 3 | Genauso nach **I2** ein ODER mit **NI2 (V0.1)** | „Schließen“ aus der App |
-| 4 | Vor den **S-Eingang von B007** ein **UND** mit **NICHT NI4 (V0.3)** setzen | Stallpflicht: B007 kann nicht mehr gesetzt werden, Q1 bleibt aus, die Klappe bleibt zu (Astro-Uhr, Taster und App). Schließen über R bleibt möglich. Soll der Taster am Stall trotz Stallpflicht öffnen können, das UND nur in den Astro-Zweig setzen. |
+| 4 | Vor den **S-Eingang von B007** ein **UND** mit **NICHT NI4 (V0.3)** setzen | Umzug Stall: B007 kann nicht mehr gesetzt werden, Q1 bleibt aus, die Klappe bleibt zu (Astro-Uhr, Taster und App). Schließen über R bleibt möglich. Soll der Taster am Stall trotz Umzug Stall öffnen können, das UND nur in den Astro-Zweig setzen. |
 | 5 | **Q4** = NI5 (V0.4) für die Tränke-Heizung, **Q3** = Schloss Ziegentür (NI3 / V0.2 mit 120-s-Begrenzung) | Ausgänge sind noch frei |
 | 6 | Ziegentür-Türkontakt auf **I6** (I5 ist schon „Klappe unten“) | Belegung angepasst |
 | 7 | *Extras → Ethernet-Verbindungen* → **„Modbus-Zugriff zulassen“** | sonst kommt der Pi nicht an die LOGO |
@@ -151,7 +151,7 @@ Danach zeigt die App oben **„online“** und den Klappenstatus.
 
 | Kachel | Funktion |
 |---|---|
-| 🚪 **Klappe** | Status live, Öffnen/Schließen per Knopf (mit Rückmeldung), **Stallpflicht-Schalter**, **Tränke-Heizung** (Automatisch/An/Aus mit Temperaturschwellen), **Wetter-Warnungen**, Protokoll mit **Foto beim Schließen**, heutige Sonnen- und Sollzeiten, Protokoll, Zeiten & Alarm einstellen |
+| 🚪 **Klappe** | Status live, Öffnen/Schließen per Knopf (mit Rückmeldung), **Schalter „Umzug Stall“**, **Tränke-Heizung** (Automatisch/An/Aus mit Temperaturschwellen), **Wetter-Warnungen**, Protokoll mit **Foto beim Schließen**, heutige Sonnen- und Sollzeiten, Protokoll, Zeiten & Alarm einstellen |
 | 📷 **Kamera** | Letztes Bild beider Objektive, Live-Modus, Verlauf mit Bildern beim Öffnen/Schließen |
 | 🥚 **Eier** | Tageszähler (+/−), Statistik 7/30 Tage, Monate, Legequote |
 | 🧹 **Pflege** | Futter, Wasser, Ausmisten … mit Intervall und Ampel, Push-Erinnerung ca. 17 Uhr |

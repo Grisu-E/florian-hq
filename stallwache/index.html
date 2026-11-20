@@ -237,7 +237,7 @@ const TILES = [
   { key: 'eier',       icon: '🥚', name: 'Eier',       desc: 'Was die Gäste gelegt haben',    c: 'var(--chalk)', r: -1 },
   { key: 'pflege',     icon: '🧹', name: 'Pflege',     desc: 'Zimmerservice: Futter, Wasser, Ausmisten', c: 'var(--mint)', r: 2 },
   { key: 'herde',      icon: '🐔', name: 'Herde',      desc: 'Unsere Gäste',                  c: 'var(--coral)', r: -1.5 },
-  { key: 'stallpflicht', icon: '🏠', name: 'Stallpflicht', desc: 'Aufstallung: Klappe bleibt zu', c: '#ff8a96', r: 1.8 },
+  { key: 'stallpflicht', icon: '🚚', name: 'Umzug Stall', desc: 'Klappe bleibt zu', c: '#ff8a96', r: 1.8 },
   { key: 'traenke',    icon: '♨️', name: 'Tränke',     desc: 'Heizung bei Frost',             c: '#9fd8ff', r: -0.8 },
   { key: 'ziegen',     icon: '🐐', name: 'Ziegen',     desc: 'Ziegentür und Freigabe',        c: '#f7b7d2',      r: -2.2 },
 ];
@@ -250,7 +250,7 @@ const DOOR = {
   stoerung:  { t: 'Störung',          c: 'bad',  e: '⚠️' },
   unbekannt: { t: 'Status unbekannt', c: '',     e: '❔' },
 };
-const EVI = { wetter: '🌦', stallpflicht: '🏠', auf: '🐔', zu: '🌙', befehl: '👆', alarm: '🚨', fehler: '⚠️', offline: '📡', online: '📡', info: 'ℹ️', start: '🔌' };
+const EVI = { wetter: '🌦', stallpflicht: '🚚', auf: '🐔', zu: '🌙', befehl: '👆', alarm: '🚨', fehler: '⚠️', offline: '📡', online: '📡', info: 'ℹ️', start: '🔌' };
 
 /* ═════════ Zustand ═════════ */
 let me = null, member = null, cfg = null, st = null, names = {}, wetter = null;
@@ -509,13 +509,13 @@ function heroCard() {
   const spaetOffen = ['offen', 'zwischen', 'oeffnet', 'stoerung'].includes(st?.door) && c.c !== 'bad' && p.zu && now > p.zu && (now.getHours() >= 12);
   const next = spaetOffen ? '' : p.auf && now < p.auf ? `Öffnet ca. ${hm(p.auf)}` : p.zu && now < p.zu ? `Schließt ca. ${hm(p.zu)}` : p.auf ? `Öffnet morgen früh` : '';
   const spa = !!cfg?.stallpflicht?.aktiv;
-  const sub = spa ? 'Stallpflicht – alle Gäste bleiben drinnen' : known && st?.changed_at ? `Klappe ${st.door === 'zu' ? 'zu' : st.door === 'offen' ? 'offen' : 'in Bewegung'} seit ${fmtDT(st.changed_at)} Uhr` : c.t;
+  const sub = spa ? 'Umzug Stall – alle Gäste bleiben drinnen' : known && st?.changed_at ? `Klappe ${st.door === 'zu' ? 'zu' : st.door === 'offen' ? 'offen' : 'in Bewegung'} seit ${fmtDT(st.changed_at)} Uhr` : c.t;
   return `<a class="signpost" href="#klappe" aria-label="Klappe: ${esc(word)}">
     <div class="board"><div class="bulbs"></div>
       <div class="name">Hühnerhotel</div>
       <div class="sub">${esc(sub)}</div>
       <div class="vacancy ${cls}${flick}">${esc(word)}</div>
-      <div class="meta">${spa ? '<span class="pill" style="border-color:var(--neon-r);color:#ffd1d7">🏠 Stallpflicht</span>' : ''}<span class="pill"><span class="dot ${c.c}"></span>${c.t}</span>${next && !spa ? `<span class="pill">⏱ ${next}</span>` : ''}${st?.info?.temp != null ? `<span class="pill">🌡 ${esc(String(st.info.temp).replace('.', ','))} °C</span>` : ''}</div>
+      <div class="meta">${spa ? '<span class="pill" style="border-color:var(--neon-r);color:#ffd1d7">🚚 Umzug Stall</span>' : ''}<span class="pill"><span class="dot ${c.c}"></span>${c.t}</span>${next && !spa ? `<span class="pill">⏱ ${next}</span>` : ''}${st?.info?.temp != null ? `<span class="pill">🌡 ${esc(String(st.info.temp).replace('.', ','))} °C</span>` : ''}</div>
       ${spaetOffen ? `<div class="warnbox small" style="margin-top:12px">Die Klappe sollte seit ca. ${hm(p.zu)} Uhr zu sein.</div>` : ''}
     </div>
     <div class="poles" aria-hidden="true"><i></i><i></i></div></a>`;
@@ -545,7 +545,7 @@ let cmdWatch = null;
 async function paintKlappe(soft) {
   if (soft && $('#klHero')) { $('#klHero').innerHTML = klHero(); return; }
   $('#app').innerHTML = `${backBtn()}<h1>🚪 Klappe</h1><div id="klHero">${klHero()}</div>
-${spAktiv() ? `<div class="warnbox small" style="margin-top:12px">🏠 Stallpflicht ist aktiv – die Klappe bleibt zu.${canView('stallpflicht') ? ' <a href="#stallpflicht">Zur Stallpflicht</a>' : ''}</div>` : ''}
+${spAktiv() ? `<div class="warnbox small" style="margin-top:12px">🚚 Umzug Stall ist aktiv – die Klappe bleibt zu.${canView('stallpflicht') ? ' <a href="#stallpflicht">Zum Umzug Stall</a>' : ''}</div>` : ''}
     <h2>Heute</h2><div class="card" id="klPlan"></div>
     <h2>Protokoll</h2><div class="card" id="klEv"><div class="spin"></div></div>
     ${canEdit('klappe') ? `<h2>Zeiten & Alarm</h2><div class="card" id="klCfg"></div><h2>Wetter-Warnungen</h2><div class="card" id="klWt"></div>` : ''}`;
@@ -558,12 +558,12 @@ function paintTraenke() {
   paintHz();
 }
 function paintStallpflicht() {
-  $('#app').innerHTML = `${backBtn()}<h1>🏠 Stallpflicht</h1><div class="card" id="klSp"></div>
+  $('#app').innerHTML = `${backBtn()}<h1>🚚 Umzug Stall</h1><div class="card" id="klSp"></div>
     <h2>Verlauf</h2><div class="card" id="spEv"><div class="spin"></div></div>`;
   paintSp();
   sb.from('hs_events').select('*').eq('kind', 'stallpflicht').order('ts', { ascending: false }).limit(20).then(({ data }) => {
     const el = $('#spEv'); if (!el) return;
-    el.innerHTML = (data || []).map((e) => `<div class="ev"><div class="e">🏠</div><div style="flex:1">${esc(e.text)}</div><div class="tm">${fmtDT(e.ts)}</div></div>`).join('') || '<span class="muted">Noch keine Einträge.</span>';
+    el.innerHTML = (data || []).map((e) => `<div class="ev"><div class="e">🚚</div><div style="flex:1">${esc(e.text)}</div><div class="tm">${fmtDT(e.ts)}</div></div>`).join('') || '<span class="muted">Noch keine Einträge.</span>';
   });
 }
 function paintHz() {
@@ -603,17 +603,17 @@ const spAktiv = () => !!cfg?.stallpflicht?.aktiv;
 function paintSp() {
   const sp = cfg?.stallpflicht || {}, ed = canEdit('stallpflicht'), el = $('#klSp'); if (!el) return;
   el.innerHTML = sp.aktiv
-    ? `<div class="row" style="align-items:flex-start"><div style="font-size:30px">🏠</div><div style="flex:1"><b style="color:var(--neon-r)">Stallpflicht ist aktiv</b>
+    ? `<div class="row" style="align-items:flex-start"><div style="font-size:30px">🚚</div><div style="flex:1"><b style="color:var(--neon-r)">Umzug Stall ist aktiv</b>
         <div class="small muted">seit ${sp.seit ? fmtDT(sp.seit) : '–'}${sp.von ? ', eingeschaltet von ' + esc(sp.von) : ''}${sp.notiz ? '<br>' + esc(sp.notiz) : ''}</div>
         <div class="small" style="margin-top:6px">Die Klappe bleibt zu: Astro-Uhr, Taster und „Öffnen“ in der App sind gesperrt. Schließen geht weiterhin.</div></div></div>
-      ${ed ? '<div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="spOff">Stallpflicht aufheben</button></div>' : ''}`
-    : `<div class="small muted">Bei einer Aufstallungsanordnung (z. B. wegen Geflügelpest) hier einschalten. Die Klappe öffnet dann nicht mehr, auch nicht über die Astro-Uhr der LOGO.</div>
-      ${ed ? `<div class="row" style="margin-top:12px"><input id="spNote" placeholder="Notiz, z. B. Aufstallung Bodenseekreis ab 21.11." style="flex:1 1 100%;min-width:0"><button class="btn bad" id="spOn" style="border-color:var(--neon-r);color:#ffd1d7">🏠 Stallpflicht einschalten</button></div>` : ''}`;
+      ${ed ? '<div class="row" style="justify-content:flex-end;margin-top:12px"><button class="btn" id="spOff">Umzug Stall beenden</button></div>' : ''}`
+    : `<div class="small muted">Während des Stall-Umzugs einschalten: Die Klappe öffnet dann nicht mehr, auch nicht über die Astro-Uhr oder den Taster. Schließen geht weiterhin.</div>
+      ${ed ? `<div class="row" style="margin-top:12px"><input id="spNote" placeholder="Notiz, z. B. Umzug in den neuen Stall" style="flex:1 1 100%;min-width:0"><button class="btn bad" id="spOn" style="border-color:var(--neon-r);color:#ffd1d7">🚚 Umzug Stall einschalten</button></div>` : ''}`;
   const set = async (on) => {
-    if (!(await confirmBox(on ? 'Stallpflicht einschalten? Die Klappe öffnet dann nicht mehr, bis du sie wieder aufhebst.' : 'Stallpflicht aufheben? Die Klappe läuft dann wieder nach Astro-Uhr bzw. Zeitplan.', on ? 'Einschalten' : 'Aufheben'))) return;
+    if (!(await confirmBox(on ? 'Umzug Stall einschalten? Die Klappe öffnet dann nicht mehr, bis du es wieder beendest.' : 'Umzug Stall beenden? Die Klappe läuft dann wieder nach Astro-Uhr bzw. Zeitplan.', on ? 'Einschalten' : 'Beenden'))) return;
     const { data, error } = await sb.rpc('hs_set_stallpflicht', { aktiv: on, notiz: on ? ($('#spNote')?.value || '') : null });
     if (error) return err(error);
-    cfg = { ...cfg, stallpflicht: data }; toast(on ? 'Stallpflicht eingeschaltet' : 'Stallpflicht aufgehoben');
+    cfg = { ...cfg, stallpflicht: data }; toast(on ? 'Umzug Stall eingeschaltet' : 'Umzug Stall beendet');
     paintStallpflicht();
   };
   $('#spOn') && ($('#spOn').onclick = () => set(true));
@@ -629,7 +629,7 @@ function klHero() {
       <span class="pill">Steuerung: ${cfg?.steuerung === 'app' ? 'Pi/App-Zeiten' : 'LOGO-Astro'}</span></div>
     </div></div>
     ${ed ? `<div class="row" style="margin-top:16px">
-      <button class="btn big pri" onclick="cmd('open')" ${c.c === 'bad' || spAktiv() ? 'disabled' : ''} ${spAktiv() ? 'title="Stallpflicht aktiv"' : ''}>${spAktiv() ? '🏠 Gesperrt' : '⬆️ Öffnen'}</button>
+      <button class="btn big pri" onclick="cmd('open')" ${c.c === 'bad' || spAktiv() ? 'disabled' : ''} ${spAktiv() ? 'title="Umzug Stall aktiv"' : ''}>${spAktiv() ? '🚚 Gesperrt' : '⬆️ Öffnen'}</button>
       <button class="btn big" onclick="cmd('close')" ${c.c === 'bad' ? 'disabled' : ''}>⬇️ Schließen</button></div>
       <div id="cmdStat" class="small muted" style="margin-top:8px"></div>` : ''}
     ${c.c === 'bad' ? `<div class="warnbox small" style="margin-top:12px">Keine Verbindung zum Stall – Befehle sind gesperrt. Prüfe Pi, Richtfunk und LOGO.</div>` : ''}
