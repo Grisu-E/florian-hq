@@ -947,9 +947,9 @@ async function paintMitglieder() {
   $('#app').innerHTML = `${backBtn()}<h1>👥 Mitglieder</h1><div class="card" style="margin-bottom:14px"><b>Einladungslink</b><div class="small muted" style="margin:4px 0 10px">Schick diesen Link an alle, die mitmachen sollen. Sie registrieren sich und erscheinen dann hier zum Freischalten.</div><div class="row"><input readonly id="invLink" value="${esc(location.origin + location.pathname + '?einladung')}" style="flex:1;min-width:0"><button class="btn pri" id="invCopy">Kopieren</button>${navigator.share ? '<button class="btn" id="invShare">Teilen</button>' : ''}</div></div>
     <p class="muted small">Neue Personen melden sich mit ihrer E-Mail an und erscheinen hier. Freigeben, dann je Bereich „sehen“ oder „bearbeiten“ wählen.</p>
     ${data.map((u) => `<div class="card"><div class="row"><div style="flex:1"><input data-name="${u.user_id}" value="${esc(u.name || '')}" placeholder="Name"><div class="small muted" style="margin-top:4px">${esc(u.email)} · ${u.role === 'admin' ? '👑 Admin' : u.status === 'approved' ? '✅ freigegeben' : '⏳ wartet'}</div></div></div>
-      ${u.role === 'admin' ? '' : `<table class="mem" style="margin-top:10px">${TILES.map((t) => `<tr><td>${t.icon} ${t.name}</td><td style="text-align:right">${lv(u, t)}</td></tr>`).join('')}</table>
+      ${u.role === 'admin' ? (u.user_id === me.id ? '' : `<div class="row" style="margin-top:10px;justify-content:flex-end"><button class="btn bad" data-role="${u.user_id}" data-v="member">Admin-Rechte entziehen</button></div>`) : `<table class="mem" style="margin-top:10px">${TILES.map((t) => `<tr><td>${t.icon} ${t.name}</td><td style="text-align:right">${lv(u, t)}</td></tr>`).join('')}</table>
       <div class="row" style="margin-top:10px;justify-content:space-between"><button class="btn bad" data-del="${u.user_id}">Entfernen</button>
-        <div class="row"><button class="btn" data-all="${u.user_id}">Alles sehen</button>${u.status === 'approved' ? `<button class="btn" data-st="${u.user_id}" data-v="pending">Sperren</button>` : `<button class="btn pri" data-st="${u.user_id}" data-v="approved">Freigeben</button>`}</div></div>`}</div>`).join('')}`;
+        <div class="row"><button class="btn" data-role="${u.user_id}" data-v="admin">Zum Admin machen</button><button class="btn" data-all="${u.user_id}">Alles sehen</button>${u.status === 'approved' ? `<button class="btn" data-st="${u.user_id}" data-v="pending">Sperren</button>` : `<button class="btn pri" data-st="${u.user_id}" data-v="approved">Freigeben</button>`}</div></div>`}</div>`).join('')}`;
   const byId = Object.fromEntries(data.map((u) => [u.user_id, u]));
   $('#invCopy').onclick = async () => { try { await navigator.clipboard.writeText($('#invLink').value); toast('Link kopiert'); } catch { $('#invLink').select(); toast('Link markiert – jetzt kopieren'); } };
   $('#invShare') && ($('#invShare').onclick = () => navigator.share({ title: 'Hühnerhotel', text: 'Komm mit ins Hühnerhotel – unsere App für Hühner und Ziegen:', url: $('#invLink').value }).catch(() => {}));
@@ -957,6 +957,11 @@ async function paintMitglieder() {
   document.querySelectorAll('select[data-u]').forEach((s) => { s.value = byId[s.dataset.u].tiles?.[s.dataset.t] || 'none'; s.onchange = () => up(s.dataset.u, { tiles: { ...byId[s.dataset.u].tiles, [s.dataset.t]: s.value } }); });
   document.querySelectorAll('[data-name]').forEach((i) => (i.onchange = () => up(i.dataset.name, { name: i.value.trim() })));
   document.querySelectorAll('[data-st]').forEach((b) => (b.onclick = async () => { await up(b.dataset.st, { status: b.dataset.v }); paintMitglieder(); }));
+  document.querySelectorAll('[data-role]').forEach((b) => (b.onclick = async () => {
+    const zuAdmin = b.dataset.v === 'admin', n = byId[b.dataset.role]?.name || byId[b.dataset.role]?.email;
+    if (!(await confirmBox(zuAdmin ? `${n} zum Admin machen? Admins sehen und bearbeiten alles und verwalten das Personal.` : `${n} die Admin-Rechte entziehen?`, zuAdmin ? 'Zum Admin machen' : 'Entziehen'))) return;
+    await up(b.dataset.role, zuAdmin ? { role: 'admin', status: 'approved' } : { role: 'member' }); paintMitglieder();
+  }));
   document.querySelectorAll('[data-all]').forEach((b) => (b.onclick = async () => { await up(b.dataset.all, { tiles: Object.fromEntries(TILES.map((t) => [t.key, 'view'])) }); paintMitglieder(); }));
   document.querySelectorAll('[data-del]').forEach((b) => (b.onclick = async () => { if (!(await confirmBox('Person wirklich entfernen?', 'Entfernen'))) return; const { error } = await sb.from('hs_members').delete().eq('user_id', b.dataset.del); if (error) return err(error); paintMitglieder(); }));
 }
