@@ -375,6 +375,7 @@ function showLogin() {
       <input id="em" type="email" placeholder="E-Mail-Adresse" autocomplete="email">
       ${mode !== 'link' ? `<input id="pw" type="password" placeholder="Passwort${mode === 'neu' ? ' (mind. 8 Zeichen)' : ''}" autocomplete="${mode === 'neu' ? 'new-password' : 'current-password'}">` : ''}
       <button class="btn pri" id="go">${{ pw: 'Anmelden', link: 'Anmelde-Link schicken', neu: 'Konto anlegen' }[mode]}</button>
+      ${mode === 'pw' ? '<button class="back" id="forgot" type="button" style="align-self:center;padding:2px 0">Passwort vergessen?</button>' : ''}
       <div id="msg" class="small"></div>
       <p class="small muted">${invite ? 'Lege dir ein Konto an. Danach schaltet dich der Admin für die passenden Bereiche frei. Hast du schon ein Konto (z. B. von Florian HQ), melde dich einfach mit „Passwort“ an.' : 'Gleiches Konto wie Florian HQ / H&amp;E Hub. Neue Personen werden vom Admin freigeschaltet.'}</p></div></div>`;
     document.querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => { mode = b.dataset.m; draw(); }));
@@ -392,17 +393,25 @@ function showLogin() {
         } else if (mode === 'neu') {
           if (password.length < 8) return msg('Passwort braucht mindestens 8 Zeichen.', true);
           const { data, error } = await sb.auth.signUp({ email, password, options: { emailRedirectTo: location.origin + location.pathname, data: { app: 'stallwache', name: ($('#nm')?.value || '').trim() } } });
-          if (error) return msg(/registered|exists/i.test(error.message) ? 'Diese E-Mail hat schon ein Konto – einfach mit Passwort anmelden.' : esc(error.message), true);
+          if (error && /registered|exists/i.test(error.message)) { mode = 'pw'; draw(); $('#em').value = email; return $('#msg').innerHTML = `<div class="infobox">Mit <b>${esc(email)}</b> gibt es schon ein Konto – meist von <b>Florian HQ, H&amp;E Hub oder Alarmstufe Pink</b>. Melde dich mit <b>diesem Passwort</b> an. Passwort nicht mehr da? Tippe unten auf „Passwort vergessen“.</div>`; }
+          if (error) return msg(esc(error.message), true);
           if (!data.session) msg('Fast fertig: Bestätige die E-Mail, die du gerade bekommen hast, und melde dich dann hier an.');
           else boot();
         } else {
           const { error } = await sb.auth.signInWithPassword({ email, password });
-          if (error) return msg(/confirm/i.test(error.message) ? 'Bitte zuerst die Bestätigungs-E-Mail öffnen.' : 'E-Mail oder Passwort stimmt nicht. Noch kein Passwort? Einmal per „Link per E-Mail“ anmelden und dann unter ⚙️ eins festlegen.', true);
+          if (error) return msg(/confirm/i.test(error.message) ? 'Bitte zuerst die Bestätigungs-E-Mail öffnen.' : 'E-Mail oder Passwort stimmt nicht. Es ist dasselbe Passwort wie bei Florian HQ / H&amp;E Hub / Alarmstufe Pink. Vergessen? Tippe unten auf „Passwort vergessen“.', true);
           boot();
         }
       } finally { goBtn.disabled = false; }
     };
     goBtn.onclick = submit;
+    $('#forgot') && ($('#forgot').onclick = async () => {
+      const email = $('#em').value.trim();
+      if (!email) return msg('Bitte zuerst oben deine E-Mail eintragen.', true);
+      const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin + location.pathname });
+      if (error) return msg(/rate|limit/i.test(error.message) ? 'Gerade zu viele Mails verschickt – bitte in einer Stunde nochmal.' : esc(error.message), true);
+      msg(`📬 Mail zum Zurücksetzen ist unterwegs an <b>${esc(email)}</b>. Den Link darin auf diesem Gerät öffnen und ein neues Passwort festlegen.`);
+    });
     document.querySelectorAll('.login input').forEach((i) => i.addEventListener('keydown', (e) => { if (e.key === 'Enter') submit(); }));
   };
   draw();
@@ -414,7 +423,24 @@ function showPending() {
     <button class="btn" onclick="location.reload()">Neu laden</button><button class="btn" onclick="logout()">Abmelden</button></div></div>`;
 }
 async function logout() { await sb.auth.signOut(); location.hash = ''; location.reload(); }
-sb.auth.onAuthStateChange((ev) => { if (ev === 'SIGNED_IN' && !member) boot(); });
+function askNewPassword() {
+  const m = modal(`<h3>🔑 Neues Passwort festlegen</h3><p class="small muted">Gilt für dein ganzes Konto – also auch für Florian HQ, H&amp;E Hub und Alarmstufe Pink.</p><div class="col">
+    <input type="password" id="np1" placeholder="Neues Passwort (mind. 8 Zeichen)" autocomplete="new-password"><input type="password" id="np2" placeholder="Wiederholen" autocomplete="new-password">
+    <div class="row" style="justify-content:flex-end"><button class="btn pri" data-s>Speichern</button></div></div>`);
+  m.querySelector('[data-s]').onclick = async () => {
+    const a = m.querySelector('#np1').value, b = m.querySelector('#np2').value;
+    if (a.length < 8) return toast('Mindestens 8 Zeichen.'); if (a !== b) return toast('Passwörter stimmen nicht überein.');
+    const { error } = await sb.auth.updateUser({ password: a });
+    if (error) return err(/same|different/i.test(error.message) ? new Error('Das ist schon dein aktuelles Passwort.') : error);
+    m.remove(); toast('Neues Passwort gespeichert ✅');
+    history.replaceState(null, '', location.pathname + location.hash);
+  };
+}
+sb.auth.onAuthStateChange((ev) => {
+  if (ev === 'PASSWORD_RECOVERY') { setTimeout(askNewPassword, 300); }
+  if (ev === 'SIGNED_IN' && !member) boot();
+});
+if (/[?&]neues-passwort\b/.test(location.search)) sb.auth.getSession().then(({ data }) => { if (data.session) setTimeout(askNewPassword, 800); });
 
 /* ═════════ Routing ═════════ */
 function go(h) { location.hash = h ? '#' + h : ''; }
