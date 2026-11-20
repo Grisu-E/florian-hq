@@ -237,6 +237,8 @@ const TILES = [
   { key: 'eier',       icon: '🥚', name: 'Eier',       desc: 'Was die Gäste gelegt haben',    c: 'var(--chalk)', r: -1 },
   { key: 'pflege',     icon: '🧹', name: 'Pflege',     desc: 'Zimmerservice: Futter, Wasser, Ausmisten', c: 'var(--mint)', r: 2 },
   { key: 'herde',      icon: '🐔', name: 'Herde',      desc: 'Unsere Gäste',                  c: 'var(--coral)', r: -1.5 },
+  { key: 'stallpflicht', icon: '🏠', name: 'Stallpflicht', desc: 'Aufstallung: Klappe bleibt zu', c: '#ff8a96', r: 1.8 },
+  { key: 'traenke',    icon: '♨️', name: 'Tränke',     desc: 'Heizung bei Frost',             c: '#9fd8ff', r: -0.8 },
   { key: 'ziegen',     icon: '🐐', name: 'Ziegen',     desc: 'Ziegentür und Freigabe',        c: '#f7b7d2',      r: -2.2 },
 ];
 const DOOR = {
@@ -333,7 +335,7 @@ function paintConn() {
   el.title = c.t + (st?.last_seen ? ' – letzte Meldung ' + ago(st.last_seen) : '');
 }
 async function loadState() {
-  if (!(canView('klappe') || canView('kamera') || canView('ziegen'))) return;
+  if (!(canView('klappe') || canView('kamera') || canView('ziegen') || canView('stallpflicht') || canView('traenke'))) return;
   const { data } = await sb.from('hs_state').select('*').eq('id', 1).maybeSingle();
   if (data) st = data;
   paintConn();
@@ -356,7 +358,7 @@ function wetterCard() {
     <div class="small muted" style="margin-top:8px">Quelle: Open-Meteo · aktualisiert ${wetter.updated_at ? fmtDT(wetter.updated_at) : '–'}</div></div>`;
 }
 async function loadCfg() {
-  if (!(canView('klappe') || canView('pflege') || canView('ziegen'))) return;
+  if (!(canView('klappe') || canView('pflege') || canView('ziegen') || canView('stallpflicht') || canView('traenke'))) return;
   const { data } = await sb.from('hs_config').select('data').eq('id', 1).maybeSingle();
   cfg = data?.data || {};
 }
@@ -380,7 +382,7 @@ async function bootInner() {
   await Promise.all([loadState(), loadCfg(), loadWetter(), sb.rpc('hs_names').then(({ data }) => (data || []).forEach((x) => (names[x.user_id] = x.name)))]);
   route();
   clearInterval(pollT);
-  pollT = setInterval(async () => { if (document.hidden) return; await loadState(); if (Date.now() - (window._wt || 0) > 600000) { window._wt = Date.now(); await loadWetter(); } if (location.hash === '' || location.hash === '#') paintHome(); if (location.hash === '#klappe') { paintKlappe(true); paintHz(); } if (location.hash === '#ziegen') paintZiegen(true); }, 10000);
+  pollT = setInterval(async () => { if (document.hidden) return; await loadState(); if (Date.now() - (window._wt || 0) > 600000) { window._wt = Date.now(); await loadWetter(); } if (location.hash === '' || location.hash === '#') paintHome(); if (location.hash === '#klappe') paintKlappe(true); if (location.hash === '#traenke') paintHz(); if (location.hash === '#ziegen') paintZiegen(true); }, 10000);
 }
 function showLogin() {
   $('#hdr').hidden = true;
@@ -469,7 +471,7 @@ function route() {
   stopLive();
   const h = location.hash.replace('#', '');
   window.scrollTo(0, 0);
-  const views = { '': paintHome, klappe: paintKlappe, kamera: paintKamera, eier: paintEier, pflege: paintPflege, herde: paintHerde, ziegen: paintZiegen, mitglieder: paintMitglieder, profil: paintProfil };
+  const views = { '': paintHome, klappe: paintKlappe, kamera: paintKamera, eier: paintEier, pflege: paintPflege, herde: paintHerde, stallpflicht: paintStallpflicht, traenke: paintTraenke, ziegen: paintZiegen, mitglieder: paintMitglieder, profil: paintProfil };
   const tileKey = TILES.find((t) => t.key === h)?.key;
   if (tileKey && !canView(tileKey)) return go('');
   if (h === 'mitglieder' && member.role !== 'admin') return go('');
@@ -524,7 +526,7 @@ function paintHome() {
   if (member.role === 'admin') tiles.push({ key: 'mitglieder', icon: '👥', name: 'Personal', desc: 'Mitglieder und Freigaben', c: 'var(--neon-t)', r: -1.2 });
   $('#app').innerHTML = `${heroCard()}${wetterCard()}
     <h2>Schlüsselbrett</h2>
-    <div class="keys">${tiles.map((t) => `<button class="key" style="--c:${t.c};--r:${t.r}deg" onclick="go('${t.key}')"><span class="ring"></span><span class="fob"><span class="ic">${t.icon}</span><span class="t" style="display:block">${t.name}</span><span class="s" style="display:block">${t.desc}</span></span>${t.key === 'mitglieder' ? '<span class="badge" id="pendBadge" hidden></span>' : ''}</button>`).join('')}</div>
+    <div class="keys">${tiles.map((t) => ({ ...t, desc: t.key === 'stallpflicht' && spAktiv() ? '⚠ AKTIV – Klappe bleibt zu' : t.key === 'traenke' && st?.info?.heizung ? (st.info.heizung.an ? '♨ heizt gerade' : 'Heizung aus') + (st.info.heizung.temp != null ? ', ' + dez(st.info.heizung.temp, 1) + ' °C' : '') : t.desc })).map((t) => `<button class="key" style="--c:${t.c};--r:${t.r}deg" onclick="go('${t.key}')"><span class="ring"></span><span class="fob"><span class="ic">${t.icon}</span><span class="t" style="display:block">${t.name}</span><span class="s" style="display:block">${t.desc}</span></span>${t.key === 'mitglieder' ? '<span class="badge" id="pendBadge" hidden></span>' : ''}</button>`).join('')}</div>
     ${tiles.length === 0 ? '<p class="muted">Dir wurde noch kein Schlüssel ausgehändigt. Der Admin schaltet dich frei.</p>' : ''}`;
   if (member.role === 'admin') sb.from('hs_members').select('user_id', { count: 'exact', head: true }).eq('status', 'pending').then(({ count }) => { const b = $('#pendBadge'); if (b && count) { b.hidden = false; b.textContent = count + ' neu'; } });
 }
@@ -534,16 +536,30 @@ let cmdWatch = null;
 async function paintKlappe(soft) {
   if (soft && $('#klHero')) { $('#klHero').innerHTML = klHero(); return; }
   $('#app').innerHTML = `${backBtn()}<h1>🚪 Klappe</h1><div id="klHero">${klHero()}</div>
-    <h2>Stallpflicht</h2><div class="card" id="klSp"></div>
-    <h2>Tränke-Heizung</h2><div class="card" id="klHz"></div>
+${spAktiv() ? `<div class="warnbox small" style="margin-top:12px">🏠 Stallpflicht ist aktiv – die Klappe bleibt zu.${canView('stallpflicht') ? ' <a href="#stallpflicht">Zur Stallpflicht</a>' : ''}</div>` : ''}
     <h2>Heute</h2><div class="card" id="klPlan"></div>
     <h2>Protokoll</h2><div class="card" id="klEv"><div class="spin"></div></div>
     ${canEdit('klappe') ? `<h2>Zeiten & Alarm</h2><div class="card" id="klCfg"></div><h2>Wetter-Warnungen</h2><div class="card" id="klWt"></div>` : ''}`;
-  paintPlan(); paintEvents(); paintSp(); paintHz(); if (canEdit('klappe')) { paintCfgForm(); paintWt(); }
+  paintPlan(); paintEvents(); if (canEdit('klappe')) { paintCfgForm(); paintWt(); }
+}
+function paintTraenke() {
+  $('#app').innerHTML = `${backBtn()}<h1>♨️ Tränke</h1><div class="card" id="klHz"></div>
+    <p class="small muted" style="margin-top:14px">Der Pi schaltet die Heizplatte über die LOGO (Ausgang Q4). Die Temperatur kommt vom Fühler am Stall oder, wenn keiner da ist, vom Wetterdienst.</p>
+    ${wetter ? '<h2>Wetter am Stall</h2>' + wetterCard() : ''}`;
+  paintHz();
+}
+function paintStallpflicht() {
+  $('#app').innerHTML = `${backBtn()}<h1>🏠 Stallpflicht</h1><div class="card" id="klSp"></div>
+    <h2>Verlauf</h2><div class="card" id="spEv"><div class="spin"></div></div>`;
+  paintSp();
+  sb.from('hs_events').select('*').eq('kind', 'stallpflicht').order('ts', { ascending: false }).limit(20).then(({ data }) => {
+    const el = $('#spEv'); if (!el) return;
+    el.innerHTML = (data || []).map((e) => `<div class="ev"><div class="e">🏠</div><div style="flex:1">${esc(e.text)}</div><div class="tm">${fmtDT(e.ts)}</div></div>`).join('') || '<span class="muted">Noch keine Einträge.</span>';
+  });
 }
 function paintHz() {
   const el = $('#klHz'); if (!el) return;
-  const t = cfg?.traenke || { modus: 'auto', ein: 1, aus: 3 }, h = st?.info?.heizung, ed = canEdit('klappe');
+  const t = cfg?.traenke || { modus: 'auto', ein: 1, aus: 3 }, h = st?.info?.heizung, ed = canEdit('traenke');
   const an = h ? h.an : st?.io?.['Tränke-Heizung'];
   el.innerHTML = `<div class="row" style="align-items:center"><div style="font-size:30px">${an ? '♨️' : '💧'}</div><div style="flex:1">
       <b>${an == null ? 'Noch keine Meldung vom Stall' : an ? 'Heizung läuft' : 'Heizung aus'}</b>
@@ -557,9 +573,8 @@ function paintHz() {
   $('#hzSave').onclick = async () => {
     const ein = +$('#hzEin').value, aus = +$('#hzAus').value;
     if (!(aus > ein)) return toast('„Ausschalten“ muss über „Einschalten“ liegen.');
-    const n = { ...cfg, traenke: { modus: $('#hzMo .on').dataset.v, ein, aus } };
-    const { error } = await sb.from('hs_config').update({ data: n }).eq('id', 1); if (error) return err(error);
-    cfg = n; toast('Gespeichert ✅'); paintHz();
+    const { data, error } = await sb.rpc('hs_set_traenke', { t: { modus: $('#hzMo .on').dataset.v, ein, aus } }); if (error) return err(error);
+    cfg = { ...cfg, traenke: data }; toast('Gespeichert ✅'); paintHz();
   };
 }
 function paintWt() {
@@ -577,7 +592,7 @@ function paintWt() {
 }
 const spAktiv = () => !!cfg?.stallpflicht?.aktiv;
 function paintSp() {
-  const sp = cfg?.stallpflicht || {}, ed = canEdit('klappe'), el = $('#klSp'); if (!el) return;
+  const sp = cfg?.stallpflicht || {}, ed = canEdit('stallpflicht'), el = $('#klSp'); if (!el) return;
   el.innerHTML = sp.aktiv
     ? `<div class="row" style="align-items:flex-start"><div style="font-size:30px">🏠</div><div style="flex:1"><b style="color:var(--neon-r)">Stallpflicht ist aktiv</b>
         <div class="small muted">seit ${sp.seit ? fmtDT(sp.seit) : '–'}${sp.von ? ', eingeschaltet von ' + esc(sp.von) : ''}${sp.notiz ? '<br>' + esc(sp.notiz) : ''}</div>
@@ -590,7 +605,7 @@ function paintSp() {
     const { data, error } = await sb.rpc('hs_set_stallpflicht', { aktiv: on, notiz: on ? ($('#spNote')?.value || '') : null });
     if (error) return err(error);
     cfg = { ...cfg, stallpflicht: data }; toast(on ? 'Stallpflicht eingeschaltet' : 'Stallpflicht aufgehoben');
-    paintSp(); $('#klHero').innerHTML = klHero(); paintEvents();
+    paintStallpflicht();
   };
   $('#spOn') && ($('#spOn').onclick = () => set(true));
   $('#spOff') && ($('#spOff').onclick = () => set(false));
