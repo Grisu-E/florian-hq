@@ -1,5 +1,5 @@
 // Florian HQ – Service Worker: App-Gerüst offline verfügbar, Daten immer live aus Supabase
-const CACHE = 'florian-hq-v24';
+const CACHE = 'florian-hq-v25';
 const SHELL = ['./', 'index.html', 'styles.css', 'app.js', 'config.js', 'manifest.webmanifest', 'icons/icon.svg', 'icons/wappen-nonnenhorn.svg', 'icons/icon-192.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())); });
 self.addEventListener('activate', e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
@@ -27,7 +27,8 @@ self.addEventListener('notificationclick', e => {
   const target = new URL(e.notification.data && e.notification.data.url || './', self.registration.scope).href;
   e.waitUntil(clients.matchAll({ type: 'window', includeUncontrolled: true }).then(ws => {
     for (const w of ws) {
-      if (w.url.startsWith(self.registration.scope)) { w.navigate(target); return w.focus(); }
+      const p = w.url.split('#')[0].split('?')[0];
+      if (p === self.registration.scope || p === self.registration.scope + 'index.html') { w.navigate(target); return w.focus(); } // nur Florian HQ, nicht die Apps in Unterordnern
     }
     return clients.openWindow(target);
   }));

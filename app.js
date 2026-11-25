@@ -684,6 +684,7 @@ function renderDefects(){
 }
 
 /* ---------- Push-Benachrichtigungen ---------- */
+const FREIGABE_EMPF=['d8cd88eb-949f-4a0b-a1c0-29b6856bd9ec']; // wie in v10-freigabe-push.sql (Eva)
 const PUSH_CATS=[['news','Neues in der Wehr'],['aktive','Dienstplan Aktive'],['jugend','Dienstplan Jugend'],['events','Veranstaltungen'],['defects','Mängel (Gerätewart/Kommandant)'],['fristen','Fristen-Erinnerung (Führung)'],['meine_fristen','Meine eigenen Fristen'],['expenses','Private Ausgaben'],['reservations','Reservierungen, für die ich verantwortlich bin'],['kleider','Kleiderkammer-Anfragen (Gerätewart/Kommandant)'],['erinnerung','Erinnerung am Vortag eines Dienstes'],['aufgaben','Meine Aufgaben (To-do)'],['freigabe','Neue Registrierungen (Freigabe)']];
 const pushSupported=()=>('serviceWorker' in navigator)&&('PushManager' in window)&&('Notification' in window);
 const isIOS=()=>/iphone|ipad|ipod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
@@ -735,7 +736,7 @@ function renderPush(){
       <div style="padding:0 20px 20px"><button class="btn primary" data-act="push-on">🔔 Benachrichtigungen einschalten</button></div>`;
   } else {
     body = `<div class="row"><div class="info"><h3>Benachrichtigungen sind an</h3><p class="note">Wähle, worüber du informiert werden willst. Gilt nur für dieses Gerät.</p></div><div class="actions"><button class="btn danger small" data-act="push-off">Alle ausschalten</button></div></div>
-      ${PUSH_CATS.filter(([k])=>(k==='defects'||k==='kleider')?canGear():(k==='fristen'?canLead():(k==='freigabe'?canCmd():true))).map(([k,n])=>{const on=(row.prefs||{})[k]!==false;return `<div class="row"><div class="info"><h3 style="font-size:16px">${esc(n)}</h3></div><div class="actions"><button class="switch" role="switch" aria-checked="${on}" data-act="push-pref" data-key="${k}" aria-label="${esc(n)}"><span></span></button></div></div>`;}).join('')}`;
+      ${PUSH_CATS.filter(([k])=>(k==='defects'||k==='kleider')?canGear():(k==='fristen'?canLead():(k==='freigabe'?FREIGABE_EMPF.includes(S.me):true))).map(([k,n])=>{const on=(row.prefs||{})[k]!==false;return `<div class="row"><div class="info"><h3 style="font-size:16px">${esc(n)}</h3></div><div class="actions"><button class="switch" role="switch" aria-checked="${on}" data-act="push-pref" data-key="${k}" aria-label="${esc(n)}"><span></span></button></div></div>`;}).join('')}`;
   }
   return `<div class="panel"><div class="panel-head"><div><h2>Benachrichtigungen</h2><p class="sub">Push-Meldungen aufs Handy oder den Computer.</p></div></div>${body}</div>`;
 }
