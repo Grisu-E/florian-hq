@@ -434,3 +434,8 @@ end $function$;
 
 -- ═══ 20.11.2026: Brücken-Funktionen nur für den Pi (anon + Geheimnis), nicht für angemeldete Nutzer ═══
 revoke execute on function public.hs_bridge_sync(text, jsonb, jsonb), public.hs_bridge_ack(text, bigint, boolean, text) from authenticated;
+
+-- ═══ 26.11.2026: Schlüssel „Netzwerk“ – Geräte mit IP, Benutzer, Passwort (verschlüsselt) ═══
+-- Tabelle public.hs_geraete (kein direkter Zugriff), Schlüssel in fhq_private.hs_keys (nur serverseitig)
+-- RPCs: hs_geraete_liste() [view: ohne Passwort], hs_geraete_passwort(k) [edit], hs_geraete_speichern(k, ip, benutzer, passwort, notiz) [edit]
+-- Passwort: pgp_sym_encrypt mit fhq_private.hs_keys.geraete_key; NULL = unverändert, '' = löschen
