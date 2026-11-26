@@ -1005,16 +1005,16 @@ async function paintZiegen(soft) {
 
 /* ═════════ Netzwerk ═════════ */
 const NETZ = [
-  { k: 'fritzbox',     t: 'FRITZ!Box',      s: 'Internet, Heimnetz', x: 40,  y: 100, w: 210, c: '#ffc93c', d: '#3a3112' },
-  { k: 'switch',       t: 'Switch',         s: 'LAN-Kabel',          x: 40,  y: 168, w: 210, c: '#9fd8ff', d: '#1d3a52' },
-  { k: 'zyxel_innen',  t: 'Zyxel PLA5215',  s: 'Powerline innen',    x: 40,  y: 236, w: 210, c: '#8be38b', d: '#1f4a1f' },
-  { k: 'zyxel_balkon', t: 'Zyxel PLA5215',  s: 'Balkon',             x: 40,  y: 320, w: 210, c: '#8be38b', d: '#1f4a1f' },
-  { k: 'cpe_haus',     t: 'CPE660',         s: 'Richtfunk Haus',     x: 40,  y: 388, w: 210, c: '#ff8a96', d: '#5a1a24' },
-  { k: 'cpe_stall',    t: 'CPE660',         s: 'Richtfunk Stall',    x: 430, y: 388, w: 210, c: '#ff8a96', d: '#5a1a24' },
-  { k: 'linksys',      t: 'Linksys WRT54GL', s: 'Router am Stall',   x: 430, y: 300, w: 210, c: '#b9a3ff', d: '#2e2366' },
-  { k: 'logo',         t: 'LOGO! 8',        s: 'Klappe',             x: 430, y: 212, w: 100, c: '#eef1e6', d: '#3a4a5c' },
-  { k: 'kamera',       t: 'Kamera',         s: 'GENBOLT',            x: 540, y: 212, w: 100, c: '#eef1e6', d: '#3a4a5c' },
-  { k: 'pi',           t: 'Raspberry Pi',   s: 'Vorschlag: hier',    x: 430, y: 120, w: 210, c: null,      d: '#ffdb75' },
+  { k: 'fritzbox',     t: 'FRITZ!Box',      s: 'Internet, Heimnetz', x: 40,  y: 100, w: 170, c: '#ffc93c', d: '#3a3112' },
+  { k: 'switch',       t: 'Switch',         s: 'LAN-Kabel',          x: 40,  y: 168, w: 170, c: '#9fd8ff', d: '#1d3a52' },
+  { k: 'pi',           t: 'Pi 3B+',         s: 'Brücke',             x: 230, y: 168, w: 84,  c: '#ffdb75', d: '#3a3112' },
+  { k: 'zyxel_innen',  t: 'Zyxel PLA5215',  s: 'Powerline innen',    x: 40,  y: 236, w: 170, c: '#8be38b', d: '#1f4a1f' },
+  { k: 'zyxel_balkon', t: 'Zyxel PLA5215',  s: 'Balkon',             x: 40,  y: 320, w: 170, c: '#8be38b', d: '#1f4a1f' },
+  { k: 'cpe_haus',     t: 'CPE660',         s: 'Richtfunk Haus',     x: 40,  y: 388, w: 170, c: '#ff8a96', d: '#5a1a24' },
+  { k: 'cpe_stall',    t: 'CPE660',         s: 'Richtfunk Stall',    x: 370, y: 388, w: 270, c: '#ff8a96', d: '#5a1a24' },
+  { k: 'linksys',      t: 'Linksys WRT54GL', s: 'Router am Stall',   x: 370, y: 300, w: 270, c: '#b9a3ff', d: '#2e2366' },
+  { k: 'logo',         t: 'LOGO! 8',        s: 'Klappe',             x: 370, y: 212, w: 125, c: '#eef1e6', d: '#3a4a5c' },
+  { k: 'kamera',       t: 'Kamera',         s: 'GENBOLT',            x: 515, y: 212, w: 125, c: '#eef1e6', d: '#3a4a5c' },
 ];
 let geraete = {};
 async function paintNetzwerk() {
@@ -1031,27 +1031,27 @@ async function paintNetzwerk() {
     const rect = n.c ? `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="44" rx="10" fill="${n.c}"/>` : `<rect x="${n.x}" y="${n.y}" width="${n.w}" height="44" rx="10" fill="none" stroke="#ffc93c" stroke-width="1.5" stroke-dasharray="6 4"/>`;
     const tc = n.c ? '#162231' : '#ffc93c';
     return `<g class="netz-dev" data-k="${n.k}" style="cursor:pointer" tabindex="0" role="button" aria-label="${esc(n.t)} bearbeiten">${rect}
-      <text x="${cx}" y="${n.y + 15}" text-anchor="middle" dominant-baseline="central" style="font:${n.w < 150 ? 12 : 14}px var(--disp);fill:${tc}">${esc(n.t)}</text>
+      <text x="${cx}" y="${n.y + 15}" text-anchor="middle" dominant-baseline="central" style="font:${n.w < 100 ? 11 : n.w < 150 ? 12 : 14}px var(--disp);fill:${tc}">${esc(n.t)}</text>
       <text x="${cx}" y="${n.y + 33}" text-anchor="middle" dominant-baseline="central" style="font:500 12px var(--body);fill:${n.d}">${esc(sub)}${g.hat_passwort ? ' 🔑' : ''}</text></g>`;
   };
   $('#netzBild').innerHTML = `<svg viewBox="0 0 680 470" width="100%" role="img" aria-label="Verbindung vom Haus zum Hühnerstall" style="display:block;max-width:680px;margin:0 auto">
     <defs><marker id="nar" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
     <rect x="0" y="0" width="680" height="470" rx="16" fill="#0f1a27" stroke="#33506f"/>
     <text x="340" y="40" text-anchor="middle" dominant-baseline="central" style="font:18px var(--disp);fill:#ffc93c">Verbindung zum Hühnerstall</text>
-    <rect x="20" y="64" width="250" height="384" rx="14" fill="none" stroke="#33506f" stroke-dasharray="5 5"/>
+    <rect x="20" y="64" width="310" height="384" rx="14" fill="none" stroke="#33506f" stroke-dasharray="5 5"/>
     <text x="36" y="84" dominant-baseline="central" style="font:14px var(--disp);fill:#ffdb75">Haus</text>
-    <rect x="410" y="64" width="250" height="384" rx="14" fill="none" stroke="#33506f" stroke-dasharray="5 5"/>
-    <text x="426" y="84" dominant-baseline="central" style="font:14px var(--disp);fill:#ffdb75">Stall</text>
+    <rect x="350" y="64" width="310" height="384" rx="14" fill="none" stroke="#33506f" stroke-dasharray="5 5"/>
+    <text x="366" y="84" dominant-baseline="central" style="font:14px var(--disp);fill:#ffdb75">Stall</text>
     <g stroke="#9db0c4" stroke-width="2" fill="none">
-      <line x1="145" y1="144" x2="145" y2="166" marker-end="url(#nar)"/><line x1="145" y1="212" x2="145" y2="234" marker-end="url(#nar)"/>
-      <line x1="145" y1="364" x2="145" y2="386" marker-end="url(#nar)"/><line x1="535" y1="388" x2="535" y2="346" marker-end="url(#nar)"/>
-      <line x1="480" y1="300" x2="480" y2="258" marker-end="url(#nar)"/><line x1="590" y1="300" x2="590" y2="258" marker-end="url(#nar)"/></g>
-    <path d="M145 280 L135 290 L155 300 L135 310 L148 318" fill="none" stroke="#ffc93c" stroke-width="2" stroke-linejoin="round" marker-end="url(#nar)"/>
-    <text x="168" y="300" dominant-baseline="central" style="font:12px var(--body);fill:#ffdb75">Stromleitung</text>
-    <line x1="250" y1="410" x2="428" y2="410" stroke="#43e0d0" stroke-width="2.5" stroke-dasharray="8 6" marker-end="url(#nar)"/>
-    <text x="340" y="384" text-anchor="middle" dominant-baseline="central" style="font:14px var(--disp);fill:#43e0d0">400 m</text>
-    <text x="340" y="434" text-anchor="middle" dominant-baseline="central" style="font:12px var(--body);fill:#9db0c4">WLAN-Richtfunk</text>
-    <path d="M640 322 L652 322 L652 142 L642 142" fill="none" stroke="#ffc93c" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#nar)"/>
+      <line x1="125" y1="144" x2="125" y2="166" marker-end="url(#nar)"/><line x1="125" y1="212" x2="125" y2="234" marker-end="url(#nar)"/>
+      <line x1="210" y1="190" x2="228" y2="190" marker-end="url(#nar)"/>
+      <line x1="125" y1="364" x2="125" y2="386" marker-end="url(#nar)"/><line x1="505" y1="388" x2="505" y2="346" marker-end="url(#nar)"/>
+      <line x1="432" y1="300" x2="432" y2="258" marker-end="url(#nar)"/><line x1="577" y1="300" x2="577" y2="258" marker-end="url(#nar)"/></g>
+    <path d="M125 280 L115 290 L135 300 L115 310 L128 318" fill="none" stroke="#ffc93c" stroke-width="2" stroke-linejoin="round" marker-end="url(#nar)"/>
+    <text x="148" y="300" dominant-baseline="central" style="font:12px var(--body);fill:#ffdb75">Stromleitung</text>
+    <line x1="210" y1="410" x2="368" y2="410" stroke="#43e0d0" stroke-width="2.5" stroke-dasharray="8 6" marker-end="url(#nar)"/>
+    <text x="290" y="384" text-anchor="middle" dominant-baseline="central" style="font:14px var(--disp);fill:#43e0d0">400 m</text>
+    <text x="340" y="459" text-anchor="middle" dominant-baseline="central" style="font:12px var(--body);fill:#9db0c4">WLAN-Richtfunk</text>
     ${NETZ.map(box).join('')}</svg>`;
   $('#netzListe').innerHTML = NETZ.map((n) => { const g = geraete[n.k] || {};
     return `<div class="li" data-k="${n.k}" style="cursor:pointer"><div class="m"><div class="a">${esc(n.t)} <span class="small muted">· ${esc(n.s)}</span></div>

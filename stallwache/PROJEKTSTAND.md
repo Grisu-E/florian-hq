@@ -32,8 +32,8 @@ Die LOGO bleibt der Chef: Astro-Uhr fährt die Klappe auch ohne Pi. Die App gibt
 | Ziegentür | ⏳ Hardware fehlt (FDX-B-Chips, Reader, WT32-ETH01, fail-secure-Schloss). Im Pi `[ziegen] aktiv = no`. |
 
 ## Netzwerk Haus → Stall (Schlüssel „Netzwerk“)
-FRITZ!Box → Switch → Zyxel PLA5215 (Powerline innen) ⚡ Zyxel PLA5215 (Balkon) → AdaLov CPE660 ┄ 400 m Richtfunk ┄ CPE660 → Linksys WRT54GL (Stall) → LOGO, Kamera (192.168.179.11).
-Offen: Steckt die CPE am Linksys im Internet-Port (eigenes Netz) oder in Port 1–4? Steckt der Switch an FRITZ!Box-LAN 4 als Gastzugang? Vorschlag: Pi am Stall direkt am Linksys.
+FRITZ!Box → Switch (+ Raspberry Pi 3B+) → Zyxel PLA5215 (Powerline innen) ⚡ Zyxel PLA5215 (Balkon) → AdaLov CPE660 ┄ 400 m Richtfunk ┄ CPE660 → Linksys WRT54GL (Stall) → LOGO, Kamera (192.168.179.11).
+Offen: Steckt die CPE am Linksys im Internet-Port (eigenes Netz) oder in Port 1–4? Steckt der Switch an FRITZ!Box-LAN 4 als Gastzugang? Der Pi 3B+ hängt im Haus am Switch nach der FRITZ!Box; er muss LOGO und Kamera hinter dem Linksys erreichen (geht nur, wenn der Linksys als Access Point läuft oder Portweiterleitungen hat).
 Zugangsdaten je Gerät in der App (Tabelle `hs_geraete`, Passwörter mit pgcrypto verschlüsselt, Schlüssel in `fhq_private.hs_keys`).
 
 ## LOGO-Belegung (Programm des Nutzers + Ergänzungen)
@@ -74,7 +74,7 @@ Zugangsdaten je Gerät in der App (Tabelle `hs_geraete`, Passwörter mit pgcrypt
 - App-Prüfer (unabhängiger Agent) nach größeren Änderungen laufen lassen, siehe Skill „app-baukasten“.
 
 ## Arbeitsweise / Hinweise
-- Änderungen an der App: `stallwache/index.html` + **Cache-Version in `sw.js` hochzählen** (`huehnerhotel-vNN`, zuletzt v20), Commit auf `main` → GitHub Pages ist nach ca. 1 Min. live.
+- Änderungen an der App: `stallwache/index.html` + **Cache-Version in `sw.js` hochzählen** (`huehnerhotel-vNN`, zuletzt v21), Commit auf `main` → GitHub Pages ist nach ca. 1 Min. live.
 - Tests: `stallwache/tests/` (simulierte LOGO per Modbus, Fake-Supabase). `python3 test_real.py` testet die echte Belegung.
 - Alle Apps teilen sich ein Login. Wer schon bei Florian HQ, H&E Hub oder Alarmstufe Pink ist, meldet sich an, statt sich zu registrieren.
 - Kostenloser Supabase-Mailversand: nur wenige Mails pro Stunde.
