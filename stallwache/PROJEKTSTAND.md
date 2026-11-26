@@ -74,7 +74,7 @@ Zugangsdaten je Gerät in der App (Tabelle `hs_geraete`, Passwörter mit pgcrypt
 - App-Prüfer (unabhängiger Agent) nach größeren Änderungen laufen lassen, siehe Skill „app-baukasten“.
 
 ## Arbeitsweise / Hinweise
-- Änderungen an der App: `stallwache/index.html` + **Cache-Version in `sw.js` hochzählen** (`huehnerhotel-vNN`, zuletzt v21), Commit auf `main` → GitHub Pages ist nach ca. 1 Min. live.
+- Änderungen an der App: `stallwache/index.html` + **Cache-Version in `sw.js` hochzählen** (`huehnerhotel-vNN`, zuletzt v22), Commit auf `main` → GitHub Pages ist nach ca. 1 Min. live.
 - Tests: `stallwache/tests/` (simulierte LOGO per Modbus, Fake-Supabase). `python3 test_real.py` testet die echte Belegung.
 - Alle Apps teilen sich ein Login. Wer schon bei Florian HQ, H&E Hub oder Alarmstufe Pink ist, meldet sich an, statt sich zu registrieren.
 - Kostenloser Supabase-Mailversand: nur wenige Mails pro Stunde.

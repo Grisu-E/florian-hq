@@ -439,3 +439,7 @@ revoke execute on function public.hs_bridge_sync(text, jsonb, jsonb), public.hs_
 -- Tabelle public.hs_geraete (kein direkter Zugriff), Schlüssel in fhq_private.hs_keys (nur serverseitig)
 -- RPCs: hs_geraete_liste() [view: ohne Passwort], hs_geraete_passwort(k) [edit], hs_geraete_speichern(k, ip, benutzer, passwort, notiz) [edit]
 -- Passwort: pgp_sym_encrypt mit fhq_private.hs_keys.geraete_key; NULL = unverändert, '' = löschen
+
+-- Nur bekannte Geräte im Netzwerkbild zulassen
+alter table public.hs_geraete drop constraint if exists hs_geraete_key_check;
+alter table public.hs_geraete add constraint hs_geraete_key_check check (key in ('fritzbox','switch','pi','zyxel_innen','zyxel_balkon','cpe_haus','cpe_stall','linksys','logo','kamera'));

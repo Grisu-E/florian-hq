@@ -1078,19 +1078,20 @@ function geraetDialog(n) {
   const show = m.querySelector('#gdShow');
   if (show) show.onclick = async () => {
     const inp = m.querySelector('#gdPw');
-    if (inp.type === 'text' && inp.value) { inp.type = 'password'; inp.value = ''; show.textContent = '👁 Zeigen'; return; }
+    const verbergen = () => { inp.type = 'password'; if (inp.value === inp.dataset.orig) inp.value = ''; show.textContent = '👁 Zeigen'; };
+    if (inp.type === 'text') return verbergen();
     const { data, error } = await sb.rpc('hs_geraete_passwort', { k: n.k }); if (error) return err(error);
-    inp.type = 'text'; inp.value = data || ''; show.textContent = '🙈 Verbergen';
-    setTimeout(() => { if (document.body.contains(inp) && inp.type === 'text') { inp.type = 'password'; inp.value = ''; show.textContent = '👁 Zeigen'; } }, 30000);
+    inp.dataset.orig = data || ''; inp.type = 'text'; inp.value = data || ''; show.textContent = '🙈 Verbergen';
+    setTimeout(() => { if (document.body.contains(inp) && inp.type === 'text') verbergen(); }, 30000);
   };
   const save = m.querySelector('[data-s]');
   if (save) save.onclick = async () => {
     const ip = m.querySelector('#gdIp').value.trim(), pwIn = m.querySelector('#gdPw').value;
     if (ip && !/^[0-9A-Za-z.:\-]{1,60}$/.test(ip)) return toast('IP-Adresse ungültig');
     const del = m.querySelector('#gdDel')?.checked;
-    const shown = m.querySelector('#gdPw').type === 'text';
-    const pw = del ? '' : pwIn ? pwIn : null;
-    const { error } = await sb.rpc('hs_geraete_speichern', { k: n.k, p_ip: ip, p_benutzer: m.querySelector('#gdUser').value, p_passwort: shown && !del && pwIn ? pwIn : pw, p_notiz: m.querySelector('#gdNote').value });
+    const orig = m.querySelector('#gdPw').dataset.orig;
+    const pw = del ? '' : (pwIn && pwIn !== orig) ? pwIn : null;
+    const { error } = await sb.rpc('hs_geraete_speichern', { k: n.k, p_ip: ip, p_benutzer: m.querySelector('#gdUser').value, p_passwort: pw, p_notiz: m.querySelector('#gdNote').value });
     if (error) return err(error);
     m.remove(); toast('Gespeichert ✅'); paintNetzwerk();
   };
